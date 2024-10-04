@@ -1,9 +1,11 @@
+const jwt = require('jsonwebtoken');
+const passport = require('passport');
+const AppleStrategy = require('passport-apple');
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
-const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const {
   isValidEmail,
@@ -356,6 +358,78 @@ const userSignin = async (req, res) => {
   }
 };
 
+
+// ---------------apple signin---------------------------------
+
+// Configure Apple Strategy
+passport.use(new AppleStrategy({
+  clientID: process.env.APPLE_CLIENT_ID,
+  teamID: process.env.APPLE_TEAM_ID,
+  callbackURL: process.env.APPLE_CALLBACK_URL,
+  keyID: process.env.APPLE_KEY_ID,
+  privateKeyLocation: process.env.APPLE_PRIVATE_KEY_LOCATION,
+  passReqToCallback: true
+}, async function(req, accessToken, refreshToken, idToken, profile, cb) {
+  try {
+      const decodedToken = jwt.decode(idToken);
+      const appleUserId = decodedToken.sub;
+      
+      let user = await User.findOne({ where: { appleUserId: appleUserId } });
+      
+      if (!user) {
+          // Create a new user if not found
+          user = await User.create({
+              appleUserId: appleUserId,
+              email: decodedToken.email,
+              isEmailVerified: true, // Apple has verified the email
+              // Add other necessary fields
+          });
+      }
+      
+      return cb(null, user);
+  } catch (error) {
+      return cb(error);
+  }
+}));
+
+// Apple Sign In route
+const appleSignIn = (req, res, next) => {
+  passport.authenticate('apple')(req, res, next);
+};
+
+// Apple Sign In callback
+const appleSignInCallback = (req, res, next) => {
+  passport.authenticate('apple', function(err, user, info) {
+      if (err) {
+          if (err == "AuthorizationError") {
+              return res.status(401).json({ message: "Authorization failed. Please try signing in again." });
+          } else if (err == "TokenError") {
+              return res.status(401).json({ message: "Failed to get a valid token from Apple's servers." });
+          } else {
+              return res.status(500).json({ message: "An error occurred during authentication." });
+          }
+      }
+      
+      if (!user) {
+          return res.status(401).json({ message: "Authentication failed." });
+      }
+      
+      // Generate JWT token for the user
+      const token = generateToken({ type: "USER", obj: user });
+      
+      res.json({
+          success: true,
+          message: "Apple Sign In successful",
+          user: {
+              id: user.id,
+              email: user.email,
+              // Add other user fields as needed
+          },
+          token: token
+      });
+  })(req, res, next);
+};
+
 // ---------------FORGET PASSWORD-----------------------------------------------------
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
@@ -580,6 +654,8 @@ module.exports = {
   userSignup,
   sendOtp,
   emailOtpVerification,
+  appleSignIn,
+  appleSignInCallback,
   userSignin,
   forgotPassword,
   resetPassword
