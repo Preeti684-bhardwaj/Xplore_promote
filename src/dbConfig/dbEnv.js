@@ -1,18 +1,18 @@
-require("dotenv").config({path:"../../.env"})
+require("dotenv").config({ path: "../.env" });
 
 const env = {
-  database:process.env.DATABASE,
-  username:process.env.USERNAME,
-  password:process.env.PASSWORD,
-  host:process.env.HOST,
-  dialect:process.env.DIALECT,
+  database: process.env.DATABASE,
+  username: process.env.USERNAME,
+  password: process.env.PASSWORD,
+  host: process.env.HOST,
+  dialect: process.env.DIALECT,
   pool: {
     max: 15,
     min: 0,
     acquire: 90000,
-    idle: 30000
+    idle: 30000,
   },
-port:5432
+  port: 5432,
 };
 
 module.exports = env;

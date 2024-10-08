@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
 const passport = require('passport');
 const AppleStrategy = require('passport-apple');
+const jwt = require('jsonwebtoken');
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const bcrypt = require("bcrypt");
@@ -24,411 +24,82 @@ const generateToken = (user) => {
 const OTP_VALIDITY = 15 * 60;
 
 // Generate OTP
-const generateOtp = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
+// const generateOtp = () => {
+//   return Math.floor(100000 + Math.random() * 900000).toString();
+// };
 
 // Helper function to generate API key
 // const generateApiKey = () => {
 //   return crypto.randomBytes(32).toString("hex");
 // };
 
-// -----------------USER SIGNUP-----------------------------------------------------
-const userSignup = async (req, res) => {
-  try {
-    const { name: rawName, phone, email, password } = req.body;
-
-    // Validate input fields
-    if (!rawName) {
-      return res.status(400).send({
-        success: false,
-        message: "Name is missing",
-      });
-    }
-    if (!phone) {
-      return res.status(400).send({
-        success: false,
-        message: "Phone is missing",
-      });
-    }
-    if (!email) {
-      return res.status(400).send({
-        success: false,
-        message: "Email is missing",
-      });
-    }
-    if (!password) {
-      return res.status(400).send({
-        success: false,
-        message: "Password is missing",
-      });
-    }
-
-    // Sanitize name: trim and reduce multiple spaces to a single space
-    const name = rawName.trim().replace(/\s+/g, " ");
-
-    // Validate input fields again to check if they are empty strings
-    if ([name, phone, email, password].some((field) => field === "")) {
-      return res.status(400).send({
-        success: false,
-        message: "Please provide all necessary fields",
-      });
-    }
-
-    // Validate name
-    const nameError = isValidLength(name);
-    if (nameError) {
-      return res.status(400).send({ success: false, message: nameError });
-    }
-
-    // Validate email format
-    if (!isValidEmail(email)) {
-      return res.status(400).send({ message: "Invalid email" });
-    }
-
-    // Convert the email to lowercase for case-insensitive comparison
-    const lowercaseEmail = email.toLowerCase();
-
-    // Check for existing user with the provided email or phone
-    const existingUser = await User.findOne({
-      where: {
-        [Op.or]: [{ email: lowercaseEmail }, { phone: phone }],
-      },
-    });
-
-    if (existingUser) {
-      if (existingUser.isEmailVerified) {
-        // If the user is already verified, block the attempt to create a new account
-        if (
-          existingUser.email.toLowerCase() === lowercaseEmail &&
-          existingUser.phone === phone
-        ) {
-          return res.status(400).send({ message: "Account already exists" });
-        } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
-          return res.status(400).send({ message: "Email already in use" });
-        } else {
-          return res
-            .status(400)
-            .send({ message: "Phone number already in use" });
-        }
-      }
-      //  else {
-      //   // Update the existing user's record with the new email and generate a new verification token
-      //   existingUser.email = lowercaseEmail;
-      //   existingUser.emailToken = generateToken({ email: lowercaseEmail });
-      //   await existingUser.save();
-      // }
-    }
-
-    // If no existing user found, validate the password and create a new user
-    const passwordValidationResult = isValidPassword(password);
-    if (passwordValidationResult) {
-      return res.status(400).send({
-        success: false,
-        message: passwordValidationResult,
-      });
-    }
-    // const hashedPassword = await bcrypt.hash(password, 10);
-    // Generate a verification token
-    // const emailToken = generateToken({ email: lowercaseEmail });
-
-    // Temporarily store minimal data in the User table
-    // const user = await User.create({
-    //   email: lowercaseEmail,
-    //   emailToken,
-    //   isEmailVerified: false, // Set verified status to false
-    // });
-
-    res.status(201).send({
-      success: true,
-      message: "Signup successful. Please verify your email.",
-    });
-  } catch (error) {
-    return res.status(500).send({
-      success: false,
-      message: error.message || "Some error occurred during signup.",
-    });
-  }
-};
-
-// ----------------Send OTP-----------------------------
-
-const sendOtp = async (req, res) => {
-  const { email } = req.body;
-
-  if (!email || !isValidEmail(email)) {
-    return res.status(400).send({ message: "Invalid or missing email" });
-  }
-
-  const otp = generateOtp();
-  const expirationTime = Date.now() + OTP_VALIDITY * 1000;
-
-  // Create a token with the email, OTP, and expiration time
-  const token = jwt.sign(
-    {
-      email,
-      otp,
-      expirationTime,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: `${OTP_VALIDITY}s` }
-  );
-
-  // Create HTML content for the email
-  //   <img src="https://stream.xircular.io/AIengage.png" alt="AI Engage Logo" style="max-width: 200px; margin-bottom: 20px;">
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>One-Time Password (OTP) for Verification</h2>
-      <p>Hello,</p>
-      <p>Your One Time Password (OTP) for Xplore Promote is:</p>
-      <h1 style="font-size: 32px; background-color: #f0f0f0; padding: 10px; display: inline-block;">${otp}</h1>
-      <p>This OTP is valid for 15 minutes.</p>
-      <p>If you didn't request this OTP, please ignore this email.</p>
-      <p>Best regards,<br>Xplore Promote Team</p>
-    </div>
-  `;
-
-  try {
-    await sendEmail({
-      email: email,
-      subject: `Xplore Promote: Your One-Time Password (OTP) for Verification`,
-      html: htmlContent,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `OTP sent to ${email} successfully`,
-      token: token,
-    });
-  } catch (emailError) {
-    console.error("Failed to send OTP email:", emailError);
-    return res.status(500).send(emailError.message);
-  }
-};
-
-// ---------------------Email OTP Verification------------------------------
-
-const emailOtpVerification = async (req, res) => {
-  const { Otp, name, phone, password } = req.body;
-  const token = req.headers["token"];
-  if (!token) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Token is required." });
-  }
-  if (!Otp) {
-    return res
-      .status(400)
-      .json({ success: false, message: "OTP is required." });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { email, otp, expirationTime } = decoded;
-
-    // Check if OTP has expired
-    if (Date.now() > expirationTime) {
-      return res
-        .status(400)
-        .json({ success: false, message: "OTP has expired." });
-    }
-
-    // Verify OTP
-    if (Otp !== otp) {
-      return res.status(400).json({ success: false, message: "Invalid OTP." });
-    }
-
-    // OTP is valid, proceed with user verification or registration
-    const lowercaseEmail = email.toLowerCase();
-
-    // Check if user already exists
-    let user = await User.findOne({ where: { email: lowercaseEmail } });
-
-    if (user) {
-      // Update existing user
-      user.isEmailVerified = true;
-      await user.save();
-    } else {
-      // Create new user
-      const hashedPassword = await bcrypt.hash(password, 10);
-      user = await User.create({
-        name: name.trim().replace(/\s+/g, " "),
-        phone: phone,
-        email: lowercaseEmail,
-        password: hashedPassword,
-        isEmailVerified: true,
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Email verified and user details saved successfully.",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        isEmailVerified: user.isEmailVerified,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Server Error",
-      error: error.message,
-    });
-  }
-};
-// -----------------USER SIGNIN-----------------------------------------------------
-const userSignin = async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    if (!email) {
-      return res
-        .status(400)
-        .send({ success: false, message: "email is missing" });
-    }
-
-    if (!password) {
-      return res
-        .status(400)
-        .send({ success: false, message: "password is missing" });
-    }
-    const user = await User.findOne({ where: { email } });
-    console.log("User Found:", user); // Debugging log
-    if (!user) {
-      return res
-        .status(404)
-        .send({ success: false, message: "User not found." });
-    }
-    //if (!user.IsActivated) {
-    //    return res.status(401).json({ message: "User not found" });
-    //}
-    if (!user.isEmailVerified) {
-      return res.status(401).json({ message: "Email not verified" });
-    }
-    console.log("password coming", password);
-    console.log("logging stored hashed password", user.password);
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    console.log("Password Valid:", isPasswordValid); // Debugging log
-
-    if (!isPasswordValid) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Invalid password." });
-    }
-
-    const obj = {
-      type: "USER",
-      obj: user,
-    };
-    // let apiKey = user.api_key;
-    // if (!apiKey) {
-    //   // Generate API key
-    //   apiKey = generateApiKey();
-    //   // Update the user record with the new API key
-    //   await user.update({ api_key: apiKey });
-    // }
-    // const options = {
-    //   expires: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-    //   httpOnly: false,
-    //   secure: true,
-    //   sameSite: "none",
-    //   path: "/",
-    // };
-    //  generate token
-    const token = generateToken(obj);
-    // res.cookie("access_token", token, options);
-    // console.log("i am from signin", req.cookies);
-    res.status(200).json({
-      success: true,
-      message: "login successfully",
-      id: user.id,
-      email: user.email,
-      token: token,
-      //   api_key: apiKey,
-      // Add additional fields as necessary
-    });
-  } catch (error) {
-    return res.status(500).send({
-      success: false,
-      message: error.message || "Some error occurred during signin.",
-    });
-  }
-};
-
-
 // ---------------apple signin---------------------------------
-
 // Configure Apple Strategy
-passport.use(new AppleStrategy({
-  clientID: process.env.APPLE_CLIENT_ID,
-  teamID: process.env.APPLE_TEAM_ID,
-  callbackURL: process.env.APPLE_CALLBACK_URL,
-  keyID: process.env.APPLE_KEY_ID,
-  privateKeyLocation: process.env.APPLE_PRIVATE_KEY_LOCATION,
-  passReqToCallback: true
-}, async function(req, accessToken, refreshToken, idToken, profile, cb) {
-  try {
-      const decodedToken = jwt.decode(idToken);
-      const appleUserId = decodedToken.sub;
-      
-      let user = await User.findOne({ where: { appleUserId: appleUserId } });
-      
-      if (!user) {
-          // Create a new user if not found
-          user = await User.create({
-              appleUserId: appleUserId,
-              email: decodedToken.email,
-              isEmailVerified: true, // Apple has verified the email
-              // Add other necessary fields
-          });
-      }
-      
-      return cb(null, user);
-  } catch (error) {
-      return cb(error);
-  }
-}));
+// passport.use(new AppleStrategy({
+//   clientID: process.env.APPLE_CLIENT_ID,
+//   teamID: process.env.APPLE_TEAM_ID,
+//   callbackURL: process.env.APPLE_CALLBACK_URL,
+//   keyID: process.env.APPLE_KEY_ID,
+//   privateKeyLocation: process.env.APPLE_PRIVATE_KEY_LOCATION,
+//   passReqToCallback: true
+// }, async function(req, accessToken, refreshToken, idToken, profile, cb) {
+//   try {
+//     const decodedToken = jwt.decode(idToken);
+//     const appleUserId = decodedToken.sub;
+    
+//     let user = await User.findOne({ where: { appleUserId: appleUserId } });
+    
+//     if (!user) {
+//       // Create a new user if not found
+//       user = await User.create({
+//         appleUserId: appleUserId,
+//         email: decodedToken.email,
+//         name: decodedToken.name ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}` : null,
+//         isEmailVerified: true, // Apple has verified the email
+//         authProvider: 'apple',
+//         IsActive: true,
+//       });
+//     }
+    
+//     return cb(null, user);
+//   } catch (error) {
+//     return cb(error);
+//   }
+// }));
 
-// Apple Sign In route
-const appleSignIn = (req, res, next) => {
-  passport.authenticate('apple')(req, res, next);
-};
+// // Apple Sign In route
+// const appleSignIn = (req, res, next) => {
+//   passport.authenticate('apple')(req, res, next);
+// };
 
-// Apple Sign In callback
-const appleSignInCallback = (req, res, next) => {
-  passport.authenticate('apple', function(err, user, info) {
-      if (err) {
-          if (err == "AuthorizationError") {
-              return res.status(401).json({ message: "Authorization failed. Please try signing in again." });
-          } else if (err == "TokenError") {
-              return res.status(401).json({ message: "Failed to get a valid token from Apple's servers." });
-          } else {
-              return res.status(500).json({ message: "An error occurred during authentication." });
-          }
-      }
-      
-      if (!user) {
-          return res.status(401).json({ message: "Authentication failed." });
-      }
-      
-      // Generate JWT token for the user
-      const token = generateToken({ type: "USER", obj: user });
-      
-      res.json({
-          success: true,
-          message: "Apple Sign In successful",
-          user: {
-              id: user.id,
-              email: user.email,
-              // Add other user fields as needed
-          },
-          token: token
-      });
-  })(req, res, next);
-};
+// // Apple Sign In callback
+// const appleSignInCallback = (req, res, next) => {
+//   passport.authenticate('apple', function(err, user, info) {
+//     if (err) {
+//       console.error('Apple Sign In Error:', err);
+//       return res.status(500).json({ success: false, message: "An error occurred during authentication." });
+//     }
+    
+//     if (!user) {
+//       return res.status(401).json({ success: false, message: "Authentication failed." });
+//     }
+    
+//     // Generate JWT token for the user
+//     const token = generateToken({ type: "USER", obj: user });
+    
+//     res.status(200).json({
+//       success: true,
+//       message: "Apple Sign In successful",
+//       user: {
+//         id: user.id,
+//         email: user.email,
+//         name: user.name,
+//         authProvider: user.authProvider,
+//       },
+//       token: token
+//     });
+//   })(req, res, next);
+// };
 
 // ---------------FORGET PASSWORD-----------------------------------------------------
 const forgotPassword = async (req, res) => {
@@ -651,12 +322,12 @@ const resetPassword = async (req, res) => {
 // });
 
 module.exports = {
-  userSignup,
-  sendOtp,
-  emailOtpVerification,
-  appleSignIn,
-  appleSignInCallback,
-  userSignin,
+  // userSignup,
+  // sendOtp,
+  // emailOtpVerification,
+  // appleSignIn,
+  // appleSignInCallback,
+  // userSignin,
   forgotPassword,
   resetPassword
 //   getUserById,
