@@ -19,7 +19,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.urlencoded({ extended: true }));
 
 // Initialize Passport
-app.use(passport.initialize());
+// app.use(passport.initialize());
 
 // Routes Imports
 const userRouter = require("./Routes/userRoutes");
