@@ -3,6 +3,7 @@ const AppleStrategy = require('passport-apple');
 const jwt = require('jsonwebtoken');
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
+const axios = require('axios');
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
@@ -68,38 +69,56 @@ const OTP_VALIDITY = 15 * 60;
 // }));
 
 // // Apple Sign In route
-// const appleSignIn = (req, res, next) => {
-//   passport.authenticate('apple')(req, res, next);
-// };
+const handleSIWALogin = async (req, res) => {
+  const authorizationCode = req.body.token; // 1
+  
+  // Prepare the request body as URL-encoded string
+  const body = new URLSearchParams({
+    client_id: process.env.APPLE_CLIENT_ID,
+    client_secret:process.env.APPLE_TEAM_ID,
+    code: authorizationCode,
+    grant_type: 'authorization_code'
+  }).toString();
 
-// // Apple Sign In callback
-// const appleSignInCallback = (req, res, next) => {
-//   passport.authenticate('apple', function(err, user, info) {
-//     if (err) {
-//       console.error('Apple Sign In Error:', err);
-//       return res.status(500).json({ success: false, message: "An error occurred during authentication." });
-//     }
-    
-//     if (!user) {
-//       return res.status(401).json({ success: false, message: "Authentication failed." });
-//     }
-    
-//     // Generate JWT token for the user
-//     const token = generateToken({ type: "USER", obj: user });
-    
-//     res.status(200).json({
-//       success: true,
-//       message: "Apple Sign In successful",
-//       user: {
-//         id: user.id,
-//         email: user.email,
-//         name: user.name,
-//         authProvider: user.authProvider,
-//       },
-//       token: token
-//     });
-//   })(req, res, next);
-// };
+  try {
+    // Make a POST request to Apple’s API to exchange authorization code for tokens
+    const response = await axios.post('https://appleid.apple.com/auth/token', body, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    }); // 2
+
+    const data = response.data; // 3
+    const idToken = data.id_token;
+
+    // Decode the ID token to get the user’s information
+    const base64Payload = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payloadBuffer = Buffer.from(base64Payload, 'base64');
+    const payload = JSON.parse(payloadBuffer.toString()); // 4
+
+    // Check if payload contains an email
+    if (payload.email) {
+      return res.status(200).send({status:true , data:payload})
+      // return createOrLogUser(payload, res); // 5
+    } else {
+      return respondWithError("Could not authenticate with this token", res);
+    }
+  } catch (error) {
+    console.error('Error during SIWA login:', error.message);
+    return respondWithError(error.message, res); // 6
+  }
+};
+
+// Function to create a new user or log in an existing user based on the payload
+function createOrLogUser(payload, res) {
+  const token = generateToken({ type: "USER", obj: user });
+  // Implement the logic to create or find a user based on the payload (e.g., using payload.email)
+  // For demonstration purposes, we'll just return a success response
+  return res.json({ success: true, message: 'User authenticated successfully', user: payload , token:token});
+}
+
+// Function to respond with an error message
+function respondWithError(message, res) {
+  return res.status(400).json({ success: false, error: message });
+}
 
 // ---------------FORGET PASSWORD-----------------------------------------------------
 const forgotPassword = async (req, res) => {
@@ -328,6 +347,7 @@ module.exports = {
   // appleSignIn,
   // appleSignInCallback,
   // userSignin,
+  handleSIWALogin,
   forgotPassword,
   resetPassword
 //   getUserById,

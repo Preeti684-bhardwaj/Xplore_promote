@@ -2,7 +2,7 @@ require("dotenv").config({ path: "../.env" });
 
 const env = {
   database: process.env.DATABASE,
-  username: process.env.USERNAME,
+  username: 'postgres',
   password: process.env.PASSWORD,
   host: process.env.HOST,
   dialect: process.env.DIALECT,

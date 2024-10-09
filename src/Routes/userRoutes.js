@@ -2,14 +2,13 @@ const express = require("express");
 const router = express.Router();
 const {
     // appleSignIn,
-    // appleSignInCallback,
+    handleSIWALogin,
     forgotPassword,
     resetPassword,
 } = require("../Controller/userController");
 
 // Apple Sign In routes
-// router.get("/auth/apple", appleSignIn);
-// router.post("/auth/apple/callback", appleSignInCallback);
+router.post('/tokensignin', handleSIWALogin);
 router.post("/forgotpassword", forgotPassword);
 router.post("/resetpassword/:token", resetPassword);
 
