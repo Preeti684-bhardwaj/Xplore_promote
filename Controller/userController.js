@@ -69,9 +69,10 @@ const OTP_VALIDITY = 15 * 60;
 // }));
 
 // // Apple Sign In route
+
 const handleSIWALogin = async (req, res) => {
   const authorizationCode = req.body.token; // 1
-  
+
   // Prepare the request body as URL-encoded string
   const body = new URLSearchParams({
     client_id: process.env.APPLE_CLIENT_ID,
