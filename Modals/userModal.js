@@ -29,6 +29,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         unique: true,
       },
+      googleUserId:{
+        type: DataTypes.STRING,
+        unique: true,
+      },
       authProvider: {
         type: DataTypes.ENUM('local', 'apple','google'),
         defaultValue: 'local',

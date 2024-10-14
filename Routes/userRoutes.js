@@ -12,7 +12,7 @@ const {
     deleteUser
 } = require("../Controller/userController");
 const {appleLogin,applePhone}=require('../Controller/appleSigin')
-
+const {googleLogin,googlePhone}=require('../Controller/googleSignin')
 const { verifyJWt } = require("../middleware/auth");
 
 
@@ -28,5 +28,9 @@ router.delete('/deleteUser',deleteUser)
 // Apple Sign In routes
 router.post('/appleSignin', appleLogin);
 router.post('/apple/phone',verifyJWt,applePhone)
+
+// Google Sign In routes
+router.post('/googleSignin', googleLogin);
+router.post('/google/phone',verifyJWt,googlePhone)
 
 module.exports = router;
