@@ -9,9 +9,9 @@ const {
     sendOtp,
     getUserById,
     updateUser,
-    deleteUser,
-    handleSIWALogin
+    deleteUser
 } = require("../Controller/userController");
+const {appleLogin,applePhone}=require('../Controller/appleSigin')
 
 const { verifyJWt } = require("../middleware/auth");
 
@@ -26,6 +26,7 @@ router.get("/getById/:id",getUserById)
 router.put('/updateUser',verifyJWt,updateUser)
 router.delete('/deleteUser',deleteUser)
 // Apple Sign In routes
-router.post('/tokensignin', handleSIWALogin);
+router.post('/appleSignin', appleLogin);
+router.post('/apple/phone',verifyJWt,applePhone)
 
 module.exports = router;

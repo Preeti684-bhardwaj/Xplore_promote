@@ -25,14 +25,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
-      // appleUserId: {
-      //   type: DataTypes.STRING,
-      //   unique: true,
-      // },
-      // authProvider: {
-      //   type: DataTypes.ENUM('local', 'apple'),
-      //   defaultValue: 'local',
-      // },
+      appleUserId: {
+        type: DataTypes.STRING,
+        unique: true,
+      },
+      authProvider: {
+        type: DataTypes.ENUM('local', 'apple','google'),
+        defaultValue: 'local',
+      },
       createdAt: DataTypes.DATE,
       updatedAt: DataTypes.DATE,
     });
