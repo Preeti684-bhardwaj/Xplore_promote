@@ -26,24 +26,12 @@ const generateToken = (user) => {
 const appleLogin = async (req, res) => {
     try {
         // Check if the Authorization header exists
-        const authHeader = req.headers['authorization'];
-        if (!authHeader) {
-          return res.status(401).json({ status: false, error: "Missing Authorization header" });
-        }
-    
-        // Check if it's a Bearer token
-        const parts = authHeader.split(' ');
-        if (parts.length !== 2 || parts[0] !== 'Bearer') {
-          return res.status(401).json({ status: false, error: "Invalid Authorization header format" });
-        }
-    
-        const idToken = parts[1];
-    
+        const idToken = req.headers["authorization"];
+        console.log(idToken);
         // Check if idToken is provided
-        if (!idToken) {
-          return res.status(401).json({ status: false, error: "Missing identity token" });
+        if (!idToken || idToken === "null") {
+            return res.status(401).send({ message: "No idToken provided." });
         }
-    
     let decodedToken;
     try {
       decodedToken = jwt.decode(idToken);

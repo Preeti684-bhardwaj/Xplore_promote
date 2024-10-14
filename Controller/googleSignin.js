@@ -39,12 +39,13 @@ const generateToken = (user) => {
 
 const googleLogin = async (req, res) => {
   try {
-    const { idToken } = req.body;
-
-    if (!idToken) {
-      return res.status(400).json({ status: false, error: "Missing idToken" });
+    // Check if the Authorization header exists
+    const idToken = req.headers["authorization"];
+    console.log(idToken);
+    // Check if idToken is provided
+    if (!idToken || idToken === "null") {
+        return res.status(401).send({ message: "No idToken provided." });
     }
-
     const response = await verifyGoogleLogin(idToken);
     if (!response) {
       return res.status(401).json({ status: false, error: "Failed to verify Google token" });
@@ -63,7 +64,6 @@ const googleLogin = async (req, res) => {
 
       try {
         user = await User.create({
-          googleUserId: response.sub,
           email: response.email || null,
           name: response.name || null,
           isEmailVerified: response.email_verified || false,
