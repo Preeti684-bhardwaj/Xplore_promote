@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
-const axios = require('axios');
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");

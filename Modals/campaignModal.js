@@ -1,53 +1,57 @@
 // module.exports = (sequelize, DataTypes) => {
-//   const Campaign = sequelize.define("Campaign", {
-//     campaignID: {
+//   const Campaign = sequelize.define(
+//     "Campaign",
+//     {
+//       campaignID: {
 //         type: DataTypes.UUID,
 //         primaryKey: true,
-//         defaultValue: DataTypes.UUIDV4
-//     },
-//     name: {
+//         defaultValue: DataTypes.UUIDV4,
+//       },
+//       name: {
 //         type: DataTypes.STRING,
-//         allowNull: false
+//         allowNull: false,
 //       },
 //       description: {
-//         type: DataTypes.TEXT
+//         type: DataTypes.TEXT,
 //       },
 //       images: {
-//         type: DataTypes.ARRAY(DataTypes.STRING)
+//         type: DataTypes.ARRAY(DataTypes.STRING),
 //       },
 //       createdBy: {
-//         type: DataTypes.STRING
+//         type: DataTypes.STRING,
 //       },
 //       createdDate: {
-//         type: DataTypes.DATE
+//         type: DataTypes.DATE,
 //       },
 //       lastModifiedBy: {
-//         type: DataTypes.STRING
+//         type: DataTypes.STRING,
 //       },
 //       lastModifiedDate: {
-//         type: DataTypes.DATE
+//         type: DataTypes.DATE,
 //       },
 //       timing: {
-//         type: DataTypes.JSON
+//         type: DataTypes.JSON,
 //       },
 //       status: {
-//         type: DataTypes.JSON
+//         type: DataTypes.JSON,
 //       },
 //       performance: {
-//         type: DataTypes.JSON
+//         type: DataTypes.JSON,
 //       },
 //       socialMediaLinks: {
-//         type: DataTypes.JSON
+//         type: DataTypes.JSON,
 //       },
 //       contactInfo: {
-//         type: DataTypes.JSON
+//         type: DataTypes.JSON,
 //       },
 //       siteInfo: {
-//         type: DataTypes.JSON
-//       }
-//     }, {
-//       timestamps: false // Disable automatic createdAt and updatedAt fields
-//     });
-  
-//     return Campaign;
-//   };
+//         type: DataTypes.JSON,
+//       },
+//     },
+//     {
+//       timestamps: false, // Disable automatic createdAt and updatedAt fields
+//     }
+//   );
+
+//   return Campaign;
+// };

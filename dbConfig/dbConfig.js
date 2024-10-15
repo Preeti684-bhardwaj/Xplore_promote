@@ -15,7 +15,10 @@ const sequelize = new Sequelize(env.database, env.username, env.password, {
     idle: env.pool.idle,
   },
   dialectOptions: {
-    ssl: false
+    ssl: {
+      require: true,
+      rejectUnauthorized: false 
+    }
   }
 });
 
@@ -26,6 +29,7 @@ db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
+db.campaigns=require("../Modals/campaignModal.js")(sequelize,Sequelize)
 
 
 // Relationships
