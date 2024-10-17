@@ -1,6 +1,8 @@
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const db = require("../dbConfig/dbConfig.js");
+require("dotenv").config();
+const {CLIENT_ID} = process.env
 const User = db.users;
 const { OAuth2Client } = require('google-auth-library');
 
@@ -11,20 +13,18 @@ const {
   isValidLength,
 } = require("../utils/validation.js");
 
-const CLIENT_ID = process.env.CLIENT_ID;
 const googleClient = new OAuth2Client({
-  clientId: CLIENT_ID
+  clientId: process.env.CLIENT_ID
 });
 
 async function verifyGoogleLogin(idToken) {
   try {
     const ticket = await googleClient.verifyIdToken({
-      audience: CLIENT_ID,
-      idToken: idToken
-    });
-    const payload = ticket.getPayload();
-    console.log(payload);
-    return payload;
+      idToken: idToken,
+      audience: CLIENT_ID
+  });
+  const payload = ticket.getPayload();
+  return payload
   } catch (error) {
     console.error("Error verifying Google token:", error);
     return null;
@@ -39,45 +39,94 @@ const generateToken = (user) => {
 
 const googleLogin = async (req, res) => {
   try {
-    // Check if the Authorization header exists
-    const idToken = req.headers["authorization"];
-    console.log(idToken);
-    // Check if idToken is provided
+    // Get token from Authorization header and remove 'Bearer ' if present
+    const authHeader = req.headers["authorization"];
+    const idToken = authHeader?.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : authHeader;
+
     if (!idToken || idToken === "null") {
-        return res.status(401).send({ message: "No idToken provided." });
-    }
-    const response = await verifyGoogleLogin(idToken);
-    if (!response) {
-      return res.status(401).json({ status: false, error: "Failed to verify Google token" });
-    }
-
-    if (!response.sub) {
-      return res.status(400).json({ status: false, error: "Invalid Google user ID" });
+      return res.status(401).json({ 
+        status: false, 
+        error: "No authentication token provided" 
+      });
     }
 
-    let user = await User.findOne({ where: { googleUserId: response.sub } });
+    let googlePayload;
+    try {
+      googlePayload = await verifyGoogleLogin(idToken);
+    } catch (error) {
+      if (error.message.includes('Token used too late')) {
+        return res.status(401).json({
+          status: false,
+          error: "Authentication token has expired. Please login again."
+        });
+      }
+      return res.status(401).json({
+        status: false,
+        error: "Invalid authentication token"
+      });
+    }
+
+    if (!googlePayload?.sub) {
+      return res.status(400).json({ 
+        status: false, 
+        error: "Invalid Google account information" 
+      });
+    }
+
+    // Try to find user by Google ID or email
+    let user = await User.findOne({ 
+      where: {
+        [db.Sequelize.Op.or]: [
+          { googleUserId: googlePayload.sub },
+          { email: googlePayload.email }
+        ]
+      }
+    });
 
     if (!user) {
-      if (response.email && !isValidEmail(response.email)) {
-        return res.status(400).json({ status: false, error: "Invalid email format" });
+      // Validate email if present
+      if (googlePayload.email && !isValidEmail(googlePayload.email)) {
+        return res.status(400).json({ 
+          status: false, 
+          error: "Invalid email format from Google account" 
+        });
       }
 
       try {
+        // Create new user
         user = await User.create({
-          email: response.email || null,
-          name: response.name || null,
-          isEmailVerified: response.email_verified || false,
+          email: googlePayload.email,
+          name: googlePayload.name,
+          googleUserId: googlePayload.sub,
+          isEmailVerified:true,
           authProvider: "google",
-          IsActive: true,
+          IsActive: true
         });
       } catch (error) {
         console.error("Error creating user:", error);
-        return res.status(500).json({ status: false, error: "Failed to create user" });
+        if (error.name === 'SequelizeUniqueConstraintError') {
+          return res.status(409).json({ 
+            status: false, 
+            error: "Account already exists with this email" 
+          });
+        }
+        throw error;
       }
+    } else {
+      // Update existing user's Google information
+      await user.update({
+        googleUserId: googlePayload.sub,
+        name: user.name || googlePayload.name
+      });
     }
 
     if (!user.IsActive) {
-      return res.status(403).json({ status: false, error: "User account is inactive" });
+      return res.status(403).json({ 
+        status: false, 
+        error: "This account has been deactivated" 
+      });
     }
 
     const obj = {
@@ -93,12 +142,18 @@ const googleLogin = async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        picture: user.picture,
+        isEmailVerified: user.isEmailVerified,
+        phone: user.phone
       },
       token: accessToken,
     });
   } catch (error) {
     console.error("Google login error:", error);
-    res.status(500).json({ status: false, error: "Internal server error" });
+    res.status(500).json({ 
+      status: false, 
+      error: "An error occurred during login. Please try again later." 
+    });
   }
 };
 

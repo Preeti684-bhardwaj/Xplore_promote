@@ -18,15 +18,19 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize Passport
-// app.use(passport.initialize());
 
 // Routes Imports
 const userRouter = require("./Routes/userRoutes");
 const notificationRouter=require("./Routes/notificationRoutes")
+const campaignRouter=require('./Routes/campaignRoutes')
+const advertisementRouter=require('./Routes/advertisementRoutes')
+const layoutRouter=require('./Routes/layoutRoutes')
 
 // Routes declaration
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/apple",notificationRouter)
+app.use("/api/v1/campaign",campaignRouter)
+app.use("/api/v1/advertisement",advertisementRouter)
+app.use("/api/v1/layout",layoutRouter)
 
 module.exports = app;
