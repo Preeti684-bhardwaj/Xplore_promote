@@ -14,7 +14,10 @@ const sequelize = new Sequelize(env.database, env.username, env.password, {
     idle: env.pool.idle,
   },
   dialectOptions: {
-    ssl:false
+    ssl: {
+      require: true,
+      rejectUnauthorized: false // Use this if you're using a self-signed certificate
+    }
   }
 });
 
