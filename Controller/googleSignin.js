@@ -1,6 +1,8 @@
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const db = require("../dbConfig/dbConfig.js");
+require("dotenv").config();
+const {CLIENT_ID} = process.env
 const User = db.users;
 const { OAuth2Client } = require('google-auth-library');
 
@@ -11,20 +13,18 @@ const {
   isValidLength,
 } = require("../utils/validation.js");
 
-const CLIENT_ID = process.env.CLIENT_ID;
 const googleClient = new OAuth2Client({
-  clientId: CLIENT_ID
+  clientId: process.env.CLIENT_ID
 });
 
 async function verifyGoogleLogin(idToken) {
   try {
     const ticket = await googleClient.verifyIdToken({
-      audience: CLIENT_ID,
-      idToken: idToken
-    });
-    const payload = ticket.getPayload();
-    console.log(payload);
-    return payload;
+      idToken: idToken,
+      audience: CLIENT_ID
+  });
+  const payload = ticket.getPayload();
+  return payload
   } catch (error) {
     console.error("Error verifying Google token:", error);
     return null;
@@ -46,7 +46,7 @@ const googleLogin = async (req, res) => {
     if (!idToken || idToken === "null") {
         return res.status(401).send({ message: "No idToken provided." });
     }
-    const response = await verifyGoogleLogin(idToken);
+    const response = await verifyGoogleLogin(idToken).catch(console.error);
     if (!response) {
       return res.status(401).json({ status: false, error: "Failed to verify Google token" });
     }
