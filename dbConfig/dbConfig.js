@@ -14,7 +14,10 @@ const sequelize = new Sequelize(env.database, env.username, env.password, {
     idle: env.pool.idle,
   },
   dialectOptions: {
-    ssl:false
+    ssl:{
+      require: true,
+      rejectUnauthorized: false // Use this if you're using a self-signed certificate
+    }
   }
 });
 
@@ -40,7 +43,7 @@ db.campaigns.hasMany(db.advertisements, {
 db.advertisements.belongsTo(db.campaigns, {
   foreignKey: 'campaignID',
   as: 'campaign',
-  onDelete: 'CASCADE' // Optional: deletes advertisement when campaign is deleted
+    onDelete: 'CASCADE' // Optional: deletes advertisement when campaign is deleted
 });
 
 db.advertisements.hasMany(db.layouts, {
