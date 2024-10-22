@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const upload = require("../middleware/multer"); // Add this line
 const {
     createCampaign,
     getAllCampaign,
@@ -9,11 +10,11 @@ const {
 } = require("../Controller/campaignController");
 const { verifyJWt } = require("../middleware/auth");
 
-
-router.post("/create",verifyJWt,createCampaign)
-router.get("/getAll",getAllCampaign)
-router.get("/getOne/:id",getOneCampaign)
-router.put("/update/:id",verifyJWt,updateCampaign)
-router.delete("/delete/:id",verifyJWt,deleteCampaign)
+// Update routes to use upload middleware
+router.post("/create", verifyJWt, upload.array('files'), createCampaign);
+router.get("/getAll", getAllCampaign);
+router.get("/getOne/:id", getOneCampaign);
+router.put("/update/:id", verifyJWt, upload.array('files'), updateCampaign);
+router.delete("/delete/:id", verifyJWt, deleteCampaign);
 
 module.exports = router;

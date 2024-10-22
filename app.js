@@ -25,6 +25,7 @@ const notificationRouter=require("./Routes/notificationRoutes")
 const campaignRouter=require('./Routes/campaignRoutes')
 const advertisementRouter=require('./Routes/advertisementRoutes')
 const layoutRouter=require('./Routes/layoutRoutes')
+const contentRouter=require('./Routes/cdnRoutes')
 
 // Routes declaration
 app.use("/api/v1/user", userRouter);
@@ -32,5 +33,6 @@ app.use("/api/v1/apple",notificationRouter)
 app.use("/api/v1/campaign",campaignRouter)
 app.use("/api/v1/advertisement",advertisementRouter)
 app.use("/api/v1/layout",layoutRouter)
+app.use("/api/v1/content",contentRouter)
 
 module.exports = app;

@@ -85,9 +85,15 @@ const isPhoneValid = (phone) => {
   return null;  // No errors
 };
 
+const getFileNameFromUrl = (url) => {
+  const urlParts = url.split('/');
+  return urlParts[urlParts.length - 1];
+};
+
 module.exports = {
   isValidEmail,
   isPhoneValid,
   isValidPassword,
-  isValidLength
+  isValidLength,
+  getFileNameFromUrl
 };

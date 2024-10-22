@@ -15,7 +15,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
       },
       images: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
+        type:DataTypes.ARRAY(DataTypes.JSON)
       },
       createdDate: {
         type: DataTypes.DATE,
