@@ -115,6 +115,25 @@ const uploadFile = async (file) => {
   }
 };
 
+// New function to handle multiple file uploads
+const uploadFiles = async (files) => {
+  if (!Array.isArray(files)) {
+    throw new Error('Files must be an array');
+  }
+
+  if (files.length === 0) {
+    return [];
+  }
+
+  try {
+    const uploadPromises = files.map(file => uploadFile(file));
+    const results = await Promise.all(uploadPromises);
+    return results;
+  } catch (error) {
+    throw new Error(`Multiple file upload failed: ${error.message}`);
+  }
+};
+
 // Delete a single file
 const deleteFile = async (fileName) => {
   try {
@@ -171,6 +190,7 @@ const listFiles = async (prefix = '') => {
 
 module.exports = {
   uploadFile,
+  uploadFiles,
   deleteFile,
   verifyMinioConnection,
   listFiles

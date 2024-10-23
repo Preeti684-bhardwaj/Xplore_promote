@@ -76,7 +76,7 @@ const createCampaign = async (req, res) => {
       socialMediaLinks,
       contactInfo,
       siteInfo,
-      images: uploadedUrls.length > 0 ? uploadedUrls : [], // Only include images if files were uploaded
+      images: uploadedUrls, // Array of uploaded file information
       createdDate: new Date(),
       lastModifiedBy: req.user.id,
       lastModifiedDate: new Date(),
@@ -95,11 +95,11 @@ const createCampaign = async (req, res) => {
   } catch (error) {
     console.error("Campaign creation error:", error);
     
-    // Clean up uploaded files if campaign creation fails and files were uploaded
+    // Clean up uploaded files if campaign creation fails
     if (uploadedUrls.length > 0) {
       try {
         await Promise.all(
-          uploadedUrls.map(file => deleteFile(file.filename))
+          uploadedUrls.map(url => deleteFile(url.filename))
         );
       } catch (cleanupError) {
         console.error("Cleanup error:", cleanupError);
