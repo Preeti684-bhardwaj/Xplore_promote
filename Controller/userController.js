@@ -92,9 +92,9 @@ const registerUser = async (req, res, next) => {
           existingUser.email.toLowerCase() === lowercaseEmail &&
           existingUser.phone === phone
         ) {
-          return res.status(400).send({ message: "Account already exists" });
+          return res.status(409).send({ message: "Account already exists" });
         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
-          return res.status(400).send({ message: "Email already in use" });
+          return res.status(409).send({ message: "Email already in use" });
         } else {
           return res
             .status(400)
@@ -107,12 +107,12 @@ const registerUser = async (req, res, next) => {
           existingUser.email.toLowerCase() === lowercaseEmail &&
           existingUser.phone === phone
         ) {
-          return res.status(400).send({ message: "Account already exists" });
+          return res.status(409).send({ message: "Account already exists" });
         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
-          return res.status(400).send({ message: "Email already in use" });
+          return res.status(409).send({ message: "Email already in use" });
         } else {
           return res
-            .status(400)
+            .status(409)
             .send({ message: "Phone number already in use" });
         }
       }
@@ -148,6 +148,7 @@ const registerUser = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: "user registered successfully",
+      data:createdUser
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
