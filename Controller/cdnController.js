@@ -148,7 +148,6 @@ const deleteFile = async (fileName) => {
       }
       throw error;
     }
-
     await minioClient.removeObject(bucketName, fileName);
     return true;
   } catch (error) {
