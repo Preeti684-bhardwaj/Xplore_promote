@@ -101,12 +101,21 @@ const registerUser = async (req, res, next) => {
             .send({ message: "Phone number already in use" });
         }
       }
-      //  else {
-      //   // Update the existing user's record with the new email and generate a new verification token
-      //   existingUser.email = lowercaseEmail;
-      //   existingUser.emailToken = generateToken({ email: lowercaseEmail });
-      //   await existingUser.save();
-      // }
+       else {
+        // Update the existing user's record with the new email and generate a new verification token
+        if (
+          existingUser.email.toLowerCase() === lowercaseEmail &&
+          existingUser.phone === phone
+        ) {
+          return res.status(400).send({ message: "Account already exists" });
+        } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
+          return res.status(400).send({ message: "Email already in use" });
+        } else {
+          return res
+            .status(400)
+            .send({ message: "Phone number already in use" });
+        }
+      }
     }
     // If no existing user found, validate the password and create a new user
     const passwordValidationResult = isValidPassword(password);
@@ -239,7 +248,7 @@ const loginUser = async (req, res, next) => {
     }
 
     if (!user.isEmailVerified) {
-      res.status(400).send({ success: false, message: "Please verify your OTP before logging in" });
+      res.status(403).send({ success: false, message: "Please verify your OTP before logging in" });
     }
     const obj = {
       type: "USER",

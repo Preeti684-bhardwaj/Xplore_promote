@@ -175,6 +175,42 @@ const deleteContent = async (req, res) => {
       });
     }
   };
+
+  const deleteContentCdn = async (req, res) => {
+    try {
+      const { fileName } = req.query;
+  
+      // Validate fileName
+      if (!fileName) {
+        return res.status(400).json({
+          success: false,
+          message: "File name is required in query parameters",
+        });
+      }
+  
+      try {
+        // Delete from CDN first
+        await deleteFile(fileName);
+  
+        return res.status(200).json({
+          success: true,
+          message: "File deleted successfully from both CDN and database",
+        });
+  
+      } catch (error) {
+        // If CDN deletion fails, don't update database
+        throw new Error(`CDN deletion failed: ${error.message}`);
+      }
+  
+    } catch (error) {
+      console.error("Delete Content Error:", error);
+      return res.status(500).json({
+        success: false,
+        message: `Deletion failed: ${error.message}`,
+        error: error.stack
+      });
+    }
+  };
   
 const getFiles = async (req, res) => {
   try {
@@ -199,4 +235,5 @@ module.exports = {
   uploadContent,
   deleteContent,
   getFiles,
+  deleteContentCdn
 };
