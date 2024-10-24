@@ -256,7 +256,7 @@ const loginUser = async (req, res) => {
     }
 
     if (!user.isEmailVerified) {
-      res.status(403).send({ success: false, message: "Please verify your OTP before logging in" });
+      return res.status(403).send({ success: false, message: "Please verify your OTP before logging in" });
     }
     const obj = {
       type: "USER",
