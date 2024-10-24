@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const {
-    loginUser,
-    signUp,
     registerUser,
+    sendOtp,
+    signUp,
+    loginUser,
     forgotPassword,
     resetPassword,
-    sendOtp,
     getUserById,
     updateUser,
     deleteUser
@@ -17,11 +17,11 @@ const { verifyJWt } = require("../middleware/auth");
 
 
 router.post("/register",registerUser)
+router.post("/sendOtp",sendOtp)
 router.post("/signUp", signUp)
 router.post("/login",loginUser)
 router.post("/password/forgot",forgotPassword)
 router.post("/password/reset/:userId",resetPassword)
-router.post("/sendOtp",sendOtp)
 router.get("/getById/:id",getUserById)
 router.put('/updateUser',verifyJWt,updateUser)
 router.delete('/deleteUser',deleteUser)

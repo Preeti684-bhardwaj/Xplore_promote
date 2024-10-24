@@ -30,7 +30,7 @@ const generateOtp = () => {
 // };
 
 // register user
-const registerUser = async (req, res, next) => {
+const registerUser = async (req, res) => {
   const { name, phone, email, password } = req.body;
   try {
     // Validate input fields
@@ -156,7 +156,7 @@ const registerUser = async (req, res, next) => {
 };
 
 // signUp user
-const signUp = async (req, res, next) => {
+const signUp = async (req, res) => {
   const { email, otp } = req.body;
 
   // Validate the OTP
@@ -202,6 +202,12 @@ const signUp = async (req, res, next) => {
     user.otpExpire = null;
     await user.save();
 
+    const obj = {
+      type: "USER",
+      obj: user,
+    };
+    const accessToken = generateToken(obj);
+
     res.status(201).json({
       success: true,
       message: "User data",
@@ -211,6 +217,7 @@ const signUp = async (req, res, next) => {
         email: user.email,
         phone: user.phone,
       },
+      token:accessToken
     });
   } catch (error) {
     res
@@ -220,7 +227,7 @@ const signUp = async (req, res, next) => {
 };
 
 // login user
-const loginUser = async (req, res, next) => {
+const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -278,11 +285,11 @@ const loginUser = async (req, res, next) => {
 };
 
 // send OTP
-const sendOtp = async (req, res, next) => {
+const sendOtp = async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
-    return res.status(400).send({ success: false, message: "Missing phone" });
+    return res.status(400).send({ success: false, message: "Missing email" });
   }
 
   // Validate email format
@@ -424,14 +431,13 @@ const forgotPassword = async (req, res) => {
 };
 
 // ---------------RESET PASSWORD------------------------------------------------------------
-const resetPassword = async (req, res, next) => {
+const resetPassword = async (req, res) => {
   const { password, otp } = req.body;
   const userId = req.params.userId;
 
   // Validate input fields
   if (!password || !otp) {
-    return next(
-      new ErrorHandler("Missing required fields: password or OTP", 400)
+   return res.status(400).send({status:false, message:"Missing required fields: password or OTP"}
     );
   }
   const passwordValidationResult = isValidPassword(password);
@@ -483,7 +489,7 @@ const resetPassword = async (req, res, next) => {
 };
 
 // getById
-const getUserById = async (req, res, next) => {
+const getUserById = async (req, res) => {
   try {
     const id = req.params.id;
     const item = await User.findByPk(id, {
@@ -500,12 +506,12 @@ const getUserById = async (req, res, next) => {
 };
 
 // Update user
-const updateUser = async (req, res, next) => {
+const updateUser = async (req, res) => {
   const { name } = req.body;
 
   // Validate input fields
   if ([name].some((field) => field?.trim() === "")) {
-    return next(new ErrorHandler("Please provide all necessary field", 400));
+   return res.status(400).send({status:false, message:"Please provide all necessary field"});
   }
 
   const nameError = isValidLength(name);
@@ -561,10 +567,10 @@ const updateUser = async (req, res, next) => {
 };
 
 // delete user
-const deleteUser = async (req, res, next) => {
+const deleteUser = async (req, res) => {
   const { phone } = req.query;
   try {
-    const user = await User.findOne({ where: { phone } });
+    const user = await User.findOne({ where: { phone:phone } });
     console.log(user);
     if (!user) {
       return res.status(400).json({
