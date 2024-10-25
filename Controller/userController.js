@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const bcrypt = require("bcrypt");
@@ -35,7 +35,12 @@ const registerUser = async (req, res) => {
   try {
     // Validate input fields
     if ([name, phone, email, password].some((field) => field?.trim() === "")) {
-      return res.status(400).json({ success: false, message: "Please provide all necessary fields" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
     }
     // Validate input fields
     if (!name) {
@@ -100,8 +105,7 @@ const registerUser = async (req, res) => {
             .status(400)
             .send({ message: "Phone number already in use" });
         }
-      }
-       else {
+      } else {
         // Update the existing user's record with the new email and generate a new verification token
         if (
           existingUser.email.toLowerCase() === lowercaseEmail &&
@@ -132,7 +136,7 @@ const registerUser = async (req, res) => {
       phone,
       email,
       password: hashedPassword,
-      authProvider: 'local',
+      authProvider: "local",
     });
 
     const createdUser = await User.findByPk(user.id, {
@@ -142,13 +146,17 @@ const registerUser = async (req, res) => {
     });
 
     if (!createdUser) {
-      return res.status(500).json({ success: false, message: "Something went wrong while registering the user" }
-      );
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: "Something went wrong while registering the user",
+        });
     }
     res.status(200).json({
       success: true,
       message: "user registered successfully",
-      data:createdUser
+      data: createdUser,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -179,7 +187,9 @@ const signUp = async (req, res) => {
   const lowercaseEmail = email.toLowerCase();
 
   try {
-    const user = await User.findOne({ where: { email:lowercaseEmail.trim()} });
+    const user = await User.findOne({
+      where: { email: lowercaseEmail.trim() },
+    });
     console.log(user);
     if (!user) {
       return res.status(400).json({
@@ -217,12 +227,10 @@ const signUp = async (req, res) => {
         email: user.email,
         phone: user.phone,
       },
-      token:accessToken
+      token: accessToken,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -231,7 +239,9 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).send({ success: false, message: "Please Enter Email & Password" });
+    return res
+      .status(400)
+      .send({ success: false, message: "Please Enter Email & Password" });
   }
 
   // Validate email format
@@ -246,17 +256,26 @@ const loginUser = async (req, res) => {
       where: { email: lowercaseEmail.trim() },
     });
     if (!user) {
-      return res.status(404).send({ success: false, message: "User does not exist" });
+      return res
+        .status(404)
+        .send({ success: false, message: "User does not exist" });
     }
     const isPasswordMatched = await bcrypt.compare(password, user.password);
     console.log("Password match result:", isPasswordMatched);
 
     if (!isPasswordMatched) {
-      return res.status(400).send({ success: false, message: "Invalid password" });
+      return res
+        .status(400)
+        .send({ success: false, message: "Invalid password" });
     }
 
     if (!user.isEmailVerified) {
-      return res.status(403).send({ success: false, message: "Please verify your OTP before logging in" });
+      return res
+        .status(403)
+        .send({
+          success: false,
+          message: "Please verify your OTP before logging in",
+        });
     }
     const obj = {
       type: "USER",
@@ -274,7 +293,7 @@ const loginUser = async (req, res) => {
       success: true,
       message: "login successfully",
       data: loggedInUser,
-      token: accessToken
+      token: accessToken,
     });
   } catch (error) {
     return res.status(500).send({
@@ -308,13 +327,15 @@ const sendOtp = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).send({ success: false, message: "User not found" });
+      return res
+        .status(400)
+        .send({ success: false, message: "User not found" });
     }
 
     const otp = generateOtp();
 
-     // Create HTML content for the email
-  const htmlContent = `
+    // Create HTML content for the email
+    const htmlContent = `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
     <h2>One-Time Password (OTP) for Verification</h2>
     <p>Hello,</p>
@@ -334,12 +355,12 @@ const sendOtp = async (req, res) => {
 
       user.otp = otp;
       user.otpExpire = Date.now() + 15 * 60 * 1000;
-  
+
       await user.save({ validate: false });
       res.status(200).json({
         success: true,
         message: `OTP sent to ${user.email} successfully`,
-        email: user.email
+        email: user.email,
       });
     } catch (emailError) {
       user.otp = null;
@@ -408,7 +429,7 @@ const forgotPassword = async (req, res) => {
     await sendEmail({
       email: user.email,
       subject: `Xplore Promote: Password Reset Request`,
-      html: htmlContent
+      html: htmlContent,
     });
 
     user.otp = otp;
@@ -419,7 +440,7 @@ const forgotPassword = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Password reset otp sent to ${user.email}`,
-      userId:user.id
+      userId: user.id,
     });
   } catch (error) {
     user.otp = null;
@@ -437,8 +458,12 @@ const resetPassword = async (req, res) => {
 
   // Validate input fields
   if (!password || !otp) {
-   return res.status(400).send({status:false, message:"Missing required fields: password or OTP"}
-    );
+    return res
+      .status(400)
+      .send({
+        status: false,
+        message: "Missing required fields: password or OTP",
+      });
   }
   const passwordValidationResult = isValidPassword(password);
   if (passwordValidationResult) {
@@ -454,15 +479,15 @@ const resetPassword = async (req, res) => {
     const user = await User.findByPk(userId);
 
     if (!user) {
-       return res.status(404).send({status:false, message:"User not found"});
+      return res.status(404).send({ status: false, message: "User not found" });
     }
 
     // Verify the OTP
     if (user.otp !== otp.trim()) {
-      return res.status(400).send({status:false, message:"Invalid OTP"});
+      return res.status(400).send({ status: false, message: "Invalid OTP" });
     }
     if (user.otpExpire < Date.now()) {
-      return res.status(400).send({status:false, message:"Expired OTP"});
+      return res.status(400).send({ status: false, message: "Expired OTP" });
     }
 
     // Update the user's password and clear OTP fields
@@ -505,13 +530,41 @@ const getUserById = async (req, res) => {
   }
 };
 
+// get user by token
+const getUserByToken = async (req, res) => {
+  try {
+    const id = req.user.id;
+    const user = await User.findByPk(id, {
+      attributes: [
+        "id",
+        "name",
+        "email",
+        "phone",
+        "isEmailVerified",
+        "appleUserId",
+        "googleUserId",
+        "authProvider",
+      ],
+    });
+    if (!user) {
+      res.status(404).json({ success: false, error: "User not found" });
+    } else {
+      res.json({ success: true, data: user });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // Update user
 const updateUser = async (req, res) => {
   const { name } = req.body;
 
   // Validate input fields
   if ([name].some((field) => field?.trim() === "")) {
-   return res.status(400).send({status:false, message:"Please provide all necessary field"});
+    return res
+      .status(400)
+      .send({ status: false, message: "Please provide all necessary field" });
   }
 
   const nameError = isValidLength(name);
@@ -525,7 +578,7 @@ const updateUser = async (req, res) => {
       { name },
       {
         where: {
-          id: req.user.id 
+          id: req.user.id,
         },
         returning: true,
       }
@@ -543,7 +596,6 @@ const updateUser = async (req, res) => {
       name: updatedName,
       email,
       phone,
-      agreePolicy,
       createdAt,
       updatedAt,
     } = updatedUser;
@@ -570,7 +622,7 @@ const updateUser = async (req, res) => {
 const deleteUser = async (req, res) => {
   const { phone } = req.query;
   try {
-    const user = await User.findOne({ where: { phone:phone } });
+    const user = await User.findOne({ where: { phone: phone } });
     console.log(user);
     if (!user) {
       return res.status(400).json({
@@ -579,7 +631,7 @@ const deleteUser = async (req, res) => {
       });
     }
     await user.destroy();
-    res.status(200).send({
+    return res.status(200).send({
       success: true,
       message: `user with phone ${user.phone} deleted successfully`,
     });
@@ -588,15 +640,15 @@ const deleteUser = async (req, res) => {
   }
 };
 
-
 module.exports = {
   registerUser,
   updateUser,
   signUp,
   loginUser,
   getUserById,
+  getUserByToken,
   forgotPassword,
   resetPassword,
   sendOtp,
-  deleteUser
+  deleteUser,
 };
