@@ -30,11 +30,11 @@ const layoutRouter = require('./Routes/layoutRoutes');
 const contentRouter = require('./Routes/cdnRoutes');
 
 // Routes declaration
-app.use("/api/v1/user", userRouter);
-app.use("/api/v1/apple", notificationRouter);
-app.use("/api/v1/campaign", campaignRouter);
-app.use("/api/v1/advertisement", advertisementRouter);
-app.use("/api/v1/layout", layoutRouter);
-app.use("/api/v1/content", contentRouter);
+app.use("/v1/user", userRouter);
+app.use("/v1/apple", notificationRouter);
+app.use("/v1/campaign", campaignRouter);
+app.use("/v1/advertisement", advertisementRouter);
+app.use("/v1/layout", layoutRouter);
+app.use("/v1/content", contentRouter);
 
 module.exports = app;
