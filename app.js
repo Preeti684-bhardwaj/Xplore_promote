@@ -3,42 +3,38 @@ const bodyParser = require("body-parser");
 require("dotenv").config({ path: "./.env" });
 const app = express();
 const cors = require("cors");
-// const passport = require('passport');
 const path = require("path");
 
-app.use(cors())
+app.use(cors());
+
+// Specific route for apple-app-site-association file
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+    res.set('Content-Type', 'application/json');
+    res.sendFile(path.join(__dirname, 'public', '.well-known', 'apple-app-site-association'));
+});
+
 // Serve static files from the 'public' directory
 app.use(express.static("public"));
-
-// // Route to serve the app launcher page
-// app.get('/.well-known/apple-app-site-association', (req, res) => {
-//     res.sendFile(path.join(__dirname, 'public', '.well-known', 'apple-app-site-association'), {
-//         headers: {
-//             'Content-Type': 'application/json'
-//         }
-//     });
-// });
 
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.urlencoded({ extended: true }));
 
-
 // Routes Imports
 const userRouter = require("./Routes/userRoutes");
-const notificationRouter=require("./Routes/notificationRoutes")
-const campaignRouter=require('./Routes/campaignRoutes')
-const advertisementRouter=require('./Routes/advertisementRoutes')
-const layoutRouter=require('./Routes/layoutRoutes')
-const contentRouter=require('./Routes/cdnRoutes')
+const notificationRouter = require("./Routes/notificationRoutes");
+const campaignRouter = require('./Routes/campaignRoutes');
+const advertisementRouter = require('./Routes/advertisementRoutes');
+const layoutRouter = require('./Routes/layoutRoutes');
+const contentRouter = require('./Routes/cdnRoutes');
 
 // Routes declaration
 app.use("/api/v1/user", userRouter);
-app.use("/api/v1/apple",notificationRouter)
-app.use("/api/v1/campaign",campaignRouter)
-app.use("/api/v1/advertisement",advertisementRouter)
-app.use("/api/v1/layout",layoutRouter)
-app.use("/api/v1/content",contentRouter)
+app.use("/api/v1/apple", notificationRouter);
+app.use("/api/v1/campaign", campaignRouter);
+app.use("/api/v1/advertisement", advertisementRouter);
+app.use("/api/v1/layout", layoutRouter);
+app.use("/api/v1/content", contentRouter);
 
 module.exports = app;
