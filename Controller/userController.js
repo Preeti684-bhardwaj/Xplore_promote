@@ -563,7 +563,7 @@ const getInsta= async (req, res) => {
     const userAgent = req.headers['user-agent'];
     console.log(userAgent);
   if (userAgent && userAgent.includes('Instagram')) {
-    res.redirect(302, 'https://pre.xplore.xircular.io/'); // Redirect to your website
+    res.status(302).redirect('https://pre.xplore.xircular.io/'); // Redirect to your website
   } else {
     res.status(200).send('<a href="https://pre.xplore.xircular.io/">Click Here</a>'); // Show the link normally
   }
