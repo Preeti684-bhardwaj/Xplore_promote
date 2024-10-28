@@ -5,8 +5,24 @@ const app = express();
 const cors = require("cors");
 const path = require("path");
 
-app.use(cors());
+// Define the allowed origins
+const allowedOrigins = [
+    "https://xplore-instant.vercel.app",
+    "https://pre.xplore.xircular.io",
+];
 
+// Configure CORS middleware
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin, like mobile apps or curl requests
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+}));
 // Specific route for apple-app-site-association file
 app.get('/.well-known/apple-app-site-association', (req, res) => {
     res.set('Content-Type', 'application/json');

@@ -558,16 +558,20 @@ const getUserByToken = async (req, res) => {
 
 
 // get insta verify 
-const getInsta= async (req, res) => {
+const getInsta = async (req, res) => {
   try {
     const userAgent = req.headers['user-agent'];
-    console.log(userAgent);
-  if (userAgent && userAgent.includes('Instagram')) {
-    res.redirect(302, 'https://pre.xplore.xircular.io/'); // Redirect to your website
-  } else {
-    res.status(200).send('<a href="https://pre.xplore.xircular.io/">Click Here</a>'); // Show the link normally
-  }
+    console.log('User-Agent:', userAgent);
+    
+    if (userAgent && userAgent.includes('Instagram')) {
+      console.log('Redirecting to Instagram link...');
+      res.redirect(302, 'https://xplore-instant.vercel.app/');
+    } else {
+      console.log('Sending normal link...');
+      res.status(200).send('<a href="https://xplore-instant.vercel.app/">Click Here</a>');
+    }
   } catch (error) {
+    console.error('Error occurred:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
