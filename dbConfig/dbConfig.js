@@ -29,34 +29,34 @@ db.sequelize = sequelize;
 // Import models
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
 db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
-db.advertisements = require("../Modals/advertisementModal.js")(sequelize, Sequelize);
+// db.advertisements = require("../Modals/advertisementModal.js")(sequelize, Sequelize);
 db.layouts = require("../Modals/layoutModal.js")(sequelize, Sequelize);
 db.assets = require("../Modals/assetStore.js")(sequelize, Sequelize);
 
 // Define relationships
-db.campaigns.hasMany(db.advertisements, {
+db.campaigns.hasMany(db.layouts, {
   foreignKey: 'campaignID',
-  as: 'advertisements',
+  as: 'layouts',
   onDelete: 'CASCADE' // Optional: deletes advertisement when campaign is deleted
 });
 
-db.advertisements.belongsTo(db.campaigns, {
+db.layouts.belongsTo(db.campaigns, {
   foreignKey: 'campaignID',
   as: 'campaign',
     onDelete: 'CASCADE' // Optional: deletes advertisement when campaign is deleted
 });
 
-db.advertisements.hasMany(db.layouts, {
-  foreignKey: 'advertisementID',
-  as: 'layouts',
-  onDelete: 'CASCADE' // Optional: deletes layout when advertisement is deleted
-});
+// db.advertisements.hasMany(db.layouts, {
+//   foreignKey: 'advertisementID',
+//   as: 'layouts',
+//   onDelete: 'CASCADE' // Optional: deletes layout when advertisement is deleted
+// });
 
-db.layouts.belongsTo(db.advertisements, {
-  foreignKey: 'advertisementID',
-  as: 'advertisement',
-  onDelete: 'CASCADE' // Optional: deletes layout when advertisement is deleted
-});
+// db.layouts.belongsTo(db.advertisements, {
+//   foreignKey: 'advertisementID',
+//   as: 'advertisement',
+//   onDelete: 'CASCADE' // Optional: deletes layout when advertisement is deleted
+// });
 
 // User-Campaign relationship
 db.users.hasMany(db.campaigns, {
