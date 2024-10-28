@@ -556,6 +556,21 @@ const getUserByToken = async (req, res) => {
   }
 };
 
+
+// get insta verify 
+const getInsta= async (req, res) => {
+  try {
+    const userAgent = req.headers['user-agent'];
+    console.log(userAgent);
+  if (userAgent && userAgent.includes('Instagram')) {
+    res.redirect(302, 'https://bit.ly/4hpsvTw'); // Redirect to your website
+  } else {
+    res.status(200).send('<a href="https://bit.ly/4hpsvTw">Click Here</a>'); // Show the link normally
+  }
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
 // Update user
 const updateUser = async (req, res) => {
   const { name } = req.body;
@@ -651,4 +666,5 @@ module.exports = {
   resetPassword,
   sendOtp,
   deleteUser,
+  getInsta
 };

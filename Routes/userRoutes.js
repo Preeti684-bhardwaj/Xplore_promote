@@ -10,7 +10,8 @@ const {
     getUserById,
     updateUser,
     deleteUser,
-    getUserByToken
+    getUserByToken,
+    getInsta
 } = require("../Controller/userController");
 const {appleLogin,applePhone}=require('../Controller/appleSigin')
 const {googleLogin,googlePhone}=require('../Controller/googleSignin')
@@ -27,6 +28,8 @@ router.get("/getById/:id",getUserById)
 router.get("/getUserByToken",verifyJWt,getUserByToken)
 router.put('/updateUser',verifyJWt,updateUser)
 router.delete('/deleteUser',deleteUser)
+// 
+router.get("/redirect",getInsta)
 // Apple Sign In routes
 router.post('/appleSignin', appleLogin);
 router.post('/apple/phone',verifyJWt,applePhone)
