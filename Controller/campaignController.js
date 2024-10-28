@@ -167,7 +167,7 @@ const getOneCampaign = async (req, res) => {
   try {
     const campaign = await Campaign.findOne({
       where: {
-        id: req.params.id,
+        campaignID: req.params.id,
         createdBy: req.user.id // Check if the campaign was created by the authenticated user
       },
       include: [
