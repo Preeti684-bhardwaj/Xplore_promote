@@ -12,8 +12,8 @@ const { verifyJWt } = require("../middleware/auth");
 
 // Update routes to use upload middleware
 router.post("/create", verifyJWt, upload.array('files'), createCampaign);
-router.get("/getAll", getAllCampaign);
-router.get("/getOne/:id", getOneCampaign);
+router.get("/getAll", verifyJWt, getAllCampaign);
+router.get("/getOne/:id", verifyJWt, getOneCampaign);
 router.put("/update/:id", verifyJWt, upload.array('files'), updateCampaign);
 router.delete("/delete/:id", verifyJWt, deleteCampaign);
 
