@@ -12,7 +12,7 @@ app.use(express.static("public"));
 
 // // Route to serve the app launcher page
 app.get('/.well-known/apple-app-site-association', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', '.well-known', 'apple-app-site-association.rtf'), {
+    res.sendFile(path.join(__dirname, 'public', '.well-known', 'apple-app-site-association'), {
         headers: {
             'Content-Type': 'application/json'
         }
