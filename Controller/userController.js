@@ -565,10 +565,10 @@ const getInsta = async (req, res) => {
     
     if (userAgent && userAgent.includes('Instagram')) {
       console.log('Redirecting to Instagram link...');
-      res.redirect(302, 'https://pre.xplore.xircular.io/');
+      res.redirect(302, 'https://xplore-instant.vercel.app/');
     } else {
       console.log('Sending normal link...');
-      res.status(200).send('<a href="https://pre.xplore.xircular.io/">Click Here</a>');
+      res.status(200).send('<a href="https://xplore-instant.vercel.app/">Click Here</a>');
     }
   } catch (error) {
     console.error('Error occurred:', error);
