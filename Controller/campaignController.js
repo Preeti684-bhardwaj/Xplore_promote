@@ -118,7 +118,12 @@ const createCampaign = async (req, res) => {
 const getAllCampaign = async (req, res) => {
   const { page, size, name } = req.query;
   const { limit, offset } = getPagination(page, size);
-  const condition = name ? { name: { [Op.iLike]: `%${name}%` } } : null;
+
+  // Modify condition to filter campaigns by authenticated user
+  const condition = {
+    createdBy: req.user.id, // Filter by the user ID from req.user
+    ...(name ? { name: { [Op.iLike]: `%${name}%` } } : {}) // Include name filter if present
+  };
 
   try {
     const data = await Campaign.findAndCountAll({
@@ -126,70 +131,72 @@ const getAllCampaign = async (req, res) => {
       limit,
       offset,
       include: [
-        { model: Layout, as: "layouts" },
+        { model: Layout, as: 'layouts' },
         {
           model: User,
-          as: "creator",
+          as: 'creator',
           attributes: [
-            "id",
-            "name",
-            "email",
-            "phone",
-            "isEmailVerified",
-            "appleUserId",
-            "googleUserId",
-            "authProvider",
+            'id',
+            'name',
+            'email',
+            'phone',
+            'isEmailVerified',
+            'appleUserId',
+            'googleUserId',
+            'authProvider',
           ],
         },
       ],
     });
 
     res.json({
+      success:true,
       totalItems: data.count,
       campaigns: data.rows,
       currentPage: page ? +page : 0,
       totalPages: Math.ceil(data.count / limit),
     });
   } catch (error) {
-    console.error("Error fetching campaigns:", error);
-    res
-      .status(500)
-      .json({ message: "Error fetching campaigns", error: error.message });
+    console.error('Error fetching campaigns:', error);
+    res.status(500).json({ success:false,message: 'Error fetching campaigns', error: error.message });
   }
 };
 
 // Get a single campaign by ID
 const getOneCampaign = async (req, res) => {
   try {
-    const campaign = await Campaign.findByPk(req.params.id, {
+    const campaign = await Campaign.findOne({
+      where: {
+        id: req.params.id,
+        createdBy: req.user.id // Check if the campaign was created by the authenticated user
+      },
       include: [
-        { model: Layout, as: "layouts" },
+        { model: Layout, as: 'layouts' },
         {
           model: User,
-          as: "creator",
+          as: 'creator',
           attributes: [
-            "id",
-            "name",
-            "email",
-            "phone",
-            "isEmailVerified",
-            "appleUserId",
-            "googleUserId",
-            "authProvider",
+            'id',
+            'name',
+            'email',
+            'phone',
+            'isEmailVerified',
+            'appleUserId',
+            'googleUserId',
+            'authProvider',
           ],
         },
       ],
     });
+
     if (campaign) {
-      res.json(campaign);
+      res.status(200).json({success:true,data:campaign});
     } else {
-      res.status(404).json({ message: "Campaign not found" });
+      res.status(404).json({success:false, message: 'Campaign not found or access denied' });
     }
   } catch (error) {
-    console.error("Error fetching campaign:", error);
-    res
-      .status(500)
-      .json({ message: "Error fetching campaign", error: error.message });
+    console.error('Error fetching campaign:', error);
+    res.status(500).json({success:false, message: 'Error fetching campaign', error: error.message });
   }
 };
 
@@ -201,7 +208,7 @@ const updateCampaign = async (req, res) => {
     // Fetch the existing campaign to preserve the current values
     const campaign = await Campaign.findByPk(req.params.id);
     if (!campaign) {
-      return res.status(404).json({ message: "Campaign not found" });
+      return res.status(404).json({success:false, message: "Campaign not found" });
     }
 
     // Start with the existing data
@@ -319,12 +326,13 @@ const updateCampaign = async (req, res) => {
       });
 
       return res.json({
+        success:true,
         message: "Campaign updated successfully",
         data: updatedCampaign,
       });
     }
 
-    return res.status(400).json({ message: "Failed to update campaign" });
+    return res.status(400).json({success:false, message: "Failed to update campaign" });
 
   } catch (error) {
     console.error("Error updating campaign:", error);
@@ -340,7 +348,8 @@ const updateCampaign = async (req, res) => {
       }
     }
 
-    res.status(400).json({ 
+    res.status(400).json({
+      success:false, 
       message: "Failed to update campaign", 
       error: error.message 
     });
@@ -356,15 +365,15 @@ const deleteCampaign = async (req, res) => {
     if (deleted) {
       res
         .status(200)
-        .json({ status: true, message: "Campaign deleted successfully" });
+        .json({ success: true, message: "Campaign deleted successfully" });
     } else {
-      res.status(404).json({ message: "Campaign not found" });
+      res.status(404).json({ success:false,message: "Campaign not found" });
     }
   } catch (error) {
     console.error("Error deleting campaign:", error);
     res
       .status(500)
-      .json({ message: "Failed to delete campaign", error: error.message });
+      .json({success:false, message: "Failed to delete campaign", error: error.message });
   }
 };
 
