@@ -1,7 +1,7 @@
 const db = require("../dbConfig/dbConfig.js");
 const { uploadFiles ,deleteFile} = require("./cdnController.js");
 const Campaign = db.campaigns;
-const Advertisement = db.advertisements;
+const Layout = db.layouts;
 const User = db.users;
 const { Op } = require("sequelize");
 const { ValidationError } = require("sequelize");
@@ -126,7 +126,7 @@ const getAllCampaign = async (req, res) => {
       limit,
       offset,
       include: [
-        { model: Advertisement, as: "advertisements" },
+        { model: Layout, as: "layouts" },
         {
           model: User,
           as: "creator",
@@ -163,7 +163,7 @@ const getOneCampaign = async (req, res) => {
   try {
     const campaign = await Campaign.findByPk(req.params.id, {
       include: [
-        { model: Advertisement, as: "advertisements" },
+        { model: Layout, as: "layouts" },
         {
           model: User,
           as: "creator",
@@ -300,7 +300,7 @@ const updateCampaign = async (req, res) => {
       // Fetch the updated campaign with associations
       const updatedCampaign = await Campaign.findByPk(req.params.id, {
         include: [
-          { model: Advertisement, as: "advertisements" },
+          { model: Layout, as: "layouts" },
           {
             model: User,
             as: "creator",
