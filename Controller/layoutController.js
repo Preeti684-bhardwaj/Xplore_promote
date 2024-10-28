@@ -61,11 +61,19 @@ const getPagination = (page, size) => {
         };
 
   // Get all layouts with pagination
- const getAllLayout=  async (req, res) => {
+  const getAllLayout = async (req, res) => {
     const { page, size, name } = req.query;
     const { limit, offset } = getPagination(page, size);
-    const condition = name ? { name: { [Op.iLike]: `%${name}%` } } : null;
-
+    
+    // Get the campaignID from request parameters
+    const campaignID = req.params.campaignID;
+  
+    // Create a condition to filter by campaignID and optionally by name
+    const condition = {
+      ...(name ? { name: { [Op.iLike]: `%${name}%` } } : {}),
+      ...(campaignID ? { campaignID: campaignID } : {}) // Include campaignID in the condition
+    };
+  
     try {
       const data = await Layout.findAndCountAll({
         where: condition,
@@ -73,8 +81,9 @@ const getPagination = (page, size) => {
         offset,
         include: [{ model: Campaign, as: 'campaign' }]
       });
-
+  
       res.json({
+        success:true,
         totalItems: data.count,
         layouts: data.rows,
         currentPage: page ? +page : 0,
@@ -82,9 +91,9 @@ const getPagination = (page, size) => {
       });
     } catch (error) {
       console.error('Error fetching layouts:', error);
-      res.status(500).json({ message: 'Error fetching layouts', error: error.message });
+      res.status(500).json({success:false, message: 'Error fetching layouts', error: error.message });
     }
-  }
+  };
 
   // Get a single layout by ID
   const getOneLayout=  async (req, res) => {
@@ -93,13 +102,13 @@ const getPagination = (page, size) => {
         include: [{ model: Campaign, as: 'campaign' }]
       });
       if (layout) {
-        res.json(layout);
+        res.status(200).json({success:true,data:layout});
       } else {
-        res.status(404).json({ message: 'Layout not found' });
+        res.status(404).json({success:false, message: 'Layout not found' });
       }
     } catch (error) {
       console.error('Error fetching layout:', error);
-      res.status(500).json({ message: 'Error fetching layout', error: error.message });
+      res.status(500).json({ success:false,message: 'Error fetching layout', error: error.message });
     }
   }
 
