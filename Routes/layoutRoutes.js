@@ -10,7 +10,7 @@ const {
 const { verifyJWt } = require("../middleware/auth");
 
 
-router.post("/create/:advertisementID",verifyJWt,createLayout)
+router.post("/create/:campaignID",verifyJWt,createLayout)
 router.get("/getAll",getAllLayout)
 router.get("/getOne/:id",getOneLayout)
 router.put("/update/:id",verifyJWt,updateLayout)
