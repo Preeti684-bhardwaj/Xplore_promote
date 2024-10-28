@@ -1,5 +1,6 @@
 const db = require("../dbConfig/dbConfig.js");
 const Layout =db.layouts;
+const Campaign=db.campaigns
 const { Op } = require('sequelize');
 
 // Pagination helper function
@@ -12,7 +13,7 @@ const getPagination = (page, size) => {
  // Create a new layout
  const createLayout= async (req, res) => {
     try {
-        const advertisementID=req.params.advertisementID
+        const campaignID=req.params.campaignID
             // Destructure required fields from request body
             const { name ,layoutJSON} =
               req.body;
@@ -24,10 +25,10 @@ const getPagination = (page, size) => {
                   "Missing required fields.",
               });
             }
-            if(!advertisementID){
+            if(!campaignID){
                 return res.status(400).json({
                     message:
-                      "Missing advertisementId",
+                      "Missing campaignId",
                   });
             }
         
@@ -43,7 +44,7 @@ const getPagination = (page, size) => {
             const layoutData = {
               name,
               layoutJSON,
-              advertisementID:advertisementID
+              campaignID:campaignID
             };
         
             // Create campaign
@@ -70,7 +71,7 @@ const getPagination = (page, size) => {
         where: condition,
         limit,
         offset,
-        include: [{ model: db.advertisements, as: 'advertisement' }]
+        include: [{ model: Campaign, as: 'campaign' }]
       });
 
       res.json({
@@ -89,7 +90,7 @@ const getPagination = (page, size) => {
   const getOneLayout=  async (req, res) => {
     try {
       const layout = await Layout.findByPk(req.params.id, {
-        include: [{ model: db.advertisements, as: 'advertisement' }]
+        include: [{ model: Campaign, as: 'campaign' }]
       });
       if (layout) {
         res.json(layout);
