@@ -41,7 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 const userRouter = require("./Routes/userRoutes");
 const notificationRouter = require("./Routes/notificationRoutes");
 const campaignRouter = require('./Routes/campaignRoutes');
-const advertisementRouter = require('./Routes/advertisementRoutes');
+// const advertisementRouter = require('./Routes/advertisementRoutes');
 const layoutRouter = require('./Routes/layoutRoutes');
 const contentRouter = require('./Routes/cdnRoutes');
 
@@ -49,7 +49,7 @@ const contentRouter = require('./Routes/cdnRoutes');
 app.use("/v1/user", userRouter);
 app.use("/v1/apple", notificationRouter);
 app.use("/v1/campaign", campaignRouter);
-app.use("/v1/advertisement", advertisementRouter);
+// app.use("/v1/advertisement", advertisementRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
 
