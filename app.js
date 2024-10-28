@@ -3,16 +3,22 @@ const bodyParser = require("body-parser");
 require("dotenv").config({ path: "./.env" });
 const app = express();
 const cors = require("cors");
-const passport = require('passport');
+// const passport = require('passport');
+const path = require("path");
 
 app.use(cors())
 // Serve static files from the 'public' directory
 app.use(express.static("public"));
 
 // // Route to serve the app launcher page
-// app.get('/launch', (req, res) => {
-//   res.sendFile(path.join(__dirname, 'public', 'app-launcher.html'));
-// });
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', '.well-known', 'apple-app-site-association'), {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+});
+
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
