@@ -8,7 +8,7 @@
                 ],
                 "components": [
                     {
-                        "/": “/campaign/*”,
+                        "/": "/campaign/*",
                         "comment": "Matches any URL with a path that starts with /stores/."
                     }
                 ]

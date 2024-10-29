@@ -627,7 +627,6 @@ const updateUser = async (req, res) => {
         name: updatedName,
         email,
         phone,
-        agreePolicy,
         createdAt,
         updatedAt,
       },
