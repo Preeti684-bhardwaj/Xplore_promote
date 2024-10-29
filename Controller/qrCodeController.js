@@ -35,15 +35,17 @@ const generateQR = async (req, res) => {
 };
 
 const verifyQRLogin = async (req, res) => {
-    const { channel, token, userId } = req.body;
+    const { channel, token } = req.body;
     const accessToken=req.token;
+    const userId=req.user.id
 
-    if (!channel || !token || !userId) {
+    if (!channel || !token) {
         return res.status(400).json({
             success: false,
             message: "Missing required parameters"
         });
     }
+   
 
     try {
         const io = req.app.get('io');

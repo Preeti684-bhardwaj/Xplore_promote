@@ -49,7 +49,9 @@ const verifyJWt = async (req, res, next) => {
 
     // Attach user to request
     req.user = user;
-    req.token=c;
+    req.token=token;
+    // console.log(user,token);
+    
     next();
   } catch (error) {
     return res.status(500).send({ success: false, message: error.message });
