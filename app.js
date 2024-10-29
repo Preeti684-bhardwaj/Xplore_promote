@@ -9,6 +9,7 @@ const path = require("path");
 const allowedOrigins = [
     "https://xplore-instant.vercel.app",
     "https://pre.xplore.xircular.io",
+    "http://localhost:5173/"
 ];
 
 // Configure CORS middleware
