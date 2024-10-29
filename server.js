@@ -49,8 +49,9 @@ db.sequelize.sync({ alter: true })
             console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
         });
 
-        const io = setupSocket(server); // Move this after server creation
-        app.set('io', io);
+       // Pass db to setupSocket
+       const io = setupSocket(server);
+        app.set('io', io); 
 
         process.on("unhandledRejection", (err) => {
             console.log(`Error: ${err.message}`);
