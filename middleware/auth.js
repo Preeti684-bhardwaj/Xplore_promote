@@ -1,37 +1,59 @@
 const db = require("../dbConfig/dbConfig");
 const User = db.users;
 const jwt = require("jsonwebtoken");
-require("dotenv").config({ path: "./.env" })
-
+require("dotenv").config({ path: "./.env" });
 
 const verifyJWt = async (req, res, next) => {
-    try {
-        const token = req.headers["authorization"];
-        console.log(token);
-        if (!token || token === "null") {
-            return res.status(401).send({ message: "No token provided." });
-        }
-        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-        req.decodedToken = decodedToken;
-        console.log("Decoded Token ID:", req.decodedToken.obj.obj.id);
-        const userId = req.decodedToken.obj.obj.id;
+  try {
+    // Get the token from Authorization header
+    const bearerHeader = req.headers["authorization"];
 
-        // Find the user by UUID
-        const user = await User.findOne({
-            where: { id: userId },
-            attributes: { exclude: ["password"] },
-        });
-        if (!user) {
-            return res.status(401).send({ success: false, message: "Invalid Access Token or user not found" }
-            );
-        }
-
-        console.log(user);
-        req.user = user;
-        next();
-    } catch (error) {
-        return res.status(500).send({ success: false, message: error.message });
+    // Check if bearer header exists
+    if (!bearerHeader) {
+      return res.status(401).json({
+        success: false,
+        message: "Access Denied. No token provided.",
+      });
     }
+
+    // Extract the token
+    // Format in Postman: "Bearer eyJhbGciOiJIUzI1NiIs..."
+    const token = bearerHeader.replace("Bearer ", "").trim();
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Access Denied. Token is required.",
+      });
+    }
+
+    // Verify token
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    req.decodedToken = decodedToken;
+
+    // Get user ID from token
+    const userId = decodedToken.obj.obj.id;
+
+    // Find user
+    const user = await User.findOne({
+      where: { id: userId },
+      attributes: { exclude: ["password"] },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token or user not found",
+      });
+    }
+
+    // Attach user to request
+    req.user = user;
+    req.token=c;
+    next();
+  } catch (error) {
+    return res.status(500).send({ success: false, message: error.message });
+  }
 };
 
 module.exports = { verifyJWt };
