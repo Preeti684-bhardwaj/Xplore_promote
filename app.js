@@ -24,15 +24,15 @@ app.use(cors({
     },
 }));
 
-app.get('/.well-known/assetlinks.json', (req, res) => {
-    res.set('Content-Type', 'application/json');
-    res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'));
-});
-// Specific route for apple-app-site-association file
-app.get('/.well-known/apple-app-site-association', (req, res) => {
-    res.set('Content-Type', 'application/json');
-    res.sendFile(path.join(__dirname, 'public', '.well-known', 'apple-app-site-association'));
-});
+// app.get('/.well-known/assetlinks.json', (req, res) => {
+//     res.set('Content-Type', 'application/json');
+//     res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'));
+// });
+// // Specific route for apple-app-site-association file
+// app.get('/.well-known/apple-app-site-association', (req, res) => {
+//     res.set('Content-Type', 'application/json');
+//     res.sendFile(path.join(__dirname, 'public', '.well-known', 'apple-app-site-association'));
+// });
 
 // Serve static files from the 'public' directory
 app.use(express.static("public"));
