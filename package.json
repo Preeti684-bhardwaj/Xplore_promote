@@ -26,6 +26,7 @@
     "passport-apple": "^2.0.2",
     "passport-jwt": "^4.0.1",
     "pg": "^8.13.0",
-    "sequelize": "^6.37.3"
+    "sequelize": "^6.37.3",
+    "socket.io": "^4.8.1"
   }
 }

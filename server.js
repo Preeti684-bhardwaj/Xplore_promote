@@ -3,6 +3,7 @@ const db = require("./dbConfig/dbConfig.js")
 require("dotenv").config({path:"./.env"})
 const passport = require('passport');
 const passportJWT = require('passport-jwt');
+const setupSocket = require('./Controller/socketSetup.js');
 
 process.on("uncaughtException" , (err)=>{
     console.log(`Error: ${err.message}`)
@@ -39,25 +40,28 @@ let strategy = new JwtStrategy(jwtOptions, function (req, jwt_payload, done) {
 });
 
 passport.use('jwt', strategy);
-  
+
 // connectDB()
 // database connection
-db.sequelize.sync({alter:true})
-.then(() => {
-    const server = app.listen(process.env.PORT || 9190, () => {
-        console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
-    })
+db.sequelize.sync({ alter: true })
+    .then(() => {
+        const server = app.listen(process.env.PORT || 9190, () => {
+            console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
+        });
 
-    process.on("unhandledRejection" , (err)=>{
-        console.log(`Error: ${err.message}`)
-        console.log(`Shutting down the server due to Unhandled Promise Rejection`);
-    
-        server.close(()=>{
-            process.exit(1)
-        })
+        const io = setupSocket(server); // Move this after server creation
+        app.set('io', io);
+
+        process.on("unhandledRejection", (err) => {
+            console.log(`Error: ${err.message}`);
+            console.log(`Shutting down the server due to Unhandled Promise Rejection`);
+
+            server.close(() => {
+                process.exit(1);
+            });
+        });
     })
-})
-.catch((err) => {
-    console.log("db connection failed !!! ", err);
-    process.exit(1)
-})
+    .catch((err) => {
+        console.log("db connection failed !!! ", err);
+        process.exit(1);
+    });

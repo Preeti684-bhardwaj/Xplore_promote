@@ -50,6 +50,8 @@ const campaignRouter = require('./Routes/campaignRoutes');
 // const advertisementRouter = require('./Routes/advertisementRoutes');
 const layoutRouter = require('./Routes/layoutRoutes');
 const contentRouter = require('./Routes/cdnRoutes');
+const qrRouter = require('./Routes/qrCodeRoutes');
+
 
 // Routes declaration
 app.use("/v1/user", userRouter);
@@ -58,5 +60,6 @@ app.use("/v1/campaign", campaignRouter);
 // app.use("/v1/advertisement", advertisementRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
+app.use("/v1/qr", qrRouter);
 
 module.exports = app;
