@@ -32,6 +32,7 @@ db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
 // db.advertisements = require("../Modals/advertisementModal.js")(sequelize, Sequelize);
 db.layouts = require("../Modals/layoutModal.js")(sequelize, Sequelize);
 db.assets = require("../Modals/assetStore.js")(sequelize, Sequelize);
+db.qrSessions = require("../Modals/qrSessionModal.js")(sequelize, Sequelize);
 
 // Define relationships
 db.campaigns.hasMany(db.layouts, {

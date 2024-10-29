@@ -35,12 +35,24 @@ const createLayout = async (req, res) => {
         .status(400)
         .json({ message: "Invalid data types for required fields." });
     }
+
     // First check if the campaign exists
     const campaign = await db.campaigns.findByPk(campaignID);
     if (!campaign) {
       return res.status(404).json({
         status: false,
         message: `Campaign with ID ${campaignID} not found`,
+      });
+    }
+
+    // Check for existing layouts with the same name for the same campaign
+    const existingLayout = await Layout.findOne({
+      where: { name, campaignID }, // Ensure uniqueness within the same campaign
+    });
+    if (existingLayout) {
+      return res.status(400).json({
+        status: false,
+        message: `${name} already exists for this campaign.`,
       });
     }
 
