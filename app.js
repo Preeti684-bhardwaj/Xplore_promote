@@ -54,12 +54,12 @@ const qrRouter = require('./Routes/qrCodeRoutes');
 
 
 // Routes declaration
-app.use("/api/v1/user", userRouter);
+app.use("/v1/user", userRouter);
 app.use("/v1/apple", notificationRouter);
-app.use("/api/v1/campaign", campaignRouter);
+app.use("/v1/campaign", campaignRouter);
 // app.use("/v1/advertisement", advertisementRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
-app.use("/api/v1/qr", qrRouter);
+app.use("/v1/qr", qrRouter);
 
 module.exports = app;
