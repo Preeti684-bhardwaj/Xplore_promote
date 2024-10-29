@@ -36,6 +36,7 @@ const generateQR = async (req, res) => {
 
 const verifyQRLogin = async (req, res) => {
     const { channel, token, userId } = req.body;
+    const accessToken=req.token;
 
     if (!channel || !token || !userId) {
         return res.status(400).json({
@@ -65,6 +66,7 @@ const verifyQRLogin = async (req, res) => {
         // Emit login event to specific channel
         io.to(channel).emit('login-event', {
             token,
+            accessToken,
             userId
         });
 
