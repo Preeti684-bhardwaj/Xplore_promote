@@ -11,7 +11,7 @@ const { verifyJWt } = require("../middleware/auth");
 
 
 router.post("/create/:campaignID",verifyJWt,createLayout)
-router.get("/getAll/:id",getAllLayout)
+router.get("/getAll/:campaignID",getAllLayout)
 router.get("/getOne/:id",getOneLayout)
 router.put("/update/:id",verifyJWt,updateLayout)
 router.delete("/delete/:id",verifyJWt,deleteLayout)

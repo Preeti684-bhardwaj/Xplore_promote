@@ -85,4 +85,17 @@ db.assets.belongsTo(db.users, {
   onDelete: 'CASCADE' // Optional: deletes asset when user is deleted
 });
 
+// User-QRSession relationship
+db.users.hasMany(db.qrSessions, {
+  foreignKey: 'userId',
+  as: 'qrSessions',
+  onDelete: 'CASCADE' // Optional: deletes all QR sessions when the user is deleted
+});
+
+db.qrSessions.belongsTo(db.users, {
+  foreignKey: 'userId',
+  as: 'user',
+  onDelete: 'CASCADE' // Optional: deletes the QR session when the associated user is deleted
+});
+
 module.exports = db;

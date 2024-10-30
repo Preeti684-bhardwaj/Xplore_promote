@@ -90,8 +90,7 @@ const getAllLayout = async (req, res) => {
 
   // Create a condition to filter by campaignID and optionally by name
   const condition = {
-    ...(name ? { name: { [Op.iLike]: `%${name}%` } } : {}),
-    ...(campaignID ? { campaignID: campaignID } : {}), // Include campaignID in the condition
+    campaignID: campaignID// Include campaignID in the condition
   };
 
   try {
