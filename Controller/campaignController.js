@@ -122,7 +122,7 @@ const getAllCampaign = async (req, res) => {
   // Modify condition to filter campaigns by authenticated user
   const condition = {
     createdBy: req.user.id, // Filter by the user ID from req.user
-    ...(name ? { name: { [Op.iLike]: `%${name}%` } } : {}) // Include name filter if present
+    // ...(name ? { name: { [Op.iLike]: `%${name}%` } } : {}) // Include name filter if present
   };
 
   try {
