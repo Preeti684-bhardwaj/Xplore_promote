@@ -20,7 +20,7 @@ const generateQR = async (req, res) => {
             message: "QR code data generated successfully",
             data: {
                 channel: channelHash,
-                token:token,
+                token: token,
                 expiresIn: QR_EXPIRY_TIME
             }
         });
@@ -36,8 +36,8 @@ const generateQR = async (req, res) => {
 
 const verifyQRLogin = async (req, res) => {
     const { channel, token } = req.body;
-    const accessToken=req.token;
-    const userId=req.user.id
+    const accessToken = req.token;
+    const userId = req.user.id;
 
     if (!channel || !token) {
         return res.status(400).json({
@@ -45,12 +45,15 @@ const verifyQRLogin = async (req, res) => {
             message: "Missing required parameters"
         });
     }
-   
 
     try {
         const io = req.app.get('io');
-        const sessionData = await getQRSession(channel);
+        if (!io) {
+            throw new Error('Socket.IO instance not found');
+        }
 
+        const sessionData = await getQRSession(channel);
+        
         if (!sessionData) {
             return res.status(404).json({
                 success: false,
@@ -65,15 +68,30 @@ const verifyQRLogin = async (req, res) => {
             });
         }
 
-        // Emit login event to specific channel
-        io.to(channel).emit('login-event', {
-            token,
-            accessToken,
-            userId
-        });
+        // Wrap socket emission in a Promise to ensure it completes
+        const emitLoginEvent = () => {
+            return new Promise((resolve, reject) => {
+                try {
+                    io.to(channel).emit('login-event', {
+                        token,
+                        accessToken,
+                        userId
+                    });
+                    
+                    // Add a small delay to ensure emission completes
+                    setTimeout(resolve, 100);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        };
 
-        // Clean up the session
-        await deleteQRSession(channel);
+        // Execute socket emission and session deletion sequentially
+        await emitLoginEvent();
+        // await deleteQRSession(channel);
+
+        // Log successful emission and deletion
+        console.log(`Login event emitted and session deleted for channel: ${channel}`);
 
         return res.status(200).json({
             success: true,
@@ -82,6 +100,14 @@ const verifyQRLogin = async (req, res) => {
         });
     } catch (error) {
         console.error('QR Verification Error:', error);
+        
+        // If there's an error, attempt to clean up the session
+        try {
+            await deleteQRSession(channel);
+        } catch (cleanupError) {
+            console.error('Failed to clean up QR session:', cleanupError);
+        }
+
         return res.status(500).json({
             success: false,
             message: "Failed to verify login",
@@ -90,7 +116,14 @@ const verifyQRLogin = async (req, res) => {
     }
 };
 
+// Add a helper function to check if socket is connected to a channel
+const isSocketConnected = (io, channel) => {
+    const room = io.sockets.adapter.rooms.get(channel);
+    return !!room && room.size > 0;
+};
+
 module.exports = {
     generateQR,
-    verifyQRLogin
+    verifyQRLogin,
+    isSocketConnected
 };
