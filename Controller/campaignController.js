@@ -38,7 +38,7 @@ const createCampaign = async (req, res) => {
 
     // Validate required fields
     const { name, description, timing, status, performance, socialMediaLinks, contactInfo, siteInfo } = data;
-    const requiredFields = { name, timing, status, performance };
+    const requiredFields = { name, timing, status};
     
     const missingFields = Object.entries(requiredFields)
       .filter(([_, value]) => !value)
