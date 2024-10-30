@@ -77,6 +77,7 @@ const verifyQRLogin = async (req, res) => {
                         accessToken,
                         userId
                     });
+                    console.log("i am emiting login-event");
                     
                     // Add a small delay to ensure emission completes
                     setTimeout(resolve, 100);
@@ -91,7 +92,7 @@ const verifyQRLogin = async (req, res) => {
         // await deleteQRSession(channel);
 
         // Log successful emission and deletion
-        console.log(`Login event emitted and session deleted for channel: ${channel}`);
+        console.log(`Login event emitted for channel: ${channel}`);
 
         return res.status(200).json({
             success: true,
