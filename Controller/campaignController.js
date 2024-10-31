@@ -18,6 +18,14 @@ const createCampaign = async (req, res) => {
   let uploadedUrls = [];
   
   try {
+    // Validate file requirements first
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one file upload is required"
+      });
+    }
+
     // Validate basic request
     if (!req.body.data) {
       return res.status(400).json({
@@ -38,7 +46,7 @@ const createCampaign = async (req, res) => {
 
     // Validate required fields
     const { name, description, timing, status, performance, socialMediaLinks, contactInfo, siteInfo } = data;
-    const requiredFields = { name, timing, status};
+    const requiredFields = { name, timing, status };
     
     const missingFields = Object.entries(requiredFields)
       .filter(([_, value]) => !value)
@@ -51,19 +59,23 @@ const createCampaign = async (req, res) => {
       });
     }
 
-    // Handle file upload if files exist
-    if (req.files && req.files.length > 0) {
-      try {
-        uploadedUrls = await uploadFiles(req.files);
-        console.log('Files uploaded successfully:', uploadedUrls);
-      } catch (uploadError) {
-        console.error('File upload error:', uploadError);
-        return res.status(500).json({
-          success: false,
-          message: "File upload failed",
-          error: uploadError.message
-        });
+    // Handle file upload
+    try {
+      uploadedUrls = await uploadFiles(req.files);
+      console.log('Files uploaded successfully:', uploadedUrls);
+
+      // Validate uploaded files results
+      if (uploadedUrls.length === 0) {
+        throw new Error('File upload failed - no files were processed');
       }
+
+    } catch (uploadError) {
+      console.error('File upload error:', uploadError);
+      return res.status(500).json({
+        success: false,
+        message: "File upload failed",
+        error: uploadError.message
+      });
     }
 
     // Prepare campaign data
@@ -101,6 +113,7 @@ const createCampaign = async (req, res) => {
         await Promise.all(
           uploadedUrls.map(url => deleteFile(url.filename))
         );
+        console.log('Cleaned up uploaded files after error');
       } catch (cleanupError) {
         console.error("Cleanup error:", cleanupError);
       }
