@@ -37,26 +37,6 @@ const generateUniqueFileName = (originalName) => {
   return `${timestamp}-${randomString}${extension}`;
 };
 
-// Determine content type with additional validation
-const getContentType = (mimetype) => {
-  const contentTypes = {
-    'image/jpeg': 'image/jpeg',
-    'image/png': 'image/png',
-    'image/gif': 'image/gif',
-    'image/webp': 'image/webp',
-    'video/mp4': 'video/mp4',
-    'video/mpeg': 'video/mpeg',
-    'video/quicktime': 'video/quicktime',
-    'video/x-msvideo': 'video/x-msvideo'
-  };
-  
-  const type = contentTypes[mimetype];
-  if (!type) {
-    throw new Error(`Unsupported file type: ${mimetype}`);
-  }
-  return type;
-};
-
 // Upload a single file
 const uploadFile = async (file) => {
   try {
@@ -69,11 +49,9 @@ const uploadFile = async (file) => {
     }
 
     const fileName = generateUniqueFileName(file.originalname);
-    const contentType = getContentType(file.mimetype);
-    const fileType = file.mimetype.startsWith('image/') ? 'image' : 'video';
     
     const metaData = {
-      'Content-Type': contentType,
+      'Content-Type': file.mimetype || 'application/octet-stream',
       'Content-Length': file.buffer.length,
       'Original-Name': file.originalname
     };
@@ -104,10 +82,10 @@ const uploadFile = async (file) => {
     
     return {
       url: fileUrl,
-      type: fileType,
       filename: fileName,
       originalName: file.originalname,
-      size: file.buffer.length
+      size: file.buffer.length,
+      mimetype: file.mimetype || 'application/octet-stream'
     };
   } catch (error) {
     console.error('Error uploading file:', error);
@@ -115,7 +93,7 @@ const uploadFile = async (file) => {
   }
 };
 
-// New function to handle multiple file uploads
+// Handle multiple file uploads
 const uploadFiles = async (files) => {
   if (!Array.isArray(files)) {
     throw new Error('Files must be an array');
@@ -155,6 +133,7 @@ const deleteFile = async (fileName) => {
     throw new Error(`File deletion failed: ${error.message}`);
   }
 };
+
 // List all files in bucket
 const listFiles = async (prefix = '') => {
   try {

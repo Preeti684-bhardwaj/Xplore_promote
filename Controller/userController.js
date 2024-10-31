@@ -638,9 +638,9 @@ const updateUser = async (req, res) => {
 
 // delete user
 const deleteUser = async (req, res) => {
-  const { phone } = req.query;
+  const userId=req.user.id
   try {
-    const user = await User.findOne({ where: { phone: phone } });
+    const user = await User.findOne({ where: { id: userId } });
     console.log(user);
     if (!user) {
       return res.status(400).json({
@@ -651,7 +651,7 @@ const deleteUser = async (req, res) => {
     await user.destroy();
     return res.status(200).send({
       success: true,
-      message: `user with phone ${user.phone} deleted successfully`,
+      message: `user with email ${user.email} deleted successfully`,
     });
   } catch (err) {
     return res.status(500).send({ status: false, message: err.message });
