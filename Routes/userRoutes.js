@@ -27,7 +27,7 @@ router.post("/password/reset/:userId",resetPassword)
 router.get("/getById/:id",getUserById)
 router.get("/getUserByToken",verifyJWt,getUserByToken)
 router.put('/updateUser',verifyJWt,updateUser)
-router.delete('/deleteUser',deleteUser)
+router.delete('/deleteUser',verifyJWt,deleteUser)
 // 
 router.get("/redirect",getInsta)
 // Apple Sign In routes
