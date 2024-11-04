@@ -4,7 +4,7 @@ const User = db.users;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
-const { deleteQRSession } = require('../utils/qrService');
+const {deleteQRSession}=require("../utils/qrService.js")
 
 // const crypto = require("crypto");
 const {
@@ -37,12 +37,10 @@ const registerUser = async (req, res) => {
   try {
     // Validate input fields
     if ([name, phone, email, password].some((field) => field?.trim() === "")) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Please provide all necessary fields",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Please provide all necessary fields",
+      });
     }
     // Validate input fields
     if (!name) {
@@ -148,12 +146,10 @@ const registerUser = async (req, res) => {
     });
 
     if (!createdUser) {
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Something went wrong while registering the user",
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Something went wrong while registering the user",
+      });
     }
     res.status(200).json({
       success: true,
@@ -272,12 +268,10 @@ const loginUser = async (req, res) => {
     }
 
     if (!user.isEmailVerified) {
-      return res
-        .status(403)
-        .send({
-          success: false,
-          message: "Please verify your OTP before logging in",
-        });
+      return res.status(403).send({
+        success: false,
+        message: "Please verify your OTP before logging in",
+      });
     }
     const obj = {
       type: "USER",
@@ -460,12 +454,10 @@ const resetPassword = async (req, res) => {
 
   // Validate input fields
   if (!password || !otp) {
-    return res
-      .status(400)
-      .send({
-        status: false,
-        message: "Missing required fields: password or OTP",
-      });
+    return res.status(400).send({
+      status: false,
+      message: "Missing required fields: password or OTP",
+    });
   }
   const passwordValidationResult = isValidPassword(password);
   if (passwordValidationResult) {
@@ -558,22 +550,23 @@ const getUserByToken = async (req, res) => {
   }
 };
 
-
-// get insta verify 
+// get insta verify
 const getInsta = async (req, res) => {
   try {
-    const userAgent = req.headers['user-agent'];
-    console.log('User-Agent:', userAgent);
-    
-    if (userAgent && userAgent.includes('Instagram')) {
-      console.log('Redirecting to Instagram link...');
-      res.redirect(302, 'https://xplore-instant.vercel.app/');
+    const userAgent = req.headers["user-agent"];
+    console.log("User-Agent:", userAgent);
+
+    if (userAgent && userAgent.includes("Instagram")) {
+      console.log("Redirecting to Instagram link...");
+      res.redirect(302, "https://xplore-instant.vercel.app/");
     } else {
-      console.log('Sending normal link...');
-      res.status(200).send('<a href="https://xplore-instant.vercel.app/">Click Here</a>');
+      console.log("Sending normal link...");
+      res
+        .status(200)
+        .send('<a href="https://xplore-instant.vercel.app/">Click Here</a>');
     }
   } catch (error) {
-    console.error('Error occurred:', error);
+    console.error("Error occurred:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -640,7 +633,7 @@ const updateUser = async (req, res) => {
 
 // delete user
 const deleteUser = async (req, res) => {
-  const userId=req.user.id
+  const userId = req.user.id;
   try {
     const user = await User.findOne({ where: { id: userId } });
     console.log(user);
@@ -660,18 +653,44 @@ const deleteUser = async (req, res) => {
   }
 };
 
-const logout=async(req,res)=>{
- const userId=req.user.id;
- const userSession=await db.qrSessions.findOne({userId:userId});
- if(!userSession){
-  return res.status(404).json({status:false,message:`session doesn't exist for ${userId}`})
- }
- await deleteQRSession(userSession.channel);
- return res.status(200).send({
-  success: true,
-  message: `user session deleted successfully`,
-});
-}
+const logout = async (req, res) => {
+  try {
+    const channel = req.body.channel;
+    const userId = req.user.id;
+
+    // Check if channel exists in request
+    if (!channel) {
+      return res.status(400).json({
+        success: false,
+        message: "Channel is required",
+      });
+    }
+
+    // Call deleteQRSession and handle its response
+    const deleteResponse = await deleteQRSession(channel, userId);
+
+    // If deleteQRSession fails, respond with the appropriate message and status
+    if (!deleteResponse.success) {
+      return res.status(deleteResponse.status).json({
+        success: deleteResponse.success,
+        message: deleteResponse.message,
+      });
+    }
+
+    // Respond with success message if session is deleted successfully
+    return res.status(200).json({
+      success: true,
+      message: "User session deleted successfully",
+    });
+  } catch (error) {
+    console.error("Logout Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred during logout",
+    });
+  }
+};
+
 
 module.exports = {
   registerUser,
@@ -685,5 +704,5 @@ module.exports = {
   sendOtp,
   deleteUser,
   getInsta,
-  logout
+  logout,
 };
