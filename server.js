@@ -3,7 +3,7 @@ const db = require("./dbConfig/dbConfig.js")
 require("dotenv").config({path:"./.env"})
 const passport = require('passport');
 const passportJWT = require('passport-jwt');
-const setupSocket = require('./Controller/socketSetup.js');
+const setupSocket = require('./utils/socketSetup.js');
 
 process.on("uncaughtException" , (err)=>{
     console.log(`Error: ${err.message}`)

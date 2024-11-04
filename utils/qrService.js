@@ -8,8 +8,13 @@ const createQRSession = async (channel, token) => {
     });
 };
 
-const getQRSession = async (channel) => {
-    return await db.qrSessions.findOne({ where: { channel } });
+const getQRSession = async (channel,userId) => {
+    const channelData= await db.qrSessions.findOne({ where: { channel } });
+     // Update channel's userId
+     channelData.userId = userId;
+     // Save the updated channel
+     await channelData.save();
+    return channelData;
 };
 
 const deleteQRSession = async (channel) => {

@@ -8,13 +8,13 @@ const {
     updateCampaign,
     deleteCampaign
 } = require("../Controller/campaignController");
-const { verifyJWt } = require("../middleware/auth");
+const { verifyJWt, verifySession } = require("../middleware/auth");
 
 // Update routes to use upload middleware
-router.post("/create", verifyJWt, upload.array('files'), createCampaign);
+router.post("/create", verifyJWt, verifySession,upload.array('files'), createCampaign);
 router.get("/getAll", verifyJWt, getAllCampaign);
 router.get("/getOne/:id", verifyJWt, getOneCampaign);
-router.put("/update/:id", verifyJWt, upload.array('files'), updateCampaign);
+router.put("/update/:id", verifyJWt,verifySession, upload.array('files'), updateCampaign);
 router.delete("/delete/:id", verifyJWt, deleteCampaign);
 
 module.exports = router;
