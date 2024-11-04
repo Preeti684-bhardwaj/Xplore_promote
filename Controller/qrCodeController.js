@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { createQRSession, getQRSession, deleteQRSession } = require('./qrService');
+const { createQRSession, getQRSession, deleteQRSession } = require('../utils/qrService');
 
 // Store active QR sessions
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
@@ -52,7 +52,7 @@ const verifyQRLogin = async (req, res) => {
             throw new Error('Socket.IO instance not found');
         }
 
-        const sessionData = await getQRSession(channel);
+        const sessionData = await getQRSession(channel ,userId);
         
         if (!sessionData) {
             return res.status(404).json({

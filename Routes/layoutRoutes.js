@@ -7,13 +7,13 @@ const {
     updateLayout,
     deleteLayout
 } = require("../Controller/layoutController");
-const { verifyJWt } = require("../middleware/auth");
+const { verifyJWt,verifySession } = require("../middleware/auth");
 
 
-router.post("/create/:campaignID",verifyJWt,createLayout)
+router.post("/create/:campaignID",verifyJWt,verifySession,createLayout)
 router.get("/getAll/:campaignID",getAllLayout)
 router.get("/getOne/:id",getOneLayout)
-router.put("/update/:id",verifyJWt,updateLayout)
-router.delete("/delete/:id",verifyJWt,deleteLayout)
+router.put("/update/:id",verifyJWt,verifySession,updateLayout)
+router.delete("/delete/:id",verifyJWt,verifySession,deleteLayout)
 
 module.exports = router;

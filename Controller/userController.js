@@ -4,6 +4,8 @@ const User = db.users;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
+const { deleteQRSession } = require('../utils/qrService');
+
 // const crypto = require("crypto");
 const {
   isValidEmail,
@@ -658,6 +660,19 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const logout=async(req,res)=>{
+ const userId=req.user.id;
+ const userSession=await db.qrSessions.findOne({userId:userId});
+ if(!userSession){
+  return res.status(404).json({status:false,message:`session doesn't exist for ${userId}`})
+ }
+ await deleteQRSession(userSession.channel);
+ return res.status(200).send({
+  success: true,
+  message: `user session deleted successfully`,
+});
+}
+
 module.exports = {
   registerUser,
   updateUser,
@@ -669,5 +684,6 @@ module.exports = {
   resetPassword,
   sendOtp,
   deleteUser,
-  getInsta
+  getInsta,
+  logout
 };

@@ -5,6 +5,8 @@ require("dotenv").config({ path: "./.env" });
 
 const verifyJWt = async (req, res, next) => {
   try {
+    console.log(req.headers);
+    
     // Get the token from Authorization header
     const bearerHeader = req.headers["authorization"];
 
@@ -58,4 +60,17 @@ const verifyJWt = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyJWt };
+const verifySession=async(req,res,next)=>{
+try{
+const userId=req.user.id;
+const userSession=await db.qrSessions.findOne({userId:userId});
+if(!userSession){
+  return res.status(404).json({status:false,message:"session expired , Please login again"})
+}
+  next();
+}catch(error){
+  return res.status(500).send({ success: false, message: error.message });
+}
+}
+
+module.exports = { verifyJWt,verifySession };
