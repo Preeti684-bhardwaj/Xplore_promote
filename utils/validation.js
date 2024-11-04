@@ -90,10 +90,37 @@ const getFileNameFromUrl = (url) => {
   return urlParts[urlParts.length - 1];
 };
 
+const getPlatform = (userAgent) => {
+  if (!userAgent) return 'unknown';
+  
+  // Check if it's a mobile device
+  const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(userAgent);
+  return isMobile ? 'mobile' : 'web';
+};
+
+const detectOS = (userAgent) => {
+  if (!userAgent) return 'Unknown';
+  
+  if (userAgent.includes('Windows')) {
+    return 'Windows';
+  } else if (userAgent.includes('Mac OS')) {
+    return 'MacOS';
+  } else if (userAgent.includes('Linux')) {
+    return 'Linux';
+  } else if (userAgent.includes('Android')) {
+    return 'Android';
+  } else if (userAgent.includes('iPhone') || userAgent.includes('iPad') || userAgent.includes('iPod')) {
+    return 'iOS';
+  }
+  return 'Unknown';
+};
+
 module.exports = {
   isValidEmail,
   isPhoneValid,
   isValidPassword,
   isValidLength,
-  getFileNameFromUrl
+  getFileNameFromUrl,
+  getPlatform,
+  detectOS
 };
