@@ -1,8 +1,10 @@
 const db = require("../dbConfig/dbConfig");
 const User = db.users;
+const QrSession = db.qrSessions;
 const jwt = require("jsonwebtoken");
-require("dotenv").config({ path: "./.env" });
-const { getPlatform, detectOS } = require("../utils/validation");
+require("dotenv").config();
+const { getPlatform, detectOS } = require("../validators/validation");
+const ErrorHandler = require("../utils/ErrorHandler");
 
 const verifyJWt = async (req, res, next) => {
   try {
@@ -13,10 +15,7 @@ const verifyJWt = async (req, res, next) => {
 
     // Check if bearer header exists
     if (!bearerHeader) {
-      return res.status(401).json({
-        success: false,
-        message: "Access Denied. No token provided.",
-      });
+      return next(new ErrorHandler("Access Denied.", 401));
     }
 
     // Extract the token
@@ -24,10 +23,7 @@ const verifyJWt = async (req, res, next) => {
     const token = bearerHeader.replace("Bearer ", "").trim();
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Access Denied. Token is required.",
-      });
+      return next(new ErrorHandler("Access Denied. Token is required.", 401));
     }
 
     // Verify token
@@ -44,10 +40,7 @@ const verifyJWt = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token or user not found",
-      });
+      return next(new ErrorHandler("Invalid token or user not found", 401));
     }
 
     // Determine platform and OS
@@ -62,7 +55,7 @@ const verifyJWt = async (req, res, next) => {
 
     next();
   } catch (error) {
-    return res.status(500).send({ success: false, message: error.message });
+    return next(new ErrorHandler(error.message, 500));
   }
 };
 
@@ -78,44 +71,46 @@ const verifyUserAgent = async (req, res, next) => {
 
     next();
   } catch (error) {
-    return res.status(500).send({ success: false, message: error.message });
+    return next(new ErrorHandler(error.message, 500));
   }
 };
 
 const verifySession = async (req, res, next) => {
   try {
     const userSession = req.headers["session"];
-console.log("verifysession",userSession);
+    console.log("verifysession", userSession);
 
     // Skip session verification for mobile users
     if (req.platform === "mobile") {
       return next();
     }
-    if(!userSession){
-      return res.status(400).json({
-        status: false,
-        message: "Please provide session",
-      });
+    if (!userSession) {
+      return next(new ErrorHandler("Missing session in headers", 400));
     }
-
     // Verify session only for web users, including OS information
-    const session = await db.qrSessions.findOne({
+    const session = await QrSession.findOne({
       where: {
         channel: userSession,
       },
     });
+    console.log(session);
+
+    // First check if userId matches
+    if (session?.userId && session.userId !== req.user?.id) {
+      return next(
+        new ErrorHandler(`session doesn't belongs to this user ${req.user?.id}`, 403)
+      );
+    }
 
     if (!session) {
-      return res.status(401).json({
-        status: false,
-        message: "Session expired, Please login again",
-      });
+      return next(new ErrorHandler("Session expired, Please login again", 401));
     }
+
+    req.session =session.channel ;
     next();
   } catch (error) {
-    return res.status(500).send({ success: false, message: error.message });
+    return next(new ErrorHandler(error.message, 500));
   }
 };
 
-
-module.exports = { verifyJWt,verifyUserAgent, verifySession };
+module.exports = { verifyJWt, verifyUserAgent, verifySession };

@@ -5,15 +5,17 @@ const {
     uploadContent,
     deleteContent,
     getFiles,
-    deleteContentCdn
+    deleteContentCdn,
+    getUploadedAssets
 } = require("../Controller/contentController");
-const { verifyJWt } = require("../middleware/auth");
+const { verifyJWt, verifySession } = require("../middleware/auth");
 
 
 // Update routes to use upload middleware
-router.post("/uploadContent", verifyJWt, upload.array('files'), uploadContent);
+router.post("/uploadContent", verifyJWt,verifySession, upload.array('files'), uploadContent);
+router.get("/getAssets", verifyJWt,verifySession,getUploadedAssets);
 router.delete("/deleteContentCdn", deleteContentCdn);
-router.delete("/deleteContent", verifyJWt ,deleteContent);
+router.delete("/deleteContent", verifyJWt,verifySession,deleteContent);
 router.get("/files", getFiles);
 
 

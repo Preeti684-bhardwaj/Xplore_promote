@@ -15,6 +15,6 @@ router.post("/create", verifyJWt, verifySession,upload.array('files'), createCam
 router.get("/getAll", verifyJWt,verifySession ,getAllCampaign);
 router.get("/getOne/:id", verifyJWt,verifySession,getOneCampaign);
 router.put("/update/:id", verifyJWt,verifySession, upload.array('files'), updateCampaign);
-router.delete("/delete/:id", verifyJWt, deleteCampaign);
+router.delete("/delete/:id", verifyJWt, verifySession,deleteCampaign);
 
 module.exports = router;

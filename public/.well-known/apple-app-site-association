@@ -9,25 +9,7 @@
                 "components": [
                     {
                         "/": "/campaign/*",
-                        "comment": "Matches any URL with a path that starts with /stores/."
-                    }
-                ]
-            }
-        ]
-    },
-    "appclips": {
-        "apps": [
-            "G33UGE8K58.com.xircular.XplorePromote.Clip"
-        ],
-        "details": [
-            {
-                "appIDs": [
-                    "G33UGE8K58.com.xircular.XplorePromote.Clip"
-                ],
-                "components": [
-                    {
-                        "/": "/campaign/*",
-                        "comment": "Matches any URL with a path that starts with /stores/."
+                        "comment": "Matches any URL with a path that starts with /campaign/."
                     }
                 ]
             }
@@ -35,13 +17,11 @@
     },
     "webcredentials": {
         "apps": [
-            "G33UGE8K58.com.xircular.XplorePromote",
-            "G33UGE8K58.com.xircular.XplorePromote.Clip"
+            "G33UGE8K58.com.xircular.XplorePromote"
         ]
     },
-    "activitycontinuation": {
+    "appclips": {
         "apps": [
-            "G33UGE8K58.com.xircular.XplorePromote",
             "G33UGE8K58.com.xircular.XplorePromote.Clip"
         ]
     }
