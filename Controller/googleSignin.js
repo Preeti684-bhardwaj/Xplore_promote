@@ -5,13 +5,13 @@ require("dotenv").config();
 const {CLIENT_ID} = process.env
 const User = db.users;
 const { OAuth2Client } = require('google-auth-library');
-
+const ErrorHandler = require("../utils/ErrorHandler.js");
+const asyncHandler = require("../utils/asyncHandler.js");
 const {
   isValidEmail,
   isPhoneValid,
-  isValidPassword,
-  isValidLength,
-} = require("../utils/validation.js");
+} = require("../validators/validation.js");
+const {generateToken}=require("../validators/userValidation.js")
 
 const googleClient = new OAuth2Client({
   clientId: process.env.CLIENT_ID
@@ -30,14 +30,8 @@ async function verifyGoogleLogin(idToken) {
     return null;
   }
 }
-
-const generateToken = (user) => {
-  return jwt.sign({ obj: user }, process.env.JWT_SECRET, {
-    expiresIn: "72h",
-  });
-};
-
-const googleLogin = async (req, res) => {
+//-----------------google signin------------------
+const googleLogin =asyncHandler(async (req, res,next) => {
   try {
     // Get token from Authorization header and remove 'Bearer ' if present
     const authHeader = req.headers["authorization"];
@@ -46,10 +40,7 @@ const googleLogin = async (req, res) => {
       : authHeader;
 
     if (!idToken || idToken === "null") {
-      return res.status(401).json({ 
-        status: false, 
-        error: "No authentication token provided" 
-      });
+     return next(new ErrorHandler("No authentication token provided",401));
     }
 
     let googlePayload;
@@ -57,22 +48,13 @@ const googleLogin = async (req, res) => {
       googlePayload = await verifyGoogleLogin(idToken);
     } catch (error) {
       if (error.message.includes('Token used too late')) {
-        return res.status(401).json({
-          status: false,
-          error: "Authentication token has expired. Please login again."
-        });
+      return next(new ErrorHandler("Authentication token has expired. Please login again.",401));
       }
-      return res.status(401).json({
-        status: false,
-        error: "Invalid authentication token"
-      });
+      return next(new ErrorHandler("Invalid authentication token",401));
     }
 
     if (!googlePayload?.sub) {
-      return res.status(400).json({ 
-        status: false, 
-        error: "Invalid Google account information" 
-      });
+     return next(new ErrorHandler("Invalid Google account information",400));
     }
 
     // Try to find user by Google ID or email
@@ -88,10 +70,7 @@ const googleLogin = async (req, res) => {
     if (!user) {
       // Validate email if present
       if (googlePayload.email && !isValidEmail(googlePayload.email)) {
-        return res.status(400).json({ 
-          status: false, 
-          error: "Invalid email format from Google account" 
-        });
+        return next(new ErrorHandler("Invalid email format from Google account",400));
       }
 
       try {
@@ -107,10 +86,7 @@ const googleLogin = async (req, res) => {
       } catch (error) {
         console.error("Error creating user:", error);
         if (error.name === 'SequelizeUniqueConstraintError') {
-          return res.status(409).json({ 
-            status: false, 
-            error: "Account already exists with this email" 
-          });
+          return next(new ErrorHandler("Account already exists with this email" ,409));
         }
         throw error;
       }
@@ -123,10 +99,7 @@ const googleLogin = async (req, res) => {
     }
 
     if (!user.IsActive) {
-      return res.status(403).json({ 
-        status: false, 
-        error: "This account has been deactivated" 
-      });
+      return next(new ErrorHandler("This account has been deactivated",403));
     }
 
     const obj = {
@@ -135,7 +108,7 @@ const googleLogin = async (req, res) => {
     };
     const accessToken = generateToken(obj);
 
-    res.status(200).json({
+    return res.status(200).json({
       status: true,
       message: "Login successful",
       user: {
@@ -150,49 +123,47 @@ const googleLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Google login error:", error);
-    res.status(500).json({ 
-      status: false, 
-      error: "An error occurred during login. Please try again later." 
-    });
+   return next(new ErrorHandler(error.message||"An error occurred during login. Please try again later.",500));
   }
-};
+});
 
-const googlePhone = async (req, res) => {
+//-------------------add phone--------------------------
+const googlePhone = asyncHandler(async (req, res,next) => {
   try {
     const { phone } = req.body;
 
     if (!phone) {
-      return res.status(400).json({ status: false, error: "Missing phone number" });
+      return next(new ErrorHandler("Missing phone number",400));
     }
 
     const phoneError = isPhoneValid(phone);
     if (phoneError) {
-      return res.status(400).json({ status: false, error: phoneError });
+      return next(new ErrorHandler(phoneError,400));
     }
 
     if (!req.decodedToken || !req.decodedToken.obj || !req.decodedToken.obj.obj || !req.decodedToken.obj.obj.id) {
-      return res.status(401).json({ status: false, error: "Invalid or missing token" });
+      return next(new ErrorHandler("Invalid or missing token",401 ));
     }
 
     const userId = req.decodedToken.obj.obj.id;
     const user = await User.findOne({ where: { id: userId } });
 
     if (!user) {
-      return res.status(404).json({ status: false, error: "User not found" });
+      return next(new ErrorHandler("User not found",404));
     }
 
     if (!user.isEmailVerified) {
-      return res.status(403).json({ status: false, error: "Email not verified. Please verify your email first." });
+      return next(new ErrorHandler("Email not verified. Please verify your email first.",403));
     }
 
     if (user.phone) {
-      return res.status(409).json({ status: false, error: "Phone number already exists for this user" });
+      return next(new ErrorHandler("Phone number already exists for this user",409));
     }
 
     user.phone = phone;
     await user.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       status: true,
       message: "Phone number added successfully",
       user: {
@@ -203,9 +174,9 @@ const googlePhone = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in googlePhone:", error);
-    res.status(500).json({ status: false, error: "Internal server error" });
+    return next(new ErrorHandler(error.message,500));
   }
-};
+});
 
 module.exports = {
   googleLogin,

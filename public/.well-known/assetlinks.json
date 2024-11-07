@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.xircular.xplorecampaign",
+      "sha256_cert_fingerprints": [
+        "42:4C:83:13:BB:FD:96:54:28:5F:EA:23:B7:A8:7B:EC:81:B9:08:24:68:96:26:E2:F7:81:44:67:11:82:B2:2A"
+      ]
+    }
+  }
+]

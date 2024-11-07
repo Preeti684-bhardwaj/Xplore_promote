@@ -4,6 +4,7 @@ require("dotenv").config({ path: "./.env" });
 const app = express();
 const cors = require("cors");
 const path = require("path");
+const errorMiddleware = require("./middleware/Error")
 
 // Define the allowed origins
 const allowedOrigins = [
@@ -61,5 +62,8 @@ app.use("/v1/campaign", campaignRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
 app.use("/v1/qr", qrRouter);
+
+// Middleware for error
+app.use(errorMiddleware);
 
 module.exports = app;

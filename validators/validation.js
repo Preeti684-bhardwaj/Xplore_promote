@@ -1,9 +1,4 @@
-// const moment = require("moment");
 const validator = require("validator");
-// const  PASSWORD_REGEX  =/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&.,:;<>^()[\]{}+_=|/~`#\s\\-])[A-Za-z\d@$!%*?&.,:;<>^()[\]{}+_=|/~`#\s\\-]{8,}$/;
-
-// Get today's date
-// const today = moment();
 
 const isValidEmail = email => validator.isEmail(email);
 
@@ -115,6 +110,13 @@ const detectOS = (userAgent) => {
   return 'Unknown';
 };
 
+// Pagination helper function
+const getPagination = (page, size) => {
+  const limit = size ? +size : 10;
+  const offset = page ? page * limit : 0;
+  return { limit, offset };
+};
+
 module.exports = {
   isValidEmail,
   isPhoneValid,
@@ -122,5 +124,7 @@ module.exports = {
   isValidLength,
   getFileNameFromUrl,
   getPlatform,
-  detectOS
+  detectOS,
+  getPagination
 };
+

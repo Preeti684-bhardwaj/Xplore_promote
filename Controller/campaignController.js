@@ -1,85 +1,42 @@
 const db = require("../dbConfig/dbConfig.js");
-const { uploadFiles ,deleteFile} = require("./cdnController.js");
 const Campaign = db.campaigns;
 const Layout = db.layouts;
 const User = db.users;
-const { Op } = require("sequelize");
-const { ValidationError } = require("sequelize");
+const { uploadFiles, deleteFile } = require("../utils/cdnImplementation.js");
+const {
+  validateFiles,
+  getPagination
+} = require("../validators/campaignValidations.js");
+const ErrorHandler = require("../utils/ErrorHandler.js");
+const asyncHandler = require("../utils/asyncHandler.js");
 
-// Pagination helper function
-const getPagination = (page, size) => {
-  const limit = size ? +size : 10;
-  const offset = page ? page * limit : 0;
-  return { limit, offset };
-};
-
-// Create a new campaign
-const createCampaign = async (req, res) => {
+//--------------------Campaign operations----------------------------------
+const createCampaign = asyncHandler(async (req, res, next) => {
   let uploadedUrls = [];
-  
+
   try {
     // Validate file requirements first
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one file upload is required"
-      });
+    const fileError = validateFiles(req.files);
+    if (fileError) {
+      return next(new ErrorHandler(fileError, 400));
     }
-
-    // Validate basic request
-    if (!req.body.data) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required data"
-      });
-    }
-
+    // Parse and validate request data
     let data;
     try {
-      data = JSON.parse(req.body.data);
+      data =
+        typeof req.body?.data === "string"
+          ? JSON.parse(req.body?.data)
+          : req.body?.data;
+      console.log(data);
     } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid JSON data format"
-      });
+      return next(new ErrorHandler("Invalid JSON data format", 400));
     }
-
+    // Validate basic request
+    if (!data) {
+      return next(new ErrorHandler("Missing required data", 400));
+    }
     // Validate required fields
-    const { name, description, timing, status, performance, socialMediaLinks, contactInfo, siteInfo } = data;
-    const requiredFields = { name, timing, status };
-    
-    const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => !value)
-      .map(([key]) => key);
-
-    if (missingFields.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Missing required fields: ${missingFields.join(', ')}`
-      });
-    }
-
-    // Handle file upload
-    try {
-      uploadedUrls = await uploadFiles(req.files);
-      console.log('Files uploaded successfully:', uploadedUrls);
-
-      // Validate uploaded files results
-      if (uploadedUrls.length === 0) {
-        throw new Error('File upload failed - no files were processed');
-      }
-
-    } catch (uploadError) {
-      console.error('File upload error:', uploadError);
-      return res.status(500).json({
-        success: false,
-        message: "File upload failed",
-        error: uploadError.message
-      });
-    }
-
-    // Prepare campaign data
-    const campaignData = {
+    const {
       name,
       description,
       timing,
@@ -88,200 +45,286 @@ const createCampaign = async (req, res) => {
       socialMediaLinks,
       contactInfo,
       siteInfo,
-      images: uploadedUrls, // Array of uploaded file information
-      createdDate: new Date(),
-      lastModifiedBy: req.user.id,
-      lastModifiedDate: new Date(),
-      createdBy: req.user.id
-    };
+    } = data;
 
-    // Create campaign
-    const campaign = await Campaign.create(campaignData);
+    const missingFields = [];
+
+    // Check for empty or missing `name`
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      missingFields.push("name");
+    }
+    // Validate `timing` field structure and required nested fields
+    if (
+      !timing ||
+      typeof timing !== "object" ||
+      !timing.startDate ||
+      !timing.endDate ||
+      !timing.isScheduled
+    ) {
+      missingFields.push(
+        "timing (must include startDate, endDate, and isScheduled)"
+      );
+    }
+
+    // Validate `status` field structure and required nested fields
+    if (
+      !status ||
+      typeof status !== "object" ||
+      !status.status ||
+      !status.approvalStatus
+    ) {
+      missingFields.push("status (must include status and approvalStatus)");
+    }
+    // Return error if any required fields are missing
+    if (missingFields.length > 0) {
+      return next(
+        new ErrorHandler(
+          `Missing required fields: ${missingFields.join(", ")}`,
+          400
+        )
+      );
+    }
+    // Handle file upload
+    try {
+      uploadedUrls = await uploadFiles(req.files);
+      console.log("Files uploaded successfully:", uploadedUrls);
+
+      // Validate uploaded files results
+      if (uploadedUrls.length === 0) {
+        return next(
+          new ErrorHandler("File upload failed - no files were processed", 400)
+        );
+      }
+    } catch (uploadError) {
+      console.error("File upload error:", uploadError);
+      return next(
+        new ErrorHandler(`File upload failed: ${uploadError.message}`, 500)
+      );
+    }
+    // Prepare campaign data
+    const campaignData = {
+      name,
+      description:
+        description && description.trim() !== "" ? description.trim() : null,
+      timing,
+      status,
+      performance:
+        performance && typeof performance === "object" ? performance : null,
+      socialMediaLinks:
+        socialMediaLinks && typeof socialMediaLinks === "object"
+          ? socialMediaLinks
+          : null,
+      contactInfo:
+        contactInfo && typeof contactInfo === "object" ? contactInfo : null,
+      siteInfo: siteInfo && typeof siteInfo === "object" ? siteInfo : null,
+      images: uploadedUrls,
+      createdDate: new Date(),
+      lastModifiedDate: new Date(),
+      createdBy: req.user.id,
+      lastModifiedBy: req.user.id,
+    };
+    // Create campaign with transaction
+    const campaign = await db.sequelize.transaction(async (t) => {
+      const newCampaign = await Campaign.create(campaignData, {
+        transaction: t,
+      });
+      return newCampaign;
+    });
 
     return res.status(201).json({
       success: true,
       message: "Campaign created successfully",
-      data: campaign
+      data: campaign,
     });
-
   } catch (error) {
     console.error("Campaign creation error:", error);
-    
     // Clean up uploaded files if campaign creation fails
     if (uploadedUrls.length > 0) {
       try {
-        await Promise.all(
-          uploadedUrls.map(url => deleteFile(url.filename))
-        );
-        console.log('Cleaned up uploaded files after error');
+        await Promise.all(uploadedUrls.map((url) => deleteFile(url.filename)));
+        console.log("Cleaned up uploaded files after error");
       } catch (cleanupError) {
         console.error("Cleanup error:", cleanupError);
       }
     }
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create campaign",
-      error: error.message
-    });
+    return next(new ErrorHandler(error.message, 500));
   }
-};
+});
 
-// Get all campaigns with pagination
-const getAllCampaign = async (req, res) => {
-  const { page, size, name } = req.query;
-  const { limit, offset } = getPagination(page, size);
-
-  // Modify condition to filter campaigns by authenticated user
-  const condition = {
-    createdBy: req.user.id, // Filter by the user ID from req.user
-    // ...(name ? { name: { [Op.iLike]: `%${name}%` } } : {}) // Include name filter if present
-  };
-
+//--------------------Get all campaigns with pagination---------------------------
+const getAllCampaign = asyncHandler(async (req, res, next) => {
   try {
+    // const { page, size, name, startDate, endDate, status } = req.query;
+    const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
+    const { limit, offset } = getPagination(page, size);
+
+    // Build filter conditions
+    const condition = {
+      createdBy: req.user.id,
+      // ...(name && { name: { [Op.iLike]: `%${name}%` } }),
+      // ...(status && { status }),
+      // ...(startDate && endDate && {
+      //   createdDate: {
+      //     [Op.between]: [new Date(startDate), new Date(endDate)]
+      //   }
+      // })
+    };
+
     const data = await Campaign.findAndCountAll({
       where: condition,
       limit,
       offset,
       include: [
-        { model: Layout, as: 'layouts' },
+        {
+          model: Layout,
+          as: "layouts",
+          order: [["createdAt", "ASC"]],
+        },
         {
           model: User,
-          as: 'creator',
-          attributes: [
-            'id',
-            'name',
-            'email',
-            'phone',
-            'isEmailVerified',
-            'appleUserId',
-            'googleUserId',
-            'authProvider',
-          ],
+          as: "creator",
+          attributes: ["id", "name", "email", "isEmailVerified"],
         },
       ],
+      order: [["createdDate", "DESC"]],
     });
 
-    res.json({
-      success:true,
+    return res.status(200).json({
+      success: true,
       totalItems: data.count,
       campaigns: data.rows,
       currentPage: page ? +page : 0,
       totalPages: Math.ceil(data.count / limit),
     });
   } catch (error) {
-    console.error('Error fetching campaigns:', error);
-    res.status(500).json({ success:false,message: 'Error fetching campaigns', error: error.message });
+    console.error("Error fetching campaigns:", error);
+    return next(new ErrorHandler(error.message, 500));
   }
-};
+});
 
 // Get a single campaign by ID
-const getOneCampaign = async (req, res) => {
+const getOneCampaign = asyncHandler(async (req, res, next) => {
   try {
+    if (!req.params?.id) {
+      return next(new ErrorHandler("Missing Campaign Id", 400));
+    }
+    if (!req.user?.id) {
+      return next(new ErrorHandler("Access Denied", 403));
+    }
+    console.log(req.user.id);
+    
     const campaign = await Campaign.findOne({
       where: {
-        campaignID: req.params.id,
-        createdBy: req.user.id // Check if the campaign was created by the authenticated user
+        campaignID: req.params?.id,
+        createdBy: req.user?.id,
       },
       include: [
-        { model: Layout, as: 'layouts' },
+        {
+          model: Layout,
+          as: "layouts",
+          order: [["createdAt", "ASC"]], // Order layouts by createdAt in ascending order
+        },
         {
           model: User,
-          as: 'creator',
-          attributes: [
-            'id',
-            'name',
-            'email',
-            'phone',
-            'isEmailVerified',
-            'appleUserId',
-            'googleUserId',
-            'authProvider',
-          ],
+          as: "creator",
+          attributes: ["id", "name", "email", "isEmailVerified"],
         },
       ],
+      order: [[{ model: Layout, as: "layouts" }, "createdAt", "ASC"]],
     });
+    console.log(campaign);
 
-    if (campaign) {
-      res.status(200).json({success:true,data:campaign});
-    } else {
-      res.status(404).json({success:false, message: 'Campaign not found or access denied' });
+    if (!campaign) {
+      return next(new ErrorHandler(`Campaign not found for user ${req.user.id}`, 404));
     }
+
+    return res.status(200).json({
+      success: true,
+      data: campaign,
+    });
   } catch (error) {
-    console.error('Error fetching campaign:', error);
-    res.status(500).json({success:false, message: 'Error fetching campaign', error: error.message });
+    return next(new ErrorHandler(error.message, 500));
   }
-};
+});
 
 // Update a campaign
-const updateCampaign = async (req, res) => {
-  let uploadedUrls = [];
-  
+const updateCampaign = asyncHandler(async (req, res, next) => {
   try {
-    // Fetch the existing campaign to preserve the current values
-    const campaign = await Campaign.findByPk(req.params.id);
-    if (!campaign) {
-      return res.status(404).json({success:false, message: "Campaign not found" });
+    let uploadedUrls = [];
+    const campaignId = req.params?.id;
+
+    if (!campaignId) {
+      return next(new ErrorHandler("Missing campaign Id", 400));
     }
 
-    // Start with the existing data
-    const updateData = {
+    const campaign = await Campaign.findByPk(campaignId, {
+      transaction: await db.sequelize.transaction(),
+    });
+
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    if (campaign.createdBy !== req.user.id) {
+      return next(new ErrorHandler("Unauthorized access", 403));
+    }
+
+    let updateData = {
       lastModifiedBy: req.user.id,
       lastModifiedDate: new Date(),
     };
 
     // Handle file uploads if present
-    if (req.files && req.files.length > 0) {
+    if (req.files) {
+      if (req.files?.length > 1) {
+        return next(new ErrorHandler(`Maximum ${1} files allowed`, 400));
+      }
       try {
-        // Upload new files
         uploadedUrls = await uploadFiles(req.files);
-        console.log('New files uploaded:', uploadedUrls);
-        
-        // Combine existing images with new uploads
         updateData.images = [...(campaign.images || []), ...uploadedUrls];
       } catch (uploadError) {
-        console.error('File upload error:', uploadError);
-        return res.status(500).json({
-          success: false,
-          message: "File upload failed",
-          error: uploadError.message
-        });
+        console.error("File upload error:", uploadError);
+        return next(
+          new ErrorHandler(`File upload failed: ${uploadError.message}`, 400)
+        );
       }
     }
 
-    // Parse and handle JSON data if present
     if (req.body.data) {
       let bodyData;
       try {
-        bodyData = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data;
+        bodyData =
+          typeof req.body.data === "string"
+            ? JSON.parse(req.body.data)
+            : req.body.data;
       } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid JSON data format"
-        });
+        return next(new ErrorHandler("Invalid JSON data format", 400));
       }
 
-      // Check and merge each field in bodyData
       if (bodyData.timing) {
         updateData.timing = { ...campaign.timing, ...bodyData.timing };
       }
-
       if (bodyData.status) {
         updateData.status = { ...campaign.status, ...bodyData.status };
       }
-
       if (bodyData.performance) {
-        updateData.performance = { ...campaign.performance, ...bodyData.performance };
+        updateData.performance = {
+          ...campaign.performance,
+          ...bodyData.performance,
+        };
       }
-
       if (bodyData.socialMediaLinks) {
-        updateData.socialMediaLinks = { ...campaign.socialMediaLinks, ...bodyData.socialMediaLinks };
+        updateData.socialMediaLinks = {
+          ...campaign.socialMediaLinks,
+          ...bodyData.socialMediaLinks,
+        };
       }
-
       if (bodyData.contactInfo) {
-        updateData.contactInfo = { ...campaign.contactInfo, ...bodyData.contactInfo };
+        updateData.contactInfo = {
+          ...campaign.contactInfo,
+          ...bodyData.contactInfo,
+        };
       }
-
       if (bodyData.siteInfo) {
         updateData.siteInfo = { ...campaign.siteInfo, ...bodyData.siteInfo };
       }
@@ -289,106 +332,249 @@ const updateCampaign = async (req, res) => {
       // Handle image deletion if specified
       if (bodyData.imagesToDelete && Array.isArray(bodyData.imagesToDelete)) {
         try {
-          // Delete specified images from storage
           await Promise.all(
-            bodyData.imagesToDelete.map(filename => deleteFile(filename))
+            bodyData.imagesToDelete.map((filename) => deleteFile(filename))
           );
-
-          // Remove deleted images from the images array
           const currentImages = updateData.images || campaign.images || [];
           updateData.images = currentImages.filter(
-            img => !bodyData.imagesToDelete.includes(img.filename)
+            (img) => !bodyData.imagesToDelete.includes(img.filename)
           );
         } catch (deleteError) {
-          console.error('Error deleting images:', deleteError);
-          // Continue with update even if image deletion fails
+          console.error("Error deleting images:", deleteError);
         }
       }
     }
 
-    // Ensure that createdBy and campaignID are not modified
     delete updateData.createdBy;
     delete updateData.campaignID;
 
-    // Perform the update, passing only the modified fields
     const [updated] = await Campaign.update(updateData, {
       where: { campaignID: req.params.id },
       returning: true,
     });
 
     if (updated) {
-      // Fetch the updated campaign with associations
       const updatedCampaign = await Campaign.findByPk(req.params.id, {
         include: [
-          { model: Layout, as: "layouts" },
           {
-            model: User,
-            as: "creator",
-            attributes: [
-              "id",
-              "name",
-              "email",
-              "phone",
-              "isEmailVerified",
-              "appleUserId",
-              "googleUserId",
-              "authProvider",
-            ],
+            model: Layout,
+            as: "layouts",
+            attributes: ["layoutID"],
+            order: [["createdAt", "ASC"]],
           },
+          { model: User, as: "creator", attributes: ["id", "email"] },
         ],
       });
 
-      return res.json({
-        success:true,
+      return res.status(200).json({
+        success: true,
         message: "Campaign updated successfully",
         data: updatedCampaign,
       });
     }
-
-    return res.status(400).json({success:false, message: "Failed to update campaign" });
-
   } catch (error) {
-    console.error("Error updating campaign:", error);
-    
-    // Clean up any newly uploaded files if the update fails
+    console.error("Campaign updation error:", error);
     if (uploadedUrls.length > 0) {
       try {
-        await Promise.all(
-          uploadedUrls.map(file => deleteFile(file.filename))
-        );
+        await Promise.all(uploadedUrls.map((url) => deleteFile(url.filename)));
+        console.log("Cleaned up uploaded files after error");
       } catch (cleanupError) {
         console.error("Cleanup error:", cleanupError);
       }
     }
-
-    res.status(400).json({
-      success:false, 
-      message: "Failed to update campaign", 
-      error: error.message 
-    });
+    return next(new ErrorHandler(error.message, 500));
   }
-};
+});
+
+// const updateCampaign = async (req, res) => {
+//   let uploadedUrls = [];
+
+//   try {
+//     // Fetch the existing campaign to preserve the current values
+//     const campaign = await Campaign.findByPk(req.params.id);
+//     if (!campaign) {
+//       return res.status(404).json({success:false, message: "Campaign not found" });
+//     }
+
+//     // Start with the existing data
+//     const updateData = {
+//       lastModifiedBy: req.user.id,
+//       lastModifiedDate: new Date(),
+//     };
+
+//     // Handle file uploads if present
+//     if (req.files && req.files.length > 0) {
+//       try {
+//         // Upload new files
+//         uploadedUrls = await uploadFiles(req.files);
+//         console.log('New files uploaded:', uploadedUrls);
+
+//         // Combine existing images with new uploads
+//         updateData.images = [...(campaign.images || []), ...uploadedUrls];
+//       } catch (uploadError) {
+//         console.error('File upload error:', uploadError);
+//         return res.status(500).json({
+//           success: false,
+//           message: "File upload failed",
+//           error: uploadError.message
+//         });
+//       }
+//     }
+
+//     // Parse and handle JSON data if present
+//     if (req.body.data) {
+//       let bodyData;
+//       try {
+//         bodyData = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data;
+//       } catch (error) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid JSON data format"
+//         });
+//       }
+
+//       // Check and merge each field in bodyData
+//       if (bodyData.timing) {
+//         updateData.timing = { ...campaign.timing, ...bodyData.timing };
+//       }
+
+//       if (bodyData.status) {
+//         updateData.status = { ...campaign.status, ...bodyData.status };
+//       }
+
+//       if (bodyData.performance) {
+//         updateData.performance = { ...campaign.performance, ...bodyData.performance };
+//       }
+
+//       if (bodyData.socialMediaLinks) {
+//         updateData.socialMediaLinks = { ...campaign.socialMediaLinks, ...bodyData.socialMediaLinks };
+//       }
+
+//       if (bodyData.contactInfo) {
+//         updateData.contactInfo = { ...campaign.contactInfo, ...bodyData.contactInfo };
+//       }
+
+//       if (bodyData.siteInfo) {
+//         updateData.siteInfo = { ...campaign.siteInfo, ...bodyData.siteInfo };
+//       }
+
+//       // Handle image deletion if specified
+//       if (bodyData.imagesToDelete && Array.isArray(bodyData.imagesToDelete)) {
+//         try {
+//           // Delete specified images from storage
+//           await Promise.all(
+//             bodyData.imagesToDelete.map(filename => deleteFile(filename))
+//           );
+
+//           // Remove deleted images from the images array
+//           const currentImages = updateData.images || campaign.images || [];
+//           updateData.images = currentImages.filter(
+//             img => !bodyData.imagesToDelete.includes(img.filename)
+//           );
+//         } catch (deleteError) {
+//           console.error('Error deleting images:', deleteError);
+//           // Continue with update even if image deletion fails
+//         }
+//       }
+//     }
+
+//     // Ensure that createdBy and campaignID are not modified
+//     delete updateData.createdBy;
+//     delete updateData.campaignID;
+
+//     // Perform the update, passing only the modified fields
+//     const [updated] = await Campaign.update(updateData, {
+//       where: { campaignID: req.params.id },
+//       returning: true,
+//     });
+
+//     if (updated) {
+//       // Fetch the updated campaign with associations
+//       const updatedCampaign = await Campaign.findByPk(req.params.id, {
+//         include: [
+//           { model: Layout, as: "layouts" },
+//           {
+//             model: User,
+//             as: "creator",
+//             attributes: [
+//               "id",
+//               "name",
+//               "email",
+//               "phone",
+//               "isEmailVerified",
+//               "appleUserId",
+//               "googleUserId",
+//               "authProvider",
+//             ],
+//           },
+//         ],
+//       });
+
+//       return res.json({
+//         success:true,
+//         message: "Campaign updated successfully",
+//         data: updatedCampaign,
+//       });
+//     }
+
+//     return res.status(400).json({success:false, message: "Failed to update campaign" });
+
+//   } catch (error) {
+//     console.error("Error updating campaign:", error);
+
+//     // Clean up any newly uploaded files if the update fails
+//     if (uploadedUrls.length > 0) {
+//       try {
+//         await Promise.all(
+//           uploadedUrls.map(file => deleteFile(file.filename))
+//         );
+//       } catch (cleanupError) {
+//         console.error("Cleanup error:", cleanupError);
+//       }
+//     }
+
+//     res.status(400).json({
+//       success:false,
+//       message: "Failed to update campaign",
+//       error: error.message
+//     });
+//   }
+// };
 
 // Delete a campaign
-const deleteCampaign = async (req, res) => {
+const deleteCampaign = asyncHandler(async (req, res, next) => {
   try {
-    const deleted = await Campaign.destroy({
-      where: { campaignID: req.params.id },
-    });
-    if (deleted) {
-      res
-        .status(200)
-        .json({ success: true, message: "Campaign deleted successfully" });
-    } else {
-      res.status(404).json({ success:false,message: "Campaign not found" });
+    if (!req.params?.id) {
+      return next(new ErrorHandler("Missing campaign Id", 400));
     }
+    const campaign = await Campaign.findByPk(req.params?.id);
+
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+    // Delete associated files first
+    if (campaign.images?.length > 0) {
+      await Promise.all(
+        campaign.images.map((image) => deleteFile(image.filename))
+      );
+    }
+
+    // Delete campaign with transaction
+    await db.sequelize.transaction(async (t) => {
+      await Campaign.destroy({
+        where: { campaignID: req.params.id },
+        transaction: t,
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Campaign deleted successfully",
+    });
   } catch (error) {
-    console.error("Error deleting campaign:", error);
-    res
-      .status(500)
-      .json({success:false, message: "Failed to delete campaign", error: error.message });
+    return next(new ErrorHandler(error.message, 500));
   }
-};
+});
 
 module.exports = {
   createCampaign,

@@ -1,22 +1,20 @@
 const crypto = require("crypto");
-const db = require('../dbConfig/dbConfig');
+const db = require("../dbConfig/dbConfig");
 const {
   createQRSession,
   getQRSession,
   deleteQRSession,
+//   isSocketConnected
 } = require("../utils/qrService");
-
-// Pagination helper function
-const getPagination = (page, size) => {
-    const limit = size ? +size : 10;
-    const offset = page ? page * limit : 0;
-    return { limit, offset };
-  };
+const { getPagination } = require("../validators/campaignValidations");
+const ErrorHandler = require("../utils/ErrorHandler.js");
+const asyncHandler= require("../utils/asyncHandler.js");
 
 // Store active QR sessions
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 
-const generateQR = async (req, res) => {
+// --------Generate QR-----------------------------------------
+const generateQR = asyncHandler(async (req, res, next) => {
   try {
     // Generate unique token and channel
     const token = crypto.randomBytes(64).toString("hex");
@@ -42,24 +40,21 @@ const generateQR = async (req, res) => {
     });
   } catch (error) {
     console.error("QR Generation Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to generate QR code",
-      error: error.message,
-    });
+    return next(new ErrorHandler(error.message, 500));
   }
-};
+});
 
-const verifyQRLogin = async (req, res) => {
+// -----------------Verify User Login---------------------------------
+const verifyQRLogin = asyncHandler(async (req, res, next) => {
   const { channel, token } = req.body;
   const accessToken = req.token;
-  const userId = req.user.id;
+  const userId = req.user?.id;
 
   if (!channel || !token) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing required parameters",
-    });
+    return next(new ErrorHandler("Missing required parameters", 400));
+  }
+  if (!userId || !accessToken) {
+    return next(new ErrorHandler("Unauthorized", 403));
   }
 
   try {
@@ -71,17 +66,11 @@ const verifyQRLogin = async (req, res) => {
     const sessionData = await getQRSession(channel, userId);
 
     if (!sessionData) {
-      return res.status(404).json({
-        success: false,
-        message: "QR session expired or not found",
-      });
+      return next(new ErrorHandler("QR session expired or not found", 404));
     }
 
     if (sessionData.token !== token) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token",
-      });
+      return next(new ErrorHandler("Invalid token", 401));
     }
 
     // Wrap socket emission in a Promise to ensure it completes
@@ -140,51 +129,47 @@ const verifyQRLogin = async (req, res) => {
       console.error("Failed to clean up QR session:", cleanupError);
     }
 
-    return res.status(500).json({
-      success: false,
-      message: "Failed to verify login",
-      error: error.message,
-    });
+    return next(new ErrorHandler(error.message, 500));
   }
-};
-const getQrSession=async (req,res)=>{
-    const { page, size } = req.query;
-    const { limit, offset } = getPagination(page, size);
-  
-    // Modify condition to filter campaigns by authenticated user
-    const condition = {
-      userId: req.user.id, 
-    };
-  
-    try {
-      const data = await db.qrSessions.findAndCountAll({
-        where: condition,
-        limit,
-        offset,
-      });
-  
-      res.json({
-        success:true,
-        totalItems: data.count,
-        sessions: data.rows,
-        currentPage: page ? +page : 0,
-        totalPages: Math.ceil(data.count / limit),
-      });
-    } catch (error) {
-      console.error('Error fetching campaigns:', error);
-      res.status(500).json({ success:false,message: 'Error fetching campaigns', error: error.message });
-    }
+});
+
+// ------------------get QR session----------------------------------------
+const getQrSession = asyncHandler(async (req, res, next) => {
+  const { page, size } = req.query;
+  const { limit, offset } = getPagination(page, size);
+
+  if (!req.user?.id) {
+    return next(new ErrorHandler("Unauthorized", 403));
+  }
+
+  // Modify condition to filter campaigns by authenticated user
+  const condition = {
+    userId: req.user?.id,
   };
 
-// Add a helper function to check if socket is connected to a channel
-const isSocketConnected = (io, channel) => {
-  const room = io.sockets.adapter.rooms.get(channel);
-  return !!room && room.size > 0;
-};
+  try {
+    const data = await db.qrSessions.findAndCountAll({
+      where: condition,
+      limit,
+      offset,
+    });
+
+    return res.status(200).json({
+      success: true,
+      totalItems: data.count,
+      sessions: data.rows,
+      currentPage: page ? +page : 0,
+      totalPages: Math.ceil(data.count / limit),
+    });
+  } catch (error) {
+    console.error("Error fetching campaigns:", error);
+    return next(new ErrorHandler(error.message,500));
+  }
+});
+
 
 module.exports = {
   generateQR,
   verifyQRLogin,
-  isSocketConnected,
   getQrSession
 };
