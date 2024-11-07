@@ -1,9 +1,17 @@
 const crypto = require("crypto");
+const db = require('../dbConfig/dbConfig');
 const {
   createQRSession,
   getQRSession,
   deleteQRSession,
 } = require("../utils/qrService");
+
+// Pagination helper function
+const getPagination = (page, size) => {
+    const limit = size ? +size : 10;
+    const offset = page ? page * limit : 0;
+    return { limit, offset };
+  };
 
 // Store active QR sessions
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
@@ -139,6 +147,34 @@ const verifyQRLogin = async (req, res) => {
     });
   }
 };
+const getQrSession=async (req,res)=>{
+    const { page, size } = req.query;
+    const { limit, offset } = getPagination(page, size);
+  
+    // Modify condition to filter campaigns by authenticated user
+    const condition = {
+      userId: req.user.id, 
+    };
+  
+    try {
+      const data = await db.qrSessions.findAndCountAll({
+        where: condition,
+        limit,
+        offset,
+      });
+  
+      res.json({
+        success:true,
+        totalItems: data.count,
+        sessions: data.rows,
+        currentPage: page ? +page : 0,
+        totalPages: Math.ceil(data.count / limit),
+      });
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      res.status(500).json({ success:false,message: 'Error fetching campaigns', error: error.message });
+    }
+  };
 
 // Add a helper function to check if socket is connected to a channel
 const isSocketConnected = (io, channel) => {
@@ -150,4 +186,5 @@ module.exports = {
   generateQR,
   verifyQRLogin,
   isSocketConnected,
+  getQrSession
 };

@@ -94,7 +94,7 @@ const getPlatform = (userAgent) => {
   if (!userAgent) return 'unknown';
   
   // Check if it's a mobile device
-  const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(userAgent);
+  const isMobile = /Mobile|Android|iPhone|iPad|iPod|PostmanRuntime|okhttp|CFNetwork|Darwin/i.test(userAgent);
   return isMobile ? 'mobile' : 'web';
 };
 
