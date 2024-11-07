@@ -98,9 +98,6 @@ const getAllLayout = asyncHandler(async (req, res, next) => {
       ],
       order: [["createdAt", "ASC"]],
     });
-    if (!data) {
-      return next(new ErrorHandler("Campaign Not found", 404));
-    }
 
     return res.status(200).json({
       success: true,
