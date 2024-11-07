@@ -301,6 +301,13 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
         return next(new ErrorHandler("Invalid JSON data format", 400));
       }
 
+      if (bodyData.name) {
+        updateData.name = bodyData.name;
+      }
+
+      if (bodyData.description) {
+        updateData.description = bodyData.description;
+      }
       if (bodyData.timing) {
         updateData.timing = { ...campaign.timing, ...bodyData.timing };
       }
