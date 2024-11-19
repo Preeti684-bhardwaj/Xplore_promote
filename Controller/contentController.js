@@ -14,86 +14,196 @@ const asyncHandler = require("../utils/asyncHandler.js");
 //-------------- Upload content to CDN and store metadata in AssetStore-----------------------------
 const uploadContent = asyncHandler(async (req, res, next) => {
   try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return next(new ErrorHandler("User ID is required", 400));
+    }
+
     // Validate file request
     const fileError = validateFiles(req.files);
     if (fileError) {
       return next(new ErrorHandler(fileError, 400));
     }
+
+    // Initialize arrays for tracking results
     const uploadResults = [];
-    const userId = req.user?.id;
 
-    // Check if the user already has an entry in AssetStore
-    let assetStore = await AssetStore.findOne({ where: { userId: userId } });
-    if(!assetStore){
-      return next(new ErrorHandler("AssetStore not found",404));
-    }
+    // First, ensure AssetStore exists for the user
+    let assetStore = await AssetStore.findOne({ 
+      where: { userId: userId } 
+    });
 
-    // Initialize assetData array, ensuring we parse existing JSON data
-    let assetData = [];
-    if (assetStore && assetStore.assetData) {
-      // Parse the existing assetData if it's a string, otherwise use it directly
-      assetData =
-        typeof assetStore.assetData === "string"
-          ? JSON.parse(assetStore.assetData)
-          : assetStore.assetData;
-    }
-
-    console.log("Existing assetData:", assetData); // Debug log
-
-    // Process each file
-    for (const file of req.files) {
-      // Upload to CDN
-      const cdnResult = await uploadFile(file);
-
-      // Prepare new asset data
-      const newAssetData = {
-        fileName: cdnResult.filename,
-        originalName: cdnResult.originalName,
-        fileType: cdnResult.type,
-        fileSize: cdnResult.size,
-        cdnUrl: cdnResult.url,
-        uploadedAt: new Date().toISOString(),
-      };
-
-      // Add new asset to assetData array
-      assetData.push(newAssetData);
-      uploadResults.push(newAssetData);
-    }
-
-    console.log("Updated assetData:", assetData); // Debug log
-
-    // Update or create AssetStore record
-    if (assetStore) {
-      // Update existing record
-      await AssetStore.update(
-        { assetData: assetData },
-        { where: { userId: userId } }
-      );
-    } else {
-      // Create new record for new user
+    // If no AssetStore exists, create one with empty assetData
+    if (!assetStore) {
       assetStore = await AssetStore.create({
         userId: userId,
-        assetData: assetData,
+        assetData: []
       });
     }
 
-    // Verify the update
-    const updatedStore = await AssetStore.findOne({
-      where: { userId: userId },
-    });
-    console.log("Verified assetData after update:", updatedStore.assetData); // Debug log
+    // Parse existing assetData
+    let assetData = [];
+    try {
+      assetData = typeof assetStore.assetData === "string" 
+        ? JSON.parse(assetStore.assetData) 
+        : assetStore.assetData || [];
+    } catch (parseError) {
+      console.error("Error parsing assetData:", parseError);
+      assetData = [];
+    }
 
-    return res.status(200).json({
-      success: true,
-      message: "Files uploaded successfully",
-      data: uploadResults,
-      currentAssets: assetData, // Include all assets in response for verification
-    });
+    // Process each file
+    for (const file of req.files) {
+      try {
+        // Upload to CDN
+        const cdnResult = await uploadFile(file);
+
+        // Prepare new asset data
+        const newAssetData = {
+          fileName: cdnResult.filename,
+          originalName: cdnResult.originalName,
+          fileType: cdnResult.type,
+          fileSize: cdnResult.size,
+          cdnUrl: cdnResult.url,
+          uploadedAt: new Date().toISOString(),
+        };
+
+        // Add new asset to arrays
+        assetData.push(newAssetData);
+        uploadResults.push(newAssetData);
+      } catch (uploadError) {
+        console.error(`Error uploading file ${file.originalname}:`, uploadError);
+        // Continue with other files if one fails
+        continue;
+      }
+    }
+
+    // Update AssetStore with new data
+    try {
+      await AssetStore.update(
+        { assetData: assetData },
+        { 
+          where: { userId: userId },
+          returning: true // Get the updated record
+        }
+      );
+
+      // Verify the update
+      const verifiedStore = await AssetStore.findOne({
+        where: { userId: userId }
+      });
+
+      if (!verifiedStore) {
+        throw new Error("Failed to verify AssetStore update");
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully uploaded ${uploadResults.length} files`,
+        data: {
+          newUploads: uploadResults,
+          totalAssets: assetData.length,
+          assetStoreId: verifiedStore.id
+        }
+      });
+
+    } catch (updateError) {
+      console.error("Error updating AssetStore:", updateError);
+      return next(new ErrorHandler("Failed to update asset store", 500));
+    }
+
   } catch (error) {
     console.error("Upload Content Error:", error);
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
+
+
+
+// const uploadContent = asyncHandler(async (req, res, next) => {
+//   try {
+//     // Validate file request
+//     const fileError = validateFiles(req.files);
+//     if (fileError) {
+//       return next(new ErrorHandler(fileError, 400));
+//     }
+//     const uploadResults = [];
+//     const userId = req.user?.id;
+
+//     // Check if the user already has an entry in AssetStore
+//     let assetStore = await AssetStore.findOne({ where: { userId: userId } });
+//     if(!assetStore){
+//       return next(new ErrorHandler("AssetStore not found",404));
+//     }
+
+//     // Initialize assetData array, ensuring we parse existing JSON data
+//     let assetData = [];
+//     if (assetStore && assetStore.assetData) {
+//       // Parse the existing assetData if it's a string, otherwise use it directly
+//       assetData =
+//         typeof assetStore.assetData === "string"
+//           ? JSON.parse(assetStore.assetData)
+//           : assetStore.assetData;
+//     }
+
+//     console.log("Existing assetData:", assetData); // Debug log
+
+//     // Process each file
+//     for (const file of req.files) {
+//       // Upload to CDN
+//       const cdnResult = await uploadFile(file);
+
+//       // Prepare new asset data
+//       const newAssetData = {
+//         fileName: cdnResult.filename,
+//         originalName: cdnResult.originalName,
+//         fileType: cdnResult.type,
+//         fileSize: cdnResult.size,
+//         cdnUrl: cdnResult.url,
+//         uploadedAt: new Date().toISOString(),
+//       };
+
+//       // Add new asset to assetData array
+//       assetData.push(newAssetData);
+//       uploadResults.push(newAssetData);
+//     }
+
+//     console.log("Updated assetData:", assetData); // Debug log
+
+//     // Update or create AssetStore record
+//     if (assetStore) {
+//       // Update existing record
+//       await AssetStore.update(
+//         { assetData: assetData },
+//         { where: { userId: userId } }
+//       );
+//     } else {
+//       // Create new record for new user
+//       assetStore = await AssetStore.create({
+//         userId: userId,
+//         assetData: assetData,
+//       });
+//     }
+
+//     // Verify the update
+//     const updatedStore = await AssetStore.findOne({
+//       where: { userId: userId },
+//     });
+//     console.log("Verified assetData after update:", updatedStore.assetData); // Debug log
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Files uploaded successfully",
+//       data: uploadResults,
+//       currentAssets: assetData, // Include all assets in response for verification
+//     });
+//   } catch (error) {
+//     console.error("Upload Content Error:", error);
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
 //-------------------Get assetstore data-----------------------
 const getUploadedAssets = asyncHandler(async (req, res, next) => {
   try {
@@ -216,7 +326,7 @@ const deleteContentCdn = asyncHandler(async (req, res,next) => {
 
       return res.status(200).json({
         success: true,
-        message: "File deleted successfully from both CDN",
+        message: "File deleted successfully from CDN",
       });
     } catch (error) {
       // If CDN deletion fails, don't update database

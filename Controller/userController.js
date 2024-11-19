@@ -4,6 +4,9 @@ const QRSession = db.qrSessions;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
+const {
+  validateFiles,
+} = require("../validators/campaignValidations.js");
 const { deleteQRSession } = require("../utils/qrService.js");
 const {
   isValidEmail,
@@ -16,23 +19,138 @@ const {
   generateOtp,
   hashPassword,
 } = require("../validators/userValidation.js");
+const { uploadFile } = require("../utils/cdnImplementation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
+const axios = require("axios");
+require("dotenv").config();
+const { KALEYRA_BASE_URL, KALEYRA_API_KEY, KALEYRA_FLOW_ID } = process.env;
+
+// Kaleyra API configuration
+const KALEYRA_CONFIG = {
+  baseURL: KALEYRA_BASE_URL,
+  apiKey: KALEYRA_API_KEY,
+  flowId: KALEYRA_FLOW_ID,
+};
 
 //----------register user-------------------------
+// const registerUser = asyncHandler(async (req, res, next) => {
+//   try {
+//     const { name, phone, email, password } = req.body;
+//     // Validate all required fields
+//     if ([name, phone, email, password].some((field) => field?.trim() === "")) {
+//       return next(new ErrorHandler("All fields are required", 400));
+//     }
+//     // Validate input fields
+//     if (!name) {
+//       return next(new ErrorHandler("Name is missing", 400));
+//     }
+//     if (!phone) {
+//       return next(new ErrorHandler("Phone is missing", 400));
+//     }
+//     if (!email) {
+//       return next(new ErrorHandler("Email is missing", 400));
+//     }
+//     if (!password) {
+//       return next(new ErrorHandler("Password is missing", 400));
+//     }
+//     // Sanitize name: trim and reduce multiple spaces to a single space
+//     name.trim().replace(/\s+/g, " ");
+//     // Convert the email to lowercase for case-insensitive comparison
+//     const lowercaseEmail = email.toLowerCase();
+
+//     // Validate name
+//     const nameError = isValidLength(name);
+//     if (nameError) {
+//       return next(new ErrorHandler(nameError, 400));
+//     }
+
+//     const phoneError = isPhoneValid(phone);
+//     if (phoneError) {
+//       return next(new ErrorHandler(phoneError, 400));
+//     }
+
+//     // Validate email format
+//     if (!isValidEmail(email)) {
+//       return next(new ErrorHandler("Invalid email", 400));
+//     }
+
+//     // Check for existing user with the provided email or phone
+//     const existingUser = await User.findOne({
+//       where: {
+//         [Op.or]: [{ email: lowercaseEmail }, { phone: phone }],
+//       },
+//     });
+
+//     if (existingUser) {
+//       if (existingUser.isEmailVerified) {
+//         // If the user is already verified, block the attempt to create a new account
+//         if (
+//           existingUser.email.toLowerCase() === lowercaseEmail &&
+//           existingUser.phone === phone
+//         ) {
+//           return next(new ErrorHandler("Account already exists", 409));
+//         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
+//           return next(new ErrorHandler("Email already in use", 409));
+//         } else {
+//           return next(new ErrorHandler("Phone number already in use", 409));
+//         }
+//       } else {
+//         // Update the existing user's record with the new email and generate a new verification token
+//         if (
+//           existingUser.email.toLowerCase() === lowercaseEmail &&
+//           existingUser.phone === phone
+//         ) {
+//           return next(new ErrorHandler("Account already exists", 409));
+//         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
+//           return next(new ErrorHandler("Email already in use", 409));
+//         } else {
+//           return next(new ErrorHandler("Phone number already in use", 409));
+//         }
+//       }
+//     }
+//     // If no existing user found, validate the password and create a new user
+//     const passwordValidationResult = isValidPassword(password);
+//     if (passwordValidationResult) {
+//       return next(new ErrorHandler(passwordValidationResult, 400));
+//     }
+//     const hashedPassword = await hashPassword(password);
+//     // Create a new user if no existing user is found
+//     const user = await User.create({
+//       name,
+//       phone,
+//       email,
+//       password: hashedPassword,
+//       authProvider: "local",
+//     });
+
+//     const userData = await User.findByPk(user.id, {
+//       attributes: {
+//         exclude: ["password", "otp", "otpExpire", "isEmailVerified"],
+//       },
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "User registered successfully",
+//       data: userData,
+//     });
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
+
 const registerUser = asyncHandler(async (req, res, next) => {
   try {
     const { name, phone, email, password } = req.body;
-    // Validate all required fields
-    if ([name, phone, email, password].some((field) => field?.trim() === "")) {
-      return next(new ErrorHandler("All fields are required", 400));
+    // Validate required fields (phone excluded as it's optional)
+    if ([name, email, password].some((field) => field?.trim() === "")) {
+      return next(new ErrorHandler("All required fields must be filled", 400));
     }
+
     // Validate input fields
     if (!name) {
       return next(new ErrorHandler("Name is missing", 400));
-    }
-    if (!phone) {
-      return next(new ErrorHandler("Phone is missing", 400));
     }
     if (!email) {
       return next(new ErrorHandler("Email is missing", 400));
@@ -40,6 +158,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     if (!password) {
       return next(new ErrorHandler("Password is missing", 400));
     }
+
     // Sanitize name: trim and reduce multiple spaces to a single space
     name.trim().replace(/\s+/g, " ");
     // Convert the email to lowercase for case-insensitive comparison
@@ -51,9 +170,12 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(nameError, 400));
     }
 
-    const phoneError = isPhoneValid(phone);
-    if (phoneError) {
-      return next(new ErrorHandler(phoneError, 400));
+    // Only validate phone if it's provided
+    if (phone) {
+      const phoneError = isPhoneValid(phone);
+      if (phoneError) {
+        return next(new ErrorHandler(phoneError, 400));
+      }
     }
 
     // Validate email format
@@ -61,50 +183,51 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Invalid email", 400));
     }
 
+    // Modify the query to handle optional phone
+    let whereClause = {
+      [Op.or]: [{ email: lowercaseEmail }],
+    };
+    
+    // Only add phone to the query if it's provided
+    if (phone) {
+      whereClause[Op.or].push({ phone });
+    }
+
     // Check for existing user with the provided email or phone
     const existingUser = await User.findOne({
-      where: {
-        [Op.or]: [{ email: lowercaseEmail }, { phone: phone }],
-      },
+      where: whereClause,
     });
 
     if (existingUser) {
       if (existingUser.isEmailVerified) {
         // If the user is already verified, block the attempt to create a new account
-        if (
-          existingUser.email.toLowerCase() === lowercaseEmail &&
-          existingUser.phone === phone
-        ) {
-          return next(new ErrorHandler("Account already exists", 409));
+        if (phone && existingUser.phone === phone) {
+          return next(new ErrorHandler("Phone number already in use", 409));
         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
           return next(new ErrorHandler("Email already in use", 409));
-        } else {
-          return next(new ErrorHandler("Phone number already in use", 409));
         }
       } else {
-        // Update the existing user's record with the new email and generate a new verification token
-        if (
-          existingUser.email.toLowerCase() === lowercaseEmail &&
-          existingUser.phone === phone
-        ) {
-          return next(new ErrorHandler("Account already exists", 409));
+        // For unverified users
+        if (phone && existingUser.phone === phone) {
+          return next(new ErrorHandler("Phone number already in use", 409));
         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
           return next(new ErrorHandler("Email already in use", 409));
-        } else {
-          return next(new ErrorHandler("Phone number already in use", 409));
         }
       }
     }
-    // If no existing user found, validate the password and create a new user
+
+    // Validate the password and create a new user
     const passwordValidationResult = isValidPassword(password);
     if (passwordValidationResult) {
       return next(new ErrorHandler(passwordValidationResult, 400));
     }
+
     const hashedPassword = await hashPassword(password);
+
     // Create a new user if no existing user is found
     const user = await User.create({
       name,
-      phone,
+      ...(phone && { phone }), // Only include phone if it's provided
       email,
       password: hashedPassword,
       authProvider: "local",
@@ -127,23 +250,103 @@ const registerUser = asyncHandler(async (req, res, next) => {
 });
 
 //-----------send OTP-------------------------------
+// const sendOtp = asyncHandler(async (req, res, next) => {
+//   try {
+//     const { email } = req.body;
+
+//     // Check if the email field is provided and not empty after trimming
+//     if (!email || email.trim() === "") {
+//       return next(new ErrorHandler("Please provide email", 400));
+//     }
+
+//     // Validate email format
+//     if (!isValidEmail(email)) {
+//       return next(new ErrorHandler("Invalid email", 400));
+//     }
+
+//     // Convert the email to lowercase for case-insensitive comparison
+//     const lowercaseEmail = email.toLowerCase().trim();
+
+//     const user = await User.findOne({
+//       where: { email: lowercaseEmail },
+//     });
+
+//     if (!user) {
+//       return next(new ErrorHandler("User not found", 404));
+//     }
+
+//     const otp = generateOtp();
+
+//     /*
+//     Hi
+//     To complete your verification, please use the One-Time Password (OTP) provided below.
+//     This OTP is for single use and will expire after 15 minutes for security reasons.
+//     Your verification code for Xplore Promote is: {OTP}
+//     Please do not share this OTP with anyone. If you did not request this, please reach out to our support team immediately.
+//     Best regards,
+//     Xplore Promote Team
+//     */
+
+//     // Create HTML content for the email
+//     const htmlContent = `
+//   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+//     <h2>One-Time Password (OTP) Verification</h2>
+//     <p>Dear ${user.name},</p>
+//     <p>Your verification code for Xplore Promote is:</p>
+//     <h1 style="font-size: 32px; background-color: #f0f0f0; padding: 10px; display: inline-block;">${otp}</h1>
+//     <p>This code is valid for 15 minutes.</p>
+//     <p>If you didn't request this code, please ignore this email.</p>
+//     <p>Best regards,<br>Xplore Promote Team</p>
+//   </div>
+// `;
+//     try {
+//       await sendEmail({
+//         email: user.email,
+//         subject: `Xplore Promote: Your Verification Code`,
+//         html: htmlContent,
+//       });
+
+//       user.otp = otp;
+//       user.otpExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+//       await user.save({ validate: false });
+
+//       return res.status(200).json({
+//         success: true,
+//         message: `OTP sent to ${user.email} successfully`,
+//         email: user.email,
+//       });
+//     } catch (emailError) {
+//       user.otp = null;
+//       user.otpExpire = null;
+//       await user.save({ validate: false });
+
+//       console.error("Failed to send OTP email:", emailError);
+//       return next(new ErrorHandler(error.message, 500));
+//     }
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
 const sendOtp = asyncHandler(async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    // Check if the email field is provided and not empty after trimming
+    // Validate input
     if (!email || email.trim() === "") {
       return next(new ErrorHandler("Please provide email", 400));
     }
+    // if (!phone || phone.trim() === "") {
+    //   return next(new ErrorHandler("Please provide phone number", 400));
+    // }
 
     // Validate email format
     if (!isValidEmail(email)) {
       return next(new ErrorHandler("Invalid email", 400));
     }
 
-    // Convert the email to lowercase for case-insensitive comparison
     const lowercaseEmail = email.toLowerCase().trim();
 
+    // Find user
     const user = await User.findOne({
       where: { email: lowercaseEmail },
     });
@@ -151,44 +354,48 @@ const sendOtp = asyncHandler(async (req, res, next) => {
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
+    if(user.isEmailVerified){
+      return next(new ErrorHandler("Verified User",409))
+    }
+    const phone = user.phone;
+    // // Format phone number to include country code if not present
+    // const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
 
-    const otp = generateOtp();
-
-    // Create HTML content for the email
-    const htmlContent = `
-  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <h2>One-Time Password (OTP) Verification</h2>
-    <p>Hello ${user.name},</p>
-    <p>Your verification code for Xplore Promote is:</p>
-    <h1 style="font-size: 32px; background-color: #f0f0f0; padding: 10px; display: inline-block;">${otp}</h1>
-    <p>This code is valid for 15 minutes.</p>
-    <p>If you didn't request this code, please ignore this email.</p>
-    <p>Best regards,<br>Xplore Promote Team</p>
-  </div>
-`;
     try {
-      await sendEmail({
-        email: user.email,
-        subject: `Xplore Promote: Your Verification Code`,
-        html: htmlContent,
+      // Call Kaleyra API to send OTP
+      const response = await axios({
+        method: "post",
+        url: `${KALEYRA_CONFIG.baseURL}/verify`,
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": KALEYRA_CONFIG.apiKey,
+        },
+        data: {
+          flow_id: KALEYRA_CONFIG.flowId,
+          to: {
+            mobile: phone,
+            email: lowercaseEmail,
+          },
+        },
       });
 
-      user.otp = otp;
-      user.otpExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+      // Store verify_id in user record
+      user.otp = response.data.data.verify_id;
+      user.otpExpire = Date.now() + 5 * 60 * 1000; // 15 minutes
       await user.save({ validate: false });
 
       return res.status(200).json({
         success: true,
-        message: `OTP sent to ${user.email} successfully`,
-        email: user.email,
+        message: `OTP sent successfully`,
+        email: user.email
       });
-    } catch (emailError) {
-      user.otp = null;
-      user.otpExpire = null;
-      await user.save({ validate: false });
-
-      console.error("Failed to send OTP email:", emailError);
-      return next(new ErrorHandler(error.message, 500));
+    } catch (error) {
+      // Handle Kaleyra API errors
+      if (error.response?.data?.error) {
+        const kaleyraError = error.response.data.error;
+        return next(new ErrorHandler(kaleyraError.message, 400));
+      }
+      throw error;
     }
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
@@ -196,67 +403,153 @@ const sendOtp = asyncHandler(async (req, res, next) => {
 });
 
 //---------User emailVerification------------------------------
+// const emailVerification = asyncHandler(async (req, res, next) => {
+//   try {
+//     const { email, otp } = req.body;
+
+//     // Validate the OTP
+//     if (!otp || otp.trim() === "") {
+//       return next(new ErrorHandler("OTP is required.", 400));
+//     }
+
+//     if (!email || email.trim() === "") {
+//       return next(new ErrorHandler("Please provide email", 400));
+//     }
+
+//     // Validate email format
+//     if (!isValidEmail(email)) {
+//       return next(new ErrorHandler("Invalid email", 400));
+//     }
+
+//     // Convert the email to lowercase for case-insensitive comparison
+//     const lowercaseEmail = email.toLowerCase().trim();
+
+//     const user = await User.findOne({
+//       where: { email: lowercaseEmail },
+//     });
+//     console.log(user);
+
+//     if (!user) {
+//       return next(new ErrorHandler("User not found", 404));
+//     }
+
+//     // Check OTP validity
+//     if (user.otp !== otp) {
+//       return next(new ErrorHandler("Invalid OTP", 400));
+//     }
+//     if (user.otpExpire < Date.now()) {
+//       return next(new ErrorHandler("OTP has expired", 400));
+//     }
+
+//     // Update user details
+//     user.isEmailVerified = true;
+//     user.otp = null;
+//     user.otpExpire = null;
+//     await user.save();
+
+//     const obj = {
+//       type: "USER",
+//       obj: user,
+//     };
+//     const accessToken = generateToken(obj);
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Email verified successfully",
+//       data: {
+//         id: user.id,
+//         name: user.name,
+//         email: user.email,
+//         phone: user.phone,
+//       },
+//       token: accessToken,
+//     });
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
+
 const emailVerification = asyncHandler(async (req, res, next) => {
   try {
     const { email, otp } = req.body;
 
-    // Validate the OTP
+    // Validate input
     if (!otp || otp.trim() === "") {
       return next(new ErrorHandler("OTP is required.", 400));
     }
-
     if (!email || email.trim() === "") {
       return next(new ErrorHandler("Please provide email", 400));
     }
-
-    // Validate email format
     if (!isValidEmail(email)) {
       return next(new ErrorHandler("Invalid email", 400));
     }
 
-    // Convert the email to lowercase for case-insensitive comparison
     const lowercaseEmail = email.toLowerCase().trim();
 
+    // Find user
     const user = await User.findOne({
       where: { email: lowercaseEmail },
     });
-    console.log(user);
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
 
-    // Check OTP validity
-    if (user.otp !== otp) {
-      return next(new ErrorHandler("Invalid OTP", 400));
+    // Check if verify_id exists and OTP hasn't expired
+    if (!user.otp) {
+      return next(new ErrorHandler("Please request a new OTP", 400));
     }
     if (user.otpExpire < Date.now()) {
       return next(new ErrorHandler("OTP has expired", 400));
     }
 
-    // Update user details
-    user.isEmailVerified = true;
-    user.otp = null;
-    user.otpExpire = null;
-    await user.save();
+    try {
+      // Validate OTP with Kaleyra
+      const response = await axios({
+        method: 'post',
+        url: `${KALEYRA_CONFIG.baseURL}/verify/validate`,
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': KALEYRA_CONFIG.apiKey
+        },
+        data: {
+          verify_id: user.otp,
+          otp: otp
+        }
+      });
 
-    const obj = {
-      type: "USER",
-      obj: user,
-    };
-    const accessToken = generateToken(obj);
+      // Update user details
+      user.isEmailVerified = true;
+      user.otp = null;
+      user.otpExpire = null;
+      await user.save();
 
-    return res.status(200).json({
-      success: true,
-      message: "Email verified successfully",
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-      },
-      token: accessToken,
-    });
+      const obj = {
+        type: "USER",
+        obj: user,
+      };
+      const accessToken = generateToken(obj);
+
+      return res.status(200).json({
+        success: true,
+        message: "Verification successful",
+        data: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+        },
+        token: accessToken,
+      });
+
+    } catch (error) {
+      // Handle Kaleyra API errors
+      if (error.response?.data?.error) {
+        const kaleyraError = error.response.data.error;
+        return next(new ErrorHandler(kaleyraError.message || "Invalid OTP", 400));
+      }
+      throw error;
+    }
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
@@ -456,7 +749,77 @@ const resetPassword = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+// --------------getUserByquery----------------------------------
+const getUserDetails = asyncHandler(async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { type } = req.query;
 
+    // Validate user authentication
+    if (!userId) {
+      return next(new ErrorHandler("Unauthorized access", 401));
+    }
+
+    // Validate query parameter
+    if (!type) {
+      return next(new ErrorHandler("Query parameter 'type' is required", 400));
+    }
+
+    // Validate type value
+    if (!['personal', 'professional'].includes(type.toLowerCase())) {
+      return next(new ErrorHandler("Type must be either 'personal' or 'professional'", 400));
+    }
+
+    // Fetch user from database
+    const user = await User.findByPk(userId);
+    
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    let responseData;
+
+    // Prepare response based on type
+    if (type.toLowerCase() === 'personal') {
+      responseData = {
+        name: user.name,
+        email: user.email,
+        countryCode: user.countryCode || null,
+        phone: user.phone,
+        userImages: user.userImages || [],
+        address: user.address || null,
+        userWebsites: user.userWebsites || [],
+        isEmailVerified: user.isEmailVerified,
+        authProvider: user.authProvider,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      };
+    } else {
+      responseData = {
+        name: user.name,
+        email: user.professionalEmail,
+        countryCode: user.countryCode || null,
+        phone: user.phone,
+        companyImages: user.companyImages || [],
+        address: user.address || null,
+        companyWebsite: user.companyWebsite || null,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      };
+    }
+
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: `${type.toLowerCase()} details fetched successfully`,
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error("Get User Details Error:", error);
+    return next(new ErrorHandler(error.message || "Error fetching user details", 500));
+  }
+});
 //----------------getById---------------------------------------
 const getUserById = asyncHandler(async (req, res, next) => {
   try {
@@ -518,61 +881,200 @@ const getInsta = asyncHandler(async (req, res, next) => {
 //--------------------Update user-----------------------------
 const updateUser = asyncHandler(async (req, res, next) => {
   try {
-    const { name } = req.body;
-
-    // Validate input field
-    if (!name || name.trim() === "") {
-      return next(new ErrorHandler("Please provide a valid name", 400));
+    const userId = req.user?.id;
+    if (!userId) {
+      return next(new ErrorHandler("User ID is required", 400));
     }
 
-    // Sanitize name: trim and reduce multiple spaces to a single space
-    const newName = name.trim().replace(/\s+/g, " ");
-    const nameError = isValidLength(newName);
-    if (nameError) {
-      return next(new ErrorHandler(nameError, 400));
+    // Parse JSON data if it's a string
+    let bodyData = req.body.data ? 
+      (typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data) 
+      : req.body;
+
+    // Validation checks
+    if (bodyData.professionalEmail && (typeof bodyData.professionalEmail !== 'string' || bodyData.professionalEmail.toLowerCase().trim() === '')) {
+      return next(new ErrorHandler('Please provide a valid email', 400));
+    }
+    if (bodyData.name && (typeof bodyData.name !== 'string' || bodyData.name.trim() === '')) {
+      return next(new ErrorHandler('Please provide a valid name', 400));
+    }
+    
+    if (bodyData.address && typeof bodyData.address !== 'object') {
+      return next(new ErrorHandler('Address must be a valid object', 400));
+    }
+    
+    if (bodyData.userWebsites) {
+      if (!Array.isArray(bodyData.userWebsites)) {
+        return next(new ErrorHandler('User websites must be an array', 400));
+      } 
+    }
+    
+    if (bodyData.companyWebsite && (typeof bodyData.companyWebsite !== 'string' || bodyData.companyWebsite.trim() === '')) {
+      return next(new ErrorHandler('Company website must be a valid URL', 400));
     }
 
-    // Update the user's name if they exist
-    const [num, [updatedUser]] = await User.update(
-      { name: newName },
-      {
-        where: {
-          id: req.user?.id,
-        },
-        returning: true,
+    // Get current user data
+    const currentUser = await User.findByPk(userId);
+    if (!currentUser) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    // Prepare update data
+    let updateData = {
+      updatedAt: new Date()
+    };
+
+    // Handle name update
+    if (bodyData.name) {
+      const newName = bodyData.name.trim().replace(/\s+/g, " ");
+      const nameError = isValidLength(newName);
+      if (nameError) {
+        return next(new ErrorHandler(nameError, 400));
       }
-    );
+      updateData.name = newName;
+    }
+// Handle professionalEmail update
+if (bodyData.professionalEmail) {
+  const newEmail = bodyData.professionalEmail.toLowerCase().trim();
+  const emailError = isValidEmail(newEmail);
+  if (emailError) {
+    return next(new ErrorHandler('Invalid Email', 400));
+      }
+      updateData.professionalEmail = newEmail;
+    }
+    // Handle userImages - REPLACE instead of append
+    if (req.files?.userImages) {
+      const fileError = validateFiles(req.files.userImages, 'user images');
+      if (fileError) {
+        return next(new ErrorHandler(fileError, 400));
+      }
+
+      // Delete existing user images from CDN
+      let currentUserImages = [];
+      try {
+        currentUserImages = typeof currentUser.userImages === 'string' 
+          ? JSON.parse(currentUser.userImages) 
+          : currentUser.userImages || [];
+        
+        // Delete existing images from CDN
+        await Promise.all(
+          currentUserImages.map((img) => deleteFile(img.fileName))
+        );
+      } catch (error) {
+        console.error("Error parsing or deleting current userImages:", error);
+      }
+
+      // Upload new images
+      const newUserImages = [];
+      for (const file of req.files.userImages) {
+        try {
+          const uploadResult = await uploadFile(file);
+          newUserImages.push({
+            fileName: uploadResult.filename,
+            originalName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: file.size,
+            cdnUrl: uploadResult.url,
+            uploadedAt: new Date().toISOString()
+          });
+        } catch (uploadError) {
+          console.error(`Error uploading user image ${file.originalname}:`, uploadError);
+          continue;
+        }
+      }
+
+      updateData.userImages = newUserImages;
+    }
+
+    // Handle companyImages - REPLACE instead of append
+    if (req.files?.companyImages) {
+      const fileError = validateFiles(req.files.companyImages, 'company images');
+      if (fileError) {
+        return next(new ErrorHandler(fileError, 400));
+      }
+
+      // Delete existing company images from CDN
+      let currentCompanyImages = [];
+      try {
+        currentCompanyImages = typeof currentUser.companyImages === 'string' 
+          ? JSON.parse(currentUser.companyImages) 
+          : currentUser.companyImages || [];
+        
+        // Delete existing images from CDN
+        await Promise.all(
+          currentCompanyImages.map((img) => deleteFile(img.fileName))
+        );
+      } catch (error) {
+        console.error("Error parsing or deleting current companyImages:", error);
+      }
+
+      // Upload new images
+      const newCompanyImages = [];
+      for (const file of req.files.companyImages) {
+        try {
+          const uploadResult = await uploadFile(file);
+          newCompanyImages.push({
+            fileName: uploadResult.filename,
+            originalName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: file.size,
+            cdnUrl: uploadResult.url,
+            uploadedAt: new Date().toISOString()
+          });
+        } catch (uploadError) {
+          console.error(`Error uploading company image ${file.originalname}:`, uploadError);
+          continue;
+        }
+      }
+
+      updateData.companyImages = newCompanyImages;
+    }
+
+    // Handle other fields
+    if (bodyData.address) {
+      updateData.address = bodyData.address;
+    }
+    if (bodyData.userWebsites) {
+      updateData.userWebsites = bodyData.userWebsites;
+    }
+    if (bodyData.companyWebsite) {
+      updateData.companyWebsite = bodyData.companyWebsite;
+    }
+
+    // Update user in database
+    const [num, [updatedUser]] = await User.update(updateData, {
+      where: { id: userId },
+      returning: true,
+    });
 
     if (num === 0) {
-      return next(
-        new ErrorHandler(
-          `Cannot update user with id=${req.user?.id}. User not found.`,
-          404
-        )
-      );
+      return next(new ErrorHandler(`Failed to update user with id=${userId}`, 404));
     }
 
-    // Destructure the updated user's relevant fields for the response
-    const { id, email, phone, createdAt, updatedAt } = updatedUser;
-
-    // Respond with the updated user data
+    // Return success response
     return res.status(200).json({
       success: true,
       message: "User updated successfully",
-      user: {
-        id,
-        name: newName, // Use newName directly
-        email,
-        phone,
-        createdAt,
-        updatedAt,
-      },
+      data: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        userImages: updatedUser.userImages,
+        companyImages: updatedUser.companyImages,
+        address: updatedUser.address,
+        userWebsites: updatedUser.userWebsites,
+        companyWebsite: updatedUser.companyWebsite,
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt
+      }
     });
+
   } catch (error) {
+    console.error("Update User Error:", error);
     return next(new ErrorHandler(error.message, 500));
   }
 });
-
 //-----------------delete user--------------------------
 const deleteUser = asyncHandler(async (req, res, next) => {
   try {
@@ -697,6 +1199,7 @@ module.exports = {
   loginUser,
   forgotPassword,
   resetPassword,
+  getUserDetails,
   getUserByToken,
   getUserById,
   updateUser,
