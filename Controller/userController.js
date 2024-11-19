@@ -616,16 +616,21 @@ const loginUser = async (req, res, next) => {
     };
     const accessToken = generateToken(obj);
 
-    const loggedInUser = await User.findByPk(user.id, {
-      attributes: {
-        exclude: ["password", "otp", "otpExpire", "isEmailVerified"],
-      },
-    });
+    // const loggedInUser = await User.findByPk(user.id, {
+    //   attributes: {
+    //     exclude: ["password", "otp", "otpExpire", "isEmailVerified"],
+    //   },
+    // });
 
     return res.status(200).json({
       success: true,
       message: "Login successfully",
-      data: loggedInUser,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+      },
       token: accessToken,
     });
   } catch (error) {
