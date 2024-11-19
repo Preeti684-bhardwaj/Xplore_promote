@@ -4,6 +4,7 @@ const QRSession = db.qrSessions;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
+const { phoneValidation } = require("../utils/phoneValidation.js");
 const {
   validateFiles,
 } = require("../validators/campaignValidations.js");
@@ -142,8 +143,7 @@ const KALEYRA_CONFIG = {
 
 const registerUser = asyncHandler(async (req, res, next) => {
   try {
-    const { name, phone, email, password } = req.body;
-
+    const { name, countryCode,phone, email, password } = req.body;
     // Validate required fields (phone excluded as it's optional)
     if ([name, email, password].some((field) => field?.trim() === "")) {
       return next(new ErrorHandler("All required fields must be filled", 400));
@@ -175,13 +175,25 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(nameError, 400));
   }
 
-    // Only validate phone if it's provided
-    if (phone) {
-      const phoneError = isPhoneValid(phone);
-      if (phoneError) {
-        return next(new ErrorHandler(phoneError, 400));
-      }
-    }
+ // Validate phone if both country code and phone are provided
+ let cleanedPhone = null;
+ let cleanedCountryCode = null;
+ 
+ if (phone || countryCode) {
+   // If one is provided, both must be provided
+   if (!phone || !countryCode) {
+     return next(new ErrorHandler("Both country code and phone number are required", 400));
+   }
+
+   const phoneValidationResult = phoneValidation.validatePhone(countryCode, phone);
+   
+   if (!phoneValidationResult.isValid) {
+     return next(new ErrorHandler(phoneValidationResult.message, 400));
+   }
+   
+   cleanedPhone = phoneValidationResult.cleanedPhone;
+   cleanedCountryCode = phoneValidationResult.cleanedCode;
+ }
 
 
     // Validate email format
@@ -195,8 +207,8 @@ const registerUser = asyncHandler(async (req, res, next) => {
     };
     
     // Only add phone to the query if it's provided
-    if (phone) {
-      whereClause[Op.or].push({ phone });
+    if (cleanedPhone) {
+      whereClause[Op.or].push({ phone: cleanedPhone });
     }
 
     // Check for existing user with the provided email or phone
@@ -207,14 +219,14 @@ const registerUser = asyncHandler(async (req, res, next) => {
     if (existingUser) {
       if (existingUser.isEmailVerified) {
         // If the user is already verified, block the attempt to create a new account
-        if (phone && existingUser.phone === phone) {
+        if (cleanedPhone && existingUser.phone === cleanedPhone) {
           return next(new ErrorHandler("Phone number already in use", 409));
         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
           return next(new ErrorHandler("Email already in use", 409));
         }
       } else {
         // For unverified users
-        if (phone && existingUser.phone === phone) {
+        if (cleanedPhone && existingUser.phone === cleanedPhone) {
           return next(new ErrorHandler("Phone number already in use", 409));
         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
           return next(new ErrorHandler("Email already in use", 409));
@@ -233,7 +245,10 @@ const registerUser = asyncHandler(async (req, res, next) => {
     // Create a new user if no existing user is found
     const user = await User.create({
       name,
-      ...(phone && { phone }), // Only include phone if it's provided
+      ...(cleanedPhone && {
+        phone: cleanedPhone,
+        countryCode: cleanedCountryCode
+      }), // Only include phone if it's provided
       email,
       password: hashedPassword,
       authProvider: "local",
