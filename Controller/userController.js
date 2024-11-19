@@ -1077,7 +1077,7 @@ if (bodyData.professionalEmail) {
       data: {
         id: updatedUser.id,
         name: updatedUser.name,
-        email: updatedUser.email,
+        email: updatedUser.professionalEmail,
         phone: updatedUser.phone,
         userImages: updatedUser.userImages,
         companyImages: updatedUser.companyImages,
