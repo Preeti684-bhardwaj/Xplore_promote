@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const upload = require("../middleware/multer");
 const {
     registerUser,
     sendOtp,
@@ -10,6 +11,7 @@ const {
     getUserById,
     updateUser,
     deleteUser,
+    getUserDetails,
     getUserByToken,
     getInsta,
     logout,
@@ -27,8 +29,16 @@ router.post("/login",loginUser)
 router.post("/password/forgot",forgotPassword)
 router.post("/password/reset/:userId",resetPassword)
 router.get("/getById/:id",getUserById)
+router.get("/getUserDetails",verifyJWt,verifySession,getUserDetails)
 router.get("/getUserByToken",verifyJWt,verifySession,getUserByToken)
-router.put('/updateUser',verifyJWt,updateUser)
+router.put('/updateUser', 
+    verifyJWt, 
+    upload.fields([
+      { name: 'userImages', maxCount: 5 },
+      { name: 'companyImages', maxCount: 5 }
+    ]), 
+    updateUser
+  );
 router.delete('/deleteUser',verifyJWt,deleteUser)
 // logout user from web
 router.delete('/logout',verifyJWt,logout)

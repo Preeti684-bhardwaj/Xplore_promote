@@ -29,6 +29,10 @@ module.exports = (sequelize, DataTypes) => {
       timing: {
         type: DataTypes.JSON,
       },
+      campaignStatus: {
+        type: DataTypes.ENUM('Starting Soon','Upcoming', 'Ongoing','Completed','Ending Soon'),
+        defaultValue: 'Upcoming',
+      },
       status: {
         type: DataTypes.JSON,
       },

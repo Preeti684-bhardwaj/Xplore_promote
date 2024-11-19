@@ -5,8 +5,12 @@ const User = db.users;
 const { uploadFiles, deleteFile } = require("../utils/cdnImplementation.js");
 const {
   validateFiles,
-  getPagination
+  getPagination,
 } = require("../validators/campaignValidations.js");
+const {
+  getCampaignStatus,
+  validateTiming,
+} = require("../utils/campaignStatusManager.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
@@ -35,6 +39,19 @@ const createCampaign = asyncHandler(async (req, res, next) => {
     if (!data) {
       return next(new ErrorHandler("Missing required data", 400));
     }
+    // Validate timing data
+    const timingErrors = validateTiming(data.timing);
+    if (timingErrors.length > 0) {
+      return next(new ErrorHandler(timingErrors.join(", "), 400));
+    }
+
+    // Calculate initial campaign status
+    const campaignStatus = getCampaignStatus(
+      data.timing.startDate,
+      data.timing.endDate,
+      data.timing.timeZone
+    );
+
     // Validate required fields
     const {
       name,
@@ -58,12 +75,9 @@ const createCampaign = asyncHandler(async (req, res, next) => {
       !timing ||
       typeof timing !== "object" ||
       !timing.startDate ||
-      !timing.endDate ||
-      !timing.isScheduled
+      !timing.endDate
     ) {
-      missingFields.push(
-        "timing (must include startDate, endDate, and isScheduled)"
-      );
+      missingFields.push("timing (must include startDate, endDate)");
     }
 
     // Validate `status` field structure and required nested fields
@@ -103,11 +117,11 @@ const createCampaign = asyncHandler(async (req, res, next) => {
     }
     // Prepare campaign data
     const campaignData = {
-      name,
-      description:
-        description && description.trim() !== "" ? description.trim() : null,
-      timing,
-      status,
+      name: data.name,
+      description: data.description?.trim() || null,
+      timing: data.timing,
+      status: data.status,
+      campaignStatus, // Add the calculated status
       performance:
         performance && typeof performance === "object" ? performance : null,
       socialMediaLinks:
@@ -170,7 +184,7 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
       // })
     };
 
-    const data = await Campaign.findAndCountAll({
+    const campaigns = await Campaign.findAndCountAll({
       where: condition,
       limit,
       offset,
@@ -188,16 +202,35 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
       ],
       order: [["createdDate", "DESC"]],
     });
+    // Update status for each campaign based on current time
+    const updatedCampaigns = await Promise.all(
+      campaigns.rows.map(async (campaign) => {
+        const currentStatus = getCampaignStatus(
+          campaign.timing.startDate,
+          campaign.timing.endDate,
+          campaign.timing.timeZone
+        );
 
+        // Update database if status has changed
+        if (currentStatus !== campaign.campaignStatus) {
+          await Campaign.update(
+            { campaignStatus: currentStatus },
+            { where: { campaignID: campaign.campaignID } }
+          );
+          campaign.campaignStatus = currentStatus;
+        }
+
+        return campaign;
+      })
+    );
     return res.status(200).json({
       success: true,
-      totalItems: data.count,
-      campaigns: data.rows,
+      totalItems: campaigns.count,
+      campaigns: updatedCampaigns,
       currentPage: page ? +page : 0,
-      totalPages: Math.ceil(data.count / limit),
+      totalPages: Math.ceil(campaigns.count / limit),
     });
   } catch (error) {
-    console.error("Error fetching campaigns:", error);
     return next(new ErrorHandler(error.message, 500));
   }
 });
@@ -208,11 +241,7 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
     if (!req.params?.id) {
       return next(new ErrorHandler("Missing Campaign Id", 400));
     }
-    if (!req.user?.id) {
-      return next(new ErrorHandler("Access Denied", 403));
-    }
-    console.log(req.user.id);
-    
+
     const campaign = await Campaign.findOne({
       where: {
         campaignID: req.params?.id,
@@ -232,12 +261,26 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
       ],
       order: [[{ model: Layout, as: "layouts" }, "createdAt", "ASC"]],
     });
-    console.log(campaign);
 
     if (!campaign) {
-      return next(new ErrorHandler(`Campaign not found for user ${req.user.id}`, 404));
+      return next(
+        new ErrorHandler(`Campaign not found for user ${req.user.id}`, 404)
+      );
     }
+    // Update campaign status based on current time
+    const currentStatus = getCampaignStatus(
+      campaign.timing.startDate,
+      campaign.timing.endDate,
+      campaign.timing.timeZone
+    );
 
+    if (currentStatus !== campaign.campaignStatus) {
+      await Campaign.update(
+        { campaignStatus: currentStatus },
+        { where: { campaignID: campaign.campaignID } }
+      );
+      campaign.campaignStatus = currentStatus;
+    }
     return res.status(200).json({
       success: true,
       data: campaign,
@@ -309,7 +352,17 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
         updateData.description = bodyData.description;
       }
       if (bodyData.timing) {
+        const timingErrors = validateTiming(bodyData.timing);
+        if (timingErrors.length > 0) {
+          return next(new ErrorHandler(timingErrors.join(', '), 400));
+        }
+
         updateData.timing = { ...campaign.timing, ...bodyData.timing };
+        updateData.campaignStatus = getCampaignStatus(
+          updateData.timing.startDate,
+          updateData.timing.endDate,
+          updateData.timing.timeZone
+        );
       }
       if (bodyData.status) {
         updateData.status = { ...campaign.status, ...bodyData.status };
