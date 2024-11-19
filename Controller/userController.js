@@ -7,7 +7,7 @@ const sendEmail = require("../utils/sendEmail.js");
 const { deleteQRSession } = require("../utils/qrService.js");
 const {
   isValidEmail,
-  isPhoneValid,
+// isPhoneValid,
   isValidPassword,
   isValidLength,
 } = require("../validators/validation.js");
@@ -24,16 +24,16 @@ const registerUser = asyncHandler(async (req, res, next) => {
   try {
     const { name, phone, email, password } = req.body;
     // Validate all required fields
-    if ([name, phone, email, password].some((field) => field?.trim() === "")) {
+    if ([name, email, password].some((field) => field?.trim() === "")) {
       return next(new ErrorHandler("All fields are required", 400));
     }
     // Validate input fields
     if (!name) {
       return next(new ErrorHandler("Name is missing", 400));
     }
-    if (!phone) {
-      return next(new ErrorHandler("Phone is missing", 400));
-    }
+   // if (!phone) {
+     // return next(new ErrorHandler("Phone is missing", 400));
+    //}
     if (!email) {
       return next(new ErrorHandler("Email is missing", 400));
     }
@@ -51,10 +51,10 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(nameError, 400));
     }
 
-    const phoneError = isPhoneValid(phone);
-    if (phoneError) {
-      return next(new ErrorHandler(phoneError, 400));
-    }
+   // const phoneError = isPhoneValid(phone);
+   // if (phoneError) {
+     // return next(new ErrorHandler(phoneError, 400));
+    //}
 
     // Validate email format
     if (!isValidEmail(email)) {
@@ -64,7 +64,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     // Check for existing user with the provided email or phone
     const existingUser = await User.findOne({
       where: {
-        [Op.or]: [{ email: lowercaseEmail }, { phone: phone }],
+        [Op.or]: [{ email: lowercaseEmail }],
       },
     });
 
@@ -104,7 +104,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     // Create a new user if no existing user is found
     const user = await User.create({
       name,
-      phone,
+     phone,
       email,
       password: hashedPassword,
       authProvider: "local",
@@ -112,7 +112,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
 
     const userData = await User.findByPk(user.id, {
       attributes: {
-        exclude: ["password", "otp", "otpExpire", "isEmailVerified"],
+        exclude: ["phone","password", "otp", "otpExpire", "isEmailVerified"],
       },
     });
 
