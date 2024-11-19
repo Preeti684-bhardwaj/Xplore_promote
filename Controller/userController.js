@@ -255,9 +255,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     });
 
     const userData = await User.findByPk(user.id, {
-      attributes: {
-        exclude: ["phone","password", "otp", "otpExpire", "isEmailVerified"],
-      },
+      attributes: ["id", "name", "email", "isEmailVerified"]
     });
 
     return res.status(201).json({
