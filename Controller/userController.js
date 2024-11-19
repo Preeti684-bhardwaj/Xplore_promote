@@ -10,7 +10,7 @@ const {
 const { deleteQRSession } = require("../utils/qrService.js");
 const {
   isValidEmail,
-// isPhoneValid,
+  isPhoneValid,
   isValidPassword,
   isValidLength,
 } = require("../validators/validation.js");
