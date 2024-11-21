@@ -1,14 +1,25 @@
-[
-  {
-    "relation": [
-      "delegate_permission/common.handle_all_urls"
-    ],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.xircular.xplorecampaign",
-      "sha256_cert_fingerprints": [
-        "42:4C:83:13:BB:FD:96:54:28:5F:EA:23:B7:A8:7B:EC:81:B9:08:24:68:96:26:E2:F7:81:44:67:11:82:B2:2A"
-      ]
-    }
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.xircular.xplorecampaign",
+    "sha256_cert_fingerprints":
+    ["37:02:E5:6D:6C:B8:43:26:54:1B:B0:62:42:2B:64:25:F5:FD:77:8A:ED:B1:FB:B4:B6:29:17:38:05:42:1D:A8"]
   }
-]
+},
+{
+  "relation": ["delegate_permission/common.get_login_creds"],
+  "target": {
+    "namespace": "web",
+    "site": "https://pre.xplore.xircular.io"
+  }
+},
+{
+  "relation": ["delegate_permission/common.get_login_creds"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.xircular.xplorecampaign",
+    "sha256_cert_fingerprints":
+    ["37:02:E5:6D:6C:B8:43:26:54:1B:B0:62:42:2B:64:25:F5:FD:77:8A:ED:B1:FB:B4:B6:29:17:38:05:42:1D:A8"]
+  }
+}]

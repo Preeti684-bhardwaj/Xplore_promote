@@ -48,6 +48,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
+      isPhoneVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       appleUserId: {
         type: DataTypes.STRING,
         unique: true,
