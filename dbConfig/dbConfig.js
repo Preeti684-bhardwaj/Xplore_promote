@@ -27,7 +27,7 @@ db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 // Import models
-db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
+// db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
 db.admins=require("../Modals/adminModal.js")(sequelize,Sequelize);
 db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
