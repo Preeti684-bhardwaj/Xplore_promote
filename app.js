@@ -46,6 +46,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes Imports
 const userRouter = require("./Routes/userRoutes");
+const adminRouter = require("./Routes/adminRoutes");
 const notificationRouter = require("./Routes/notificationRoutes");
 const campaignRouter = require('./Routes/campaignRoutes');
 // const advertisementRouter = require('./Routes/advertisementRoutes');
@@ -56,6 +57,7 @@ const qrRouter = require('./Routes/qrCodeRoutes');
 
 // Routes declaration
 app.use("/v1/user", userRouter);
+app.use("/v1/admin", adminRouter);
 app.use("/v1/apple", notificationRouter);
 app.use("/v1/campaign", campaignRouter);
 // app.use("/v1/advertisement", advertisementRouter);
