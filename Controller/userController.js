@@ -5,9 +5,7 @@ const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
 const { phoneValidation } = require("../utils/phoneValidation.js");
-const {
-  validateFiles,
-} = require("../validators/campaignValidations.js");
+const { validateFiles } = require("../validators/campaignValidations.js");
 const { deleteQRSession } = require("../utils/qrService.js");
 const {
   isValidEmail,
@@ -25,13 +23,19 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const axios = require("axios");
 require("dotenv").config();
-const { KALEYRA_BASE_URL, KALEYRA_API_KEY, KALEYRA_FLOW_ID } = process.env;
+const {
+  KALEYRA_BASE_URL,
+  KALEYRA_API_KEY,
+  KALEYRA_FLOW_ID,
+  KALEYRA_PHONE_FLOW_ID,
+} = process.env;
 
 // Kaleyra API configuration
 const KALEYRA_CONFIG = {
   baseURL: KALEYRA_BASE_URL,
   apiKey: KALEYRA_API_KEY,
   flowId: KALEYRA_FLOW_ID,
+  phoneFlowId: KALEYRA_PHONE_FLOW_ID,
 };
 
 //----------register user-------------------------
@@ -143,7 +147,7 @@ const KALEYRA_CONFIG = {
 
 const registerUser = asyncHandler(async (req, res, next) => {
   try {
-    const { name, countryCode,phone, email, password } = req.body;
+    const { name, countryCode, phone, email, password } = req.body;
     // Validate required fields (phone excluded as it's optional)
     if ([name, email, password].some((field) => field?.trim() === "")) {
       return next(new ErrorHandler("All required fields must be filled", 400));
@@ -175,25 +179,33 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(nameError, 400));
   }
 
- // Validate phone if both country code and phone are provided
- let cleanedPhone = null;
- let cleanedCountryCode = null;
- 
- if (phone || countryCode) {
-   // If one is provided, both must be provided
-   if (!phone || !countryCode) {
-     return next(new ErrorHandler("Both country code and phone number are required", 400));
-   }
+    // Validate phone if both country code and phone are provided
+    let cleanedPhone = null;
+    let cleanedCountryCode = null;
 
-   const phoneValidationResult = phoneValidation.validatePhone(countryCode, phone);
-   
-   if (!phoneValidationResult.isValid) {
-     return next(new ErrorHandler(phoneValidationResult.message, 400));
-   }
-   
-   cleanedPhone = phoneValidationResult.cleanedPhone;
-   cleanedCountryCode = phoneValidationResult.cleanedCode;
- }
+    if (phone || countryCode) {
+      // If one is provided, both must be provided
+      if (!phone || !countryCode) {
+        return next(
+          new ErrorHandler(
+            "Both country code and phone number are required",
+            400
+          )
+        );
+      }
+
+      const phoneValidationResult = phoneValidation.validatePhone(
+        countryCode,
+        phone
+      );
+
+      if (!phoneValidationResult.isValid) {
+        return next(new ErrorHandler(phoneValidationResult.message, 400));
+      }
+
+      cleanedPhone = phoneValidationResult.cleanedPhone;
+      cleanedCountryCode = phoneValidationResult.cleanedCode;
+    }
 
 
     // Validate email format
@@ -205,7 +217,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     let whereClause = {
       [Op.or]: [{ email: lowercaseEmail }],
     };
-    
+
     // Only add phone to the query if it's provided
     if (cleanedPhone) {
       whereClause[Op.or].push({ phone: cleanedPhone });
@@ -247,7 +259,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
       name,
       ...(cleanedPhone && {
         phone: cleanedPhone,
-        countryCode: cleanedCountryCode
+        countryCode: cleanedCountryCode,
       }), // Only include phone if it's provided
       email,
       password: hashedPassword,
@@ -268,6 +280,190 @@ const registerUser = asyncHandler(async (req, res, next) => {
   }
 });
 
+//----------send phone otp----------------------------
+const sendPhoneOtp = asyncHandler(async (req, res, next) => {
+  try {
+    const { countryCode, phone } = req.body;
+    // Phone Validation
+    if (phone || countryCode) {
+      // If one is provided, both must be provided
+      if (!phone || !countryCode) {
+        return next(
+          new ErrorHandler(
+            "Both country code and phone number are required",
+            400
+          )
+        );
+      }
+    }
+
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
+
+    if (!phoneValidationResult.isValid) {
+      return next(new ErrorHandler(phoneValidationResult.message, 400));
+    }
+
+    cleanedPhone = phoneValidationResult.cleanedPhone;
+    cleanedCountryCode = phoneValidationResult.cleanedCode;
+
+    // Find user
+    const user = await User.findOne({
+      where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    if (user.isPhoneVerified) {
+      return next(new ErrorHandler("Phone already verified", 409));
+    }
+    // Construct full phone number
+    const fullPhoneNumber = `+${user.countryCode}${user.phone}`;
+
+    try {
+      // Call Kaleyra API to send OTP
+      const response = await axios({
+        method: "post",
+        url: `${KALEYRA_CONFIG.baseURL}/verify`,
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": KALEYRA_CONFIG.apiKey,
+        },
+        data: {
+          flow_id: KALEYRA_CONFIG.phoneFlowId,
+          to: {
+            mobile: fullPhoneNumber,
+          },
+        },
+      });
+
+      // Store verify_id in user record
+      user.otp = response.data.data.verify_id;
+      user.otpExpire = Date.now() + 10 * 60 * 1000; // 5 minutes
+      await user.save({ validate: false });
+
+      return res.status(200).json({
+        success: true,
+        message: `OTP sent successfully`,
+        phone: fullPhoneNumber,
+      });
+    } catch (error) {
+      // Handle Kaleyra API errors
+      if (error.response?.data?.error) {
+        const kaleyraError = error.response.data.error;
+        return next(new ErrorHandler(kaleyraError.message, 400));
+      }
+      throw error;
+    }
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+//----------phone verification----------------------------
+const phoneVerification = asyncHandler(async (req, res, next) => {
+  try {
+    const { countryCode, phone, otp } = req.body;
+
+    // Validate input
+    if (!otp || otp.trim() === "") {
+      return next(new ErrorHandler("OTP is required", 400));
+    }
+    // Phone Validation
+    if (phone || countryCode) {
+      // If one is provided, both must be provided
+      if (!phone || !countryCode) {
+        return next(
+          new ErrorHandler(
+            "Both country code and phone number are required",
+            400
+          )
+        );
+      }
+    }
+
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
+
+    if (!phoneValidationResult.isValid) {
+      return next(new ErrorHandler(phoneValidationResult.message, 400));
+    }
+
+    cleanedPhone = phoneValidationResult.cleanedPhone;
+    cleanedCountryCode = phoneValidationResult.cleanedCode;
+
+    // Find user
+    const user = await User.findOne({
+      where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    // Check if verify_id exists and OTP hasn't expired
+    if (!user.otp) {
+      return next(new ErrorHandler("Please request a new OTP", 400));
+    }
+    if (user.otpExpire < Date.now()) {
+      return next(new ErrorHandler("OTP has expired", 400));
+    }
+
+    try {
+      // Validate OTP with Kaleyra
+      const response = await axios({
+        method: "post",
+        url: `${KALEYRA_CONFIG.baseURL}/verify/validate`,
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": KALEYRA_CONFIG.apiKey,
+        },
+        data: {
+          verify_id: user.otp,
+          otp: otp,
+        },
+      });
+
+      // Update user details
+      user.isPhoneVerified = true;
+      user.otp = null;
+      user.otpExpire = null;
+      await user.save();
+
+      // const obj = {
+      //   type: "USER",
+      //   obj: user,
+      // };
+      // const accessToken = generateToken(obj);
+
+      return res.status(200).json({
+        success: true,
+        message: "Phone verification successful",
+        data: {
+          id: user.id,
+          name: user.name,
+          phone: user.phone,
+        },
+      });
+    } catch (error) {
+      // Handle Kaleyra API errors
+      if (error.response?.data?.error) {
+        const kaleyraError = error.response.data.error;
+        return next(
+          new ErrorHandler(kaleyraError.message || "Invalid OTP", 400)
+        );
+      }
+      throw error;
+    }
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
 //-----------send OTP-------------------------------
 // const sendOtp = asyncHandler(async (req, res, next) => {
 //   try {
@@ -373,8 +569,8 @@ const sendOtp = asyncHandler(async (req, res, next) => {
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
-    if(user.isEmailVerified){
-      return next(new ErrorHandler("Verified User",409))
+    if (user.isEmailVerified) {
+      return next(new ErrorHandler("Verified User", 409));
     }
     const phone = user.phone;
     // // Format phone number to include country code if not present
@@ -406,7 +602,7 @@ const sendOtp = asyncHandler(async (req, res, next) => {
       return res.status(200).json({
         success: true,
         message: `OTP sent successfully`,
-        email: user.email
+        email: user.email,
       });
     } catch (error) {
       // Handle Kaleyra API errors
@@ -525,16 +721,16 @@ const emailVerification = asyncHandler(async (req, res, next) => {
     try {
       // Validate OTP with Kaleyra
       const response = await axios({
-        method: 'post',
+        method: "post",
         url: `${KALEYRA_CONFIG.baseURL}/verify/validate`,
         headers: {
-          'Content-Type': 'application/json',
-          'api-key': KALEYRA_CONFIG.apiKey
+          "Content-Type": "application/json",
+          "api-key": KALEYRA_CONFIG.apiKey,
         },
         data: {
           verify_id: user.otp,
-          otp: otp
-        }
+          otp: otp,
+        },
       });
 
       // Update user details
@@ -560,12 +756,13 @@ const emailVerification = asyncHandler(async (req, res, next) => {
         },
         token: accessToken,
       });
-
     } catch (error) {
       // Handle Kaleyra API errors
       if (error.response?.data?.error) {
         const kaleyraError = error.response.data.error;
-        return next(new ErrorHandler(kaleyraError.message || "Invalid OTP", 400));
+        return next(
+          new ErrorHandler(kaleyraError.message || "Invalid OTP", 400)
+        );
       }
       throw error;
     }
@@ -790,13 +987,18 @@ const getUserDetails = asyncHandler(async (req, res, next) => {
     }
 
     // Validate type value
-    if (!['personal', 'professional'].includes(type.toLowerCase())) {
-      return next(new ErrorHandler("Type must be either 'personal' or 'professional'", 400));
+    if (!["personal", "professional"].includes(type.toLowerCase())) {
+      return next(
+        new ErrorHandler(
+          "Type must be either 'personal' or 'professional'",
+          400
+        )
+      );
     }
 
     // Fetch user from database
     const user = await User.findByPk(userId);
-    
+
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
@@ -804,7 +1006,7 @@ const getUserDetails = asyncHandler(async (req, res, next) => {
     let responseData;
 
     // Prepare response based on type
-    if (type.toLowerCase() === 'personal') {
+    if (type.toLowerCase() === "personal") {
       responseData = {
         name: user.name,
         email: user.email,
@@ -816,7 +1018,7 @@ const getUserDetails = asyncHandler(async (req, res, next) => {
         isEmailVerified: user.isEmailVerified,
         authProvider: user.authProvider,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        updatedAt: user.updatedAt,
       };
     } else {
       responseData = {
@@ -828,7 +1030,7 @@ const getUserDetails = asyncHandler(async (req, res, next) => {
         address: user.address || null,
         companyWebsite: user.companyWebsite || null,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        updatedAt: user.updatedAt,
       };
     }
 
@@ -836,12 +1038,13 @@ const getUserDetails = asyncHandler(async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: `${type.toLowerCase()} details fetched successfully`,
-      data: responseData
+      data: responseData,
     });
-
   } catch (error) {
     console.error("Get User Details Error:", error);
-    return next(new ErrorHandler(error.message || "Error fetching user details", 500));
+    return next(
+      new ErrorHandler(error.message || "Error fetching user details", 500)
+    );
   }
 });
 //----------------getById---------------------------------------
@@ -911,30 +1114,43 @@ const updateUser = asyncHandler(async (req, res, next) => {
     }
 
     // Parse JSON data if it's a string
-    let bodyData = req.body.data ? 
-      (typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data) 
+    let bodyData = req.body.data
+      ? typeof req.body.data === "string"
+        ? JSON.parse(req.body.data)
+        : req.body.data
       : req.body;
 
     // Validation checks
-    if (bodyData.professionalEmail && (typeof bodyData.professionalEmail !== 'string' || bodyData.professionalEmail.toLowerCase().trim() === '')) {
-      return next(new ErrorHandler('Please provide a valid email', 400));
+    if (
+      bodyData.professionalEmail &&
+      (typeof bodyData.professionalEmail !== "string" ||
+        bodyData.professionalEmail.toLowerCase().trim() === "")
+    ) {
+      return next(new ErrorHandler("Please provide a valid email", 400));
     }
-    if (bodyData.name && (typeof bodyData.name !== 'string' || bodyData.name.trim() === '')) {
-      return next(new ErrorHandler('Please provide a valid name', 400));
+    if (
+      bodyData.name &&
+      (typeof bodyData.name !== "string" || bodyData.name.trim() === "")
+    ) {
+      return next(new ErrorHandler("Please provide a valid name", 400));
     }
-    
-    if (bodyData.address && typeof bodyData.address !== 'object') {
-      return next(new ErrorHandler('Address must be a valid object', 400));
+
+    if (bodyData.address && typeof bodyData.address !== "object") {
+      return next(new ErrorHandler("Address must be a valid object", 400));
     }
-    
+
     if (bodyData.userWebsites) {
       if (!Array.isArray(bodyData.userWebsites)) {
-        return next(new ErrorHandler('User websites must be an array', 400));
-      } 
+        return next(new ErrorHandler("User websites must be an array", 400));
+      }
     }
-    
-    if (bodyData.companyWebsite && (typeof bodyData.companyWebsite !== 'string' || bodyData.companyWebsite.trim() === '')) {
-      return next(new ErrorHandler('Company website must be a valid URL', 400));
+
+    if (
+      bodyData.companyWebsite &&
+      (typeof bodyData.companyWebsite !== "string" ||
+        bodyData.companyWebsite.trim() === "")
+    ) {
+      return next(new ErrorHandler("Company website must be a valid URL", 400));
     }
 
     // Get current user data
@@ -945,7 +1161,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
 
     // Prepare update data
     let updateData = {
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     // Handle name update
@@ -957,18 +1173,18 @@ const updateUser = asyncHandler(async (req, res, next) => {
       }
       updateData.name = newName;
     }
-// Handle professionalEmail update
-if (bodyData.professionalEmail) {
-  const newEmail = bodyData.professionalEmail.toLowerCase().trim();
-  const emailError = isValidEmail(newEmail);
-  if (emailError) {
-    return next(new ErrorHandler('Invalid Email', 400));
+    // Handle professionalEmail update
+    if (bodyData.professionalEmail) {
+      const newEmail = bodyData.professionalEmail.toLowerCase().trim();
+      const emailError = isValidEmail(newEmail);
+      if (emailError) {
+        return next(new ErrorHandler("Invalid Email", 400));
       }
       updateData.professionalEmail = newEmail;
     }
     // Handle userImages - REPLACE instead of append
     if (req.files?.userImages) {
-      const fileError = validateFiles(req.files.userImages, 'user images');
+      const fileError = validateFiles(req.files.userImages, "user images");
       if (fileError) {
         return next(new ErrorHandler(fileError, 400));
       }
@@ -976,10 +1192,11 @@ if (bodyData.professionalEmail) {
       // Delete existing user images from CDN
       let currentUserImages = [];
       try {
-        currentUserImages = typeof currentUser.userImages === 'string' 
-          ? JSON.parse(currentUser.userImages) 
-          : currentUser.userImages || [];
-        
+        currentUserImages =
+          typeof currentUser.userImages === "string"
+            ? JSON.parse(currentUser.userImages)
+            : currentUser.userImages || [];
+
         // Delete existing images from CDN
         await Promise.all(
           currentUserImages.map((img) => deleteFile(img.fileName))
@@ -999,10 +1216,13 @@ if (bodyData.professionalEmail) {
             fileType: file.mimetype,
             fileSize: file.size,
             cdnUrl: uploadResult.url,
-            uploadedAt: new Date().toISOString()
+            uploadedAt: new Date().toISOString(),
           });
         } catch (uploadError) {
-          console.error(`Error uploading user image ${file.originalname}:`, uploadError);
+          console.error(
+            `Error uploading user image ${file.originalname}:`,
+            uploadError
+          );
           continue;
         }
       }
@@ -1012,7 +1232,10 @@ if (bodyData.professionalEmail) {
 
     // Handle companyImages - REPLACE instead of append
     if (req.files?.companyImages) {
-      const fileError = validateFiles(req.files.companyImages, 'company images');
+      const fileError = validateFiles(
+        req.files.companyImages,
+        "company images"
+      );
       if (fileError) {
         return next(new ErrorHandler(fileError, 400));
       }
@@ -1020,16 +1243,20 @@ if (bodyData.professionalEmail) {
       // Delete existing company images from CDN
       let currentCompanyImages = [];
       try {
-        currentCompanyImages = typeof currentUser.companyImages === 'string' 
-          ? JSON.parse(currentUser.companyImages) 
-          : currentUser.companyImages || [];
-        
+        currentCompanyImages =
+          typeof currentUser.companyImages === "string"
+            ? JSON.parse(currentUser.companyImages)
+            : currentUser.companyImages || [];
+
         // Delete existing images from CDN
         await Promise.all(
           currentCompanyImages.map((img) => deleteFile(img.fileName))
         );
       } catch (error) {
-        console.error("Error parsing or deleting current companyImages:", error);
+        console.error(
+          "Error parsing or deleting current companyImages:",
+          error
+        );
       }
 
       // Upload new images
@@ -1043,10 +1270,13 @@ if (bodyData.professionalEmail) {
             fileType: file.mimetype,
             fileSize: file.size,
             cdnUrl: uploadResult.url,
-            uploadedAt: new Date().toISOString()
+            uploadedAt: new Date().toISOString(),
           });
         } catch (uploadError) {
-          console.error(`Error uploading company image ${file.originalname}:`, uploadError);
+          console.error(
+            `Error uploading company image ${file.originalname}:`,
+            uploadError
+          );
           continue;
         }
       }
@@ -1072,7 +1302,9 @@ if (bodyData.professionalEmail) {
     });
 
     if (num === 0) {
-      return next(new ErrorHandler(`Failed to update user with id=${userId}`, 404));
+      return next(
+        new ErrorHandler(`Failed to update user with id=${userId}`, 404)
+      );
     }
 
     // Return success response
@@ -1090,10 +1322,9 @@ if (bodyData.professionalEmail) {
         userWebsites: updatedUser.userWebsites,
         companyWebsite: updatedUser.companyWebsite,
         createdAt: updatedUser.createdAt,
-        updatedAt: updatedUser.updatedAt
-      }
+        updatedAt: updatedUser.updatedAt,
+      },
     });
-
   } catch (error) {
     console.error("Update User Error:", error);
     return next(new ErrorHandler(error.message, 500));
@@ -1218,6 +1449,8 @@ const logoutAll = asyncHandler(async (req, res, next) => {
 
 module.exports = {
   registerUser,
+  phoneVerification,
+  sendPhoneOtp,
   sendOtp,
   emailVerification,
   loginUser,

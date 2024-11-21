@@ -58,6 +58,19 @@ const verifyJWt = async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 };
+//authorisation
+const authorize = (roles = []) => {
+  return [
+    (req, res, next) => {
+      console.log(req.decodedToken.obj.type);
+      if (roles.length && !roles.includes(req.decodedToken.obj.type)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      next();
+    },
+  ];
+};
 
 const verifyUserAgent = async (req, res, next) => {
   try {
@@ -113,4 +126,4 @@ const verifySession = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyJWt, verifyUserAgent, verifySession };
+module.exports = { verifyJWt, authorize,verifyUserAgent, verifySession };

@@ -17,12 +17,32 @@
     },
     "webcredentials": {
         "apps": [
-            "G33UGE8K58.com.xircular.XplorePromote"
+            "G33UGE8K58.com.xircular.XplorePromote",
+            "G33UGE8K58.com.xircular.XplorePromote.Clip"
+        ]
+    },
+    "activitycontinuation": {
+        "apps": [
+            "G33UGE8K58.com.xircular.XplorePromote",
+            "G33UGE8K58.com.xircular.XplorePromote.Clip"
         ]
     },
     "appclips": {
         "apps": [
             "G33UGE8K58.com.xircular.XplorePromote.Clip"
+        ],
+        "details": [
+            {
+                "appIDs": [
+                    "G33UGE8K58.com.xircular.XplorePromote.Clip"
+                ],
+                "components": [
+                    {
+                        "/": "/campaign/*",
+                        "comment": "Matches any URL with a path that starts with /campaign/."
+                    }
+                ]
+            }
         ]
     }
 }
