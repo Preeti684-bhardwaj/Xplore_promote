@@ -19,7 +19,7 @@ const {
     logout,
     logoutAll
 } = require("../Controller/userController");
-const {appleLogin,applePhone}=require('../Controller/appleSigin')
+const {appleLogin,getUserByAppleUserId,applePhone}=require('../Controller/appleSigin')
 const {googleLogin,googlePhone}=require('../Controller/googleSignin')
 const { verifyJWt, authorize, verifySession } = require("../middleware/auth");
 
@@ -52,6 +52,7 @@ router.delete('/logoutAll',verifyJWt,authorize(["USER"]),logoutAll)
 router.get("/redirect",getInsta)
 // Apple Sign In routes
 router.post('/appleSignin', appleLogin);
+router.get('/getUserByAppleUserId/:appleUserId',getUserByAppleUserId)
 router.post('/apple/phone',verifyJWt,authorize(["USER"]),applePhone)
 
 // Google Sign In routes

@@ -15,8 +15,14 @@ const asyncHandler = require("../utils/asyncHandler.js");
 const appleLogin =asyncHandler(async (req, res,next) => {
   try {
     const idToken = req.headers['authorization'];
+    const {email,name,appleUserId} = req.body;
+    if(!email || !name || !appleUserId){
+      return next(new ErrorHandler('Email, name and appleUserId are required', 400));
+    }
     const decodedToken = validateAppleToken(idToken);
-    const user = await createOrUpdateUser(decodedToken.sub, decodedToken);
+    console.log("decodedToken",decodedToken)
+    const user = await createOrUpdateUser(email,name,appleUserId,decodedToken.sub, decodedToken);
+console.log("appleUserId",decodedToken.sub);
 
     const obj = {
       type: 'USER',
@@ -34,7 +40,7 @@ const appleLogin =asyncHandler(async (req, res,next) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        lastLoginAt: user.lastLoginAt,
+        appleUserId: user.appleUserId,
       },
       token: accessToken,
     });
@@ -126,7 +132,29 @@ const applePhone = asyncHandler(async (req, res,next) => {
   }
 });
 
+// ---------------get user by appleUserId ---------------------------------
+const getUserByAppleUserId = asyncHandler(async (req, res,next) => {
+  try {
+    const idToken = req.headers['authorization'];   
+    const decodedToken = validateAppleToken(idToken);
+    const {appleUserId} = req.params;
+    const user = await User.findOne({where:{appleUserId:decodedToken.sub || appleUserId}})
+    if(!user){
+      return next(new ErrorHandler('User not found',404))
+    }
+    return res.status(200).json({status:true,user:{
+      id:user.id,
+      email:user.email,
+      name:user.name,
+      appleUserId:user.appleUserId
+    }}) 
+  } catch (error) {
+    return next(new ErrorHandler(error.message,500))
+  }
+})
+
 module.exports = {
   appleLogin,
+  getUserByAppleUserId,
   applePhone,
 };

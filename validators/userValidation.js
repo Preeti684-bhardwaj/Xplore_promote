@@ -63,6 +63,8 @@ const validateAppleToken = (idToken) => {
 
   try {
     const decodedToken = jwt.decode(idToken);
+    console.log(decodedToken);
+    
     if (!decodedToken || !decodedToken.sub) {
       return {
         success: false,
@@ -82,9 +84,9 @@ const validateAppleToken = (idToken) => {
 };
 
 // Helper function to create or update user
-const createOrUpdateUser = async (appleUserId, decodedToken) => {
+const createOrUpdateUser = async (email,name,appleUserId,decodedAppleId, decodedToken) => {
   try {
-    let user = await User.findOne({ where: { appleUserId } });
+    let user = await User.findOne({ where: { appleUserId:decodedAppleId || appleUserId } });
 
     if (!user) {
       if (decodedToken.email && !isValidEmail(decodedToken.email)) {
@@ -100,9 +102,9 @@ const createOrUpdateUser = async (appleUserId, decodedToken) => {
         : null;
 
       user = await User.create({
-        appleUserId,
-        email: decodedToken.email || null,
-        name: userName,
+        appleUserId:decodedAppleId || appleUserId,
+        email: decodedToken.email || email,
+        name: userName || name,
         isEmailVerified: true,
         authProvider: "apple",
         IsActive: true

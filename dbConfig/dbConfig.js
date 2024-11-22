@@ -14,7 +14,7 @@ const sequelize = new Sequelize(env.database, env.username, env.password, {
     idle: env.pool.idle,
   },
   dialectOptions: {
-    ssl:  {
+    ssl: {
       require: true,
       rejectUnauthorized: false // Use this if you're using a self-signed certificate
     }
@@ -27,7 +27,7 @@ db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 // Import models
-// db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
+db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
 db.admins=require("../Modals/adminModal.js")(sequelize,Sequelize);
 db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
@@ -47,6 +47,19 @@ db.layouts.belongsTo(db.campaigns, {
   foreignKey: 'campaignID',
   as: 'campaign',
     onDelete: 'CASCADE' // Optional: deletes advertisement when campaign is deleted
+});
+
+// Establish relationship between Campaign and EndUser
+db.campaigns.hasMany(db.endUsers, {
+  foreignKey: 'campaignID',
+  as: 'endUsers',
+  onDelete: 'CASCADE' // Optional: deletes associated end users when campaign is deleted
+});
+
+db.endUsers.belongsTo(db.campaigns, {
+  foreignKey: 'campaignID',
+  as: 'campaign',
+  onDelete: 'CASCADE' // Optional: deletes end user when campaign is deleted
 });
 
 // db.advertisements.hasMany(db.layouts, {
