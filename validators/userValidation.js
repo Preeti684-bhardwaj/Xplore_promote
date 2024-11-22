@@ -98,6 +98,11 @@ const createOrUpdateUser = async (
       where: { appleUserId: decodedAppleId || appleUserId },
     });
     if (!user) {
+      
+      if(!email || !name || !appleUserId){
+        return next(new ErrorHandler('Email, name and appleUserId are required', 400));
+      }
+
       if (decodedToken.email && !isValidEmail(decodedToken.email)) {
         return {
           success: false,
