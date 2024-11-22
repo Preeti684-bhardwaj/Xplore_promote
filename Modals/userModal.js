@@ -23,6 +23,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false
       },
+      visitorIds:{
+        type: DataTypes.ARRAY(DataTypes.STRING)
+      },
       userImages: {
         type:DataTypes.JSON
       },
