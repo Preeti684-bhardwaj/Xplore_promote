@@ -5,7 +5,7 @@ const {
  adminSignin,
  updateBusinessUser
 } = require("../Controller/adminController");
-const { verifyJWt, authorize} = require("../middleware/auth");
+// const { verifyJWt, authorize} = require("../middleware/auth");
 
 
 router.post("/signUp",adminSignup)

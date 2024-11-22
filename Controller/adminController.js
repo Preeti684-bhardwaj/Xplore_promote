@@ -4,10 +4,6 @@ const User = db.users;
 const asyncHandler = require("../utils/asyncHandler.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const { Op } = require("sequelize");
-const { validationResult } = require("express-validator");
-const sendEmail = require("../utils/sendEmail.js");
 const {
   generateToken,
   generateOtp,
@@ -15,9 +11,7 @@ const {
 } = require("../validators/userValidation.js");
 const {
   isValidEmail,
-  isPhoneValid,
-  isValidPassword,
-  isValidLength,
+  isValidPassword
 } = require("../validators/validation.js");
 
 // -------------------ADMIN SIGNUP------------------------------------------------------
