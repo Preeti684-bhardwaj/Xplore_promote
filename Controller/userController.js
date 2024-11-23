@@ -22,6 +22,11 @@ const { uploadFile } = require("../utils/cdnImplementation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const axios = require("axios");
+// const {
+//   FingerprintJsServerApiClient,
+//   Region
+// } =require('@fingerprintjs/fingerprintjs-pro-server-api')
+// const {FINGERPRINT_SECRETKEY,FINGERPRINT_REGION} = process.env
 require("dotenv").config();
 const {
   KALEYRA_BASE_URL,
@@ -37,6 +42,21 @@ const KALEYRA_CONFIG = {
   flowId: KALEYRA_FLOW_ID,
   phoneFlowId: KALEYRA_PHONE_FLOW_ID,
 };
+
+// const client = new FingerprintJsServerApiClient({
+//   apiKey:FINGERPRINT_SECRETKEY,
+//   region:Region.AP,
+// })
+
+// // // Get visit history of a specific visitor
+// client.getVisits('<visitorId>').then((visitorHistory) => {
+//   console.log(visitorHistory)
+// })
+// // Get a specific identification event
+// client.getEvent('<requestId>').then((event) => {
+//   console.log(event)
+// })
+
 
 //----------register user-------------------------
 // const registerUser = asyncHandler(async (req, res, next) => {

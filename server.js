@@ -4,11 +4,6 @@ require("dotenv").config({path:"./.env"})
 const passport = require('passport');
 const passportJWT = require('passport-jwt');
 const setupSocket = require('./utils/socketSetup.js');
-const {
-  FingerprintJsServerApiClient,
-  Region
-} =require('@fingerprintjs/fingerprintjs-pro-server-api')
-const {FINGERPRINT_SECRETKEY,FINGERPRINT_REGION} = process.env
 
 process.on("uncaughtException" , (err)=>{
     console.log(`Error: ${err.message}`)
@@ -47,19 +42,6 @@ let strategy = new JwtStrategy(jwtOptions, function (req, jwt_payload, done) {
 
 passport.use('jwt', strategy);
 
-const client = new FingerprintJsServerApiClient({
-  apiKey:FINGERPRINT_SECRETKEY,
-  region:Region.AP,
-})
-
-// // Get visit history of a specific visitor
-// client.getVisits('<visitorId>').then((visitorHistory) => {
-//   console.log(visitorHistory)
-// })
-// // Get a specific identification event
-// client.getEvent('<requestId>').then((event) => {
-//   console.log(event)
-// })
 
 // connectDB()
 // database connection

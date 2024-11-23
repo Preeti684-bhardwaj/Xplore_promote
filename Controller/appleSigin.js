@@ -16,9 +16,6 @@ const appleLogin =asyncHandler(async (req, res,next) => {
   try {
     const idToken = req.headers['authorization'];
     const {email,name,appleUserId} = req.body;
-    if(!email || !name || !appleUserId){
-      return next(new ErrorHandler('Email, name and appleUserId are required', 400));
-    }
     const decodedToken = validateAppleToken(idToken);
     console.log("decodedToken",decodedToken)
     const user = await createOrUpdateUser(email,name,appleUserId,decodedToken.sub, decodedToken);
