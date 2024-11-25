@@ -11,7 +11,7 @@ const createLayout = asyncHandler(async (req, res, next) => {
   try {
     const campaignID = req.params?.campaignID;
     // Destructure required fields from request body
-    const { name, layoutJSON } = req.body;
+    const { name, layoutJSON, isInitial } = req.body;
 
     // Validate required fields
     if (!name || !layoutJSON) {
@@ -48,19 +48,37 @@ const createLayout = asyncHandler(async (req, res, next) => {
         new ErrorHandler(`${name} already exists for this campaign.`, 400)
       );
     }
+     // If isInitial is true, check if another initial layout exists
+     if (isInitial === true) {
+      const existingInitialLayout = await Layout.findOne({
+        where: { 
+          campaignID,
+          isInitial: true 
+        }
+      });
 
+      if (existingInitialLayout) {
+        return next(
+          new ErrorHandler(
+            `Campaign already has an initial layout: ${existingInitialLayout.name}. Only one layout can be set as initial.`,
+            400
+          )
+        );
+      }
+    }
     // Prepare campaign data
     const layoutData = {
       name,
       layoutJSON,
       campaignID: campaignID,
+      isInitial: isInitial || false, 
     };
 
     // Create campaign
     const layout = await Layout.create(layoutData);
 
     return res.status(201).json({
-      status: true,
+      success: true,
       message: "Layout created successfully",
       data: layout,
     });
@@ -98,11 +116,15 @@ const getAllLayout = asyncHandler(async (req, res, next) => {
       ],
       order: [["createdAt", "ASC"]],
     });
+    console.log(data.rows);
+    // Find the initial layout from the results
+    const initialLayout = data.rows.find((layout) => layout.isInitial === true);
 
     return res.status(200).json({
       success: true,
       totalItems: data.count,
       layouts: data.rows,
+      initialLayout: initialLayout.name || null, // Include the initial layout in response
       currentPage: page ? +page : 0,
       totalPages: Math.ceil(data.count / limit),
     });
@@ -141,6 +163,9 @@ const updateLayout = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Missing Layout Id", 400));
     }
     const layout = await Layout.findByPk(req.params.id);
+    if (!layout) {
+      return next(new ErrorHandler("Layout not found", 404));
+    }
     const campaignID = layout.campaignID;
 
     // First check if the campaign exists
@@ -154,6 +179,20 @@ const updateLayout = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Unauthorized access", 403));
     }
 
+    // Handle isInitial flag update
+    if (req.body.isInitial === true && !layout.isInitial) {
+      // Find current initial layout and update it to false
+      await Layout.update(
+        { isInitial: false },
+        {
+          where: {
+            campaignID: campaignID,
+            isInitial: true,
+            layoutID: { [Op.ne]: req.params.id } // Exclude current layout
+          }
+        }
+      );
+    }
     const [updated] = await Layout.update(req.body, {
       where: { layoutID: req.params.id },
     });
@@ -161,11 +200,11 @@ const updateLayout = asyncHandler(async (req, res, next) => {
       const updatedLayout = await Layout.findByPk(req.params.id);
       return res.status(200).json({
         status: true,
-        message: "updated successfully",
+        message: "Layout updated successfully",
         data: updatedLayout,
       });
     } else {
-      return next(new ErrorHandler("Layout not found", 404));
+      return next(new ErrorHandler("Failed to update layout", 400));
     }
   } catch (error) {
     console.error("Error updating layout:", error);
