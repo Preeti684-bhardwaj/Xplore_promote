@@ -1,5 +1,3 @@
-// const passport = require("passport");
-// const AppleStrategy = require("passport-apple");
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const { Op } = require("sequelize");

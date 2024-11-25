@@ -1,5 +1,6 @@
 const db = require("../dbConfig/dbConfig");
 const User = db.users;
+const EndUser = db.endUsers;
 const QrSession = db.qrSessions;
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -52,6 +53,50 @@ const verifyJWt = async (req, res, next) => {
     req.user = user;
     req.token = token;
     console.log(req.user);
+
+    next();
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+};
+const verifyEndUser = async (req, res, next) => {
+  try {
+    console.log(req.headers);
+
+    // Get the token from Authorization header
+    const bearerHeader = req.headers["authorization"];
+
+    // Check if bearer header exists
+    if (!bearerHeader) {
+      return next(new ErrorHandler("Access Denied.", 401));
+    }
+
+    // Extract the token
+    // Format in Postman: "Bearer eyJhbGciOiJIUzI1NiIs..."
+    const token = bearerHeader.replace("Bearer ", "").trim();
+
+    if (!token) {
+      return next(new ErrorHandler("Access Denied. Token is required.", 401));
+    }
+
+    // Verify token
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    req.decodedToken = decodedToken;
+
+    // Get user ID from token
+    const userId = decodedToken.obj.obj.id;
+
+    // find end user
+    const endUser = await EndUser.findOne({
+      where: { id: userId },
+    });
+    console.log(endUser);
+
+    if (!endUser) {
+      return next(new ErrorHandler("Invalid token or enduser not found", 401));
+    }
+
+    req.endUser = endUser;
 
     next();
   } catch (error) {
@@ -111,7 +156,10 @@ const verifySession = async (req, res, next) => {
     // First check if userId matches
     if (session?.userId && session.userId !== req.user?.id) {
       return next(
-        new ErrorHandler(`session doesn't belongs to this user ${req.user?.id}`, 403)
+        new ErrorHandler(
+          `session doesn't belongs to this user ${req.user?.id}`,
+          403
+        )
       );
     }
 
@@ -119,11 +167,11 @@ const verifySession = async (req, res, next) => {
       return next(new ErrorHandler("Session expired, Please login again", 401));
     }
 
-    req.session =session.channel ;
+    req.session = session.channel;
     next();
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
 };
 
-module.exports = { verifyJWt, authorize,verifyUserAgent, verifySession };
+module.exports = { verifyJWt,verifyEndUser, authorize, verifyUserAgent, verifySession };
