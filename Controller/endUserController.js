@@ -802,6 +802,105 @@ const getUserByToken = asyncHandler(async (req, res, next) => {
   }
 });
 
+// ----isInterestedProducts--------------------------------
+const updateInterestedProduct = async (req, res) => {
+  try {
+      const { visitorId, deviceId, productName } = req.body;
+
+      if (!productName) {
+          return res.status(400).json({
+              success: false,
+              message: 'Product name is required'
+          });
+      }
+
+      if (!visitorId && !deviceId) {
+          return res.status(400).json({
+              success: false,
+              message: 'Either visitorId or deviceId is required'
+          });
+      }
+
+      // Build the query condition based on provided ID
+      const whereCondition = {
+          [Op.or]: []
+      };
+
+      if (visitorId) {
+          whereCondition[Op.or].push({
+              visitorIds: {
+                  [Op.contains]: [visitorId]
+              }
+          });
+      }
+
+      if (deviceId) {
+          whereCondition[Op.or].push({
+              deviceId: {
+                  [Op.contains]: [deviceId]
+              }
+          });
+      }
+
+      // Find the user
+      const user = await EndUser.findOne({
+          where: whereCondition
+      });
+
+      if (!user) {
+          return res.status(404).json({
+              success: false,
+              message: 'User not found'
+          });
+      }
+
+      // Get current interested products array or initialize if null
+      let currentProducts = user.isInterestedProducts || [];
+
+        // Check if product name already exists
+        if (currentProducts.includes(productName)) {
+          return res.status(400).json({
+              success: false,
+              message: `You have already shown interest in this product: ${productName}`
+          });
+      }
+
+      // Check if product name already exists
+      if (!currentProducts.includes(productName)) {
+          // Update the array with the new product name
+          const updatedProducts = [...currentProducts, productName];
+
+          // Update the user record
+          await user.update({
+            isInterestedProducts: updatedProducts
+          });
+          console.log('Updated user:', user);
+          return res.status(200).json({
+              success: true,
+              message: 'Product interest updated successfully',
+              data: {
+                  isInterestedProduct: updatedProducts
+              }
+          });
+      }
+
+      return res.status(200).json({
+          success: true,
+          message: 'Product already exists in interests',
+          data: {
+              isInterestedProduct: currentProducts
+          }
+      });
+
+  } catch (error) {
+      console.error('Error updating product interest:', error);
+      return res.status(500).json({
+          success: false,
+          message: 'Internal server error',
+          error: error.message
+      });
+  }
+};
 //--------------------Update user-----------------------------
 const updateUser = asyncHandler(async (req, res, next) => {
   try {
@@ -1054,6 +1153,7 @@ module.exports = {
   appleLogin,
   applePhone,
   googleLogin,
+  updateInterestedProduct,
   contactUs,
   getUserByToken,
 };

@@ -42,6 +42,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM('local', 'apple','google'),
         defaultValue: 'local',
       },
+      isInterestedProducts: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        unique: true,
+      },
       createdAt: DataTypes.DATE,
       updatedAt: DataTypes.DATE,
     });
