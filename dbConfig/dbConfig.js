@@ -56,10 +56,10 @@ db.campaigns.hasMany(db.endUsers, {
   onDelete: 'CASCADE' // Optional: deletes associated end users when campaign is deleted
 });
 
-db.endUsers.belongsTo(db.campaigns, {
-  foreignKey: 'campaignID',
-  as: 'campaign',
-  onDelete: 'CASCADE' // Optional: deletes end user when campaign is deleted
+db.campaigns.belongsTo(db.endUsers, {
+  foreignKey: 'userID', // Foreign key in Campaign table
+  as: 'user', // Alias for the relationship
+  onDelete: 'CASCADE', // Optional: deletes the campaign when its user is deleted
 });
 
 // db.advertisements.hasMany(db.layouts, {

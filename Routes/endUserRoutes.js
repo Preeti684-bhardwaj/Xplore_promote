@@ -3,6 +3,7 @@ const router = express.Router();
 const {
     saveVisitorAndCampaign,
     appleLogin,
+    googleLogin,
     applePhone,
     contactUs,
     getUserByToken
@@ -20,7 +21,7 @@ router.post('/appleSignin', appleLogin);
 router.post('/apple/phone',verifyEndUser,authorize(["USER"]),applePhone)
 
 // Google Sign In routes
-// router.post('/googleSignin', googleLogin);
+router.post('/googleSignin', googleLogin);
 // router.post('/google/phone',verifyJWt,authorize(["USER"]),googlePhone)
 
 module.exports = router;
