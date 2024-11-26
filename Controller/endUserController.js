@@ -89,7 +89,12 @@ const saveVisitorAndCampaign = async (req, res) => {
         await transaction.rollback();
         return res.status(409).json({
           error: "User is already registered for this campaign.",
-          user: existingUser,
+          user: {
+            name: existingUser.name,
+            email: existingUser.email,
+            countryCode: existingUser.countryCode,
+            phone: existingUser.phone
+          },
         });
       }
 
@@ -117,8 +122,16 @@ const saveVisitorAndCampaign = async (req, res) => {
 
       return res.status(200).json({
         message: "Existing user associated with campaign.",
-        user: existingUser,
-        campaign: campaign,
+        user: {
+          name: existingUser.name,
+          email: existingUser.email,
+          countryCode: existingUser.countryCode,
+          phone: existingUser.phone
+        },
+        campaign: {
+          campaignID: campaign.campaignID,
+          name: campaign.name
+        },
       });
     }
 
