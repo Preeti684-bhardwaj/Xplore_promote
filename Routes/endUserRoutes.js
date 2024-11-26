@@ -6,6 +6,7 @@ const {
     googleLogin,
     applePhone,
     contactUs,
+    updateInterestedProduct,
     getUserByToken
 } = require("../Controller/endUserController");
 const { verifyEndUser, authorize, verifySession } = require("../middleware/auth");
@@ -13,6 +14,7 @@ const { verifyEndUser, authorize, verifySession } = require("../middleware/auth"
 
 router.post("/saveVisitorAndCampaign",saveVisitorAndCampaign)
 router.post("/contactUs",contactUs)
+router.post("/updateInterestedProduct",updateInterestedProduct)
 router.get("/getUserByToken",verifyEndUser,authorize(["USER"]),verifySession,getUserByToken)
 // router.delete('/deleteUser',verifyJWt,authorize(["USER"]),deleteUser)
 // Apple Sign In routes
