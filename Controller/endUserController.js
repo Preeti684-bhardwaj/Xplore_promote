@@ -95,13 +95,16 @@ const saveVisitorAndCampaign = async (req, res) => {
 
       // Update existing user's identifiers
       const updateData = {
-        deviceId: existingUser.deviceId.includes(deviceId)
-          ? existingUser.deviceId
-          : [...new Set([...existingUser.deviceId, deviceId])],
-        visitorIds:
-          visitorId && !existingUser.visitorIds.includes(visitorId)
-            ? [...new Set([...existingUser.visitorIds, visitorId])]
-            : existingUser.visitorIds,
+        deviceId: Array.isArray(existingUser.deviceId)
+          ? (existingUser.deviceId.includes(deviceId)
+              ? existingUser.deviceId
+              : [...new Set([...existingUser.deviceId, deviceId])])
+          : [deviceId],
+        visitorIds: Array.isArray(existingUser.visitorIds) && visitorId
+          ? (existingUser.visitorIds.includes(visitorId)
+              ? existingUser.visitorIds
+              : [...new Set([...existingUser.visitorIds, visitorId])])
+          : (visitorId ? [visitorId] : []),
       };
 
       // Update user with new identifiers
