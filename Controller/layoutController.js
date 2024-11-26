@@ -124,7 +124,7 @@ const getAllLayout = asyncHandler(async (req, res, next) => {
       success: true,
       totalItems: data.count,
       layouts: data.rows,
-      initialLayout: initialLayout.name || null, // Include the initial layout in response
+      initialLayout: initialLayout|| null, // Include the initial layout in response
       currentPage: page ? +page : 0,
       totalPages: Math.ceil(data.count / limit),
     });
