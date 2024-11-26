@@ -156,6 +156,39 @@ const getOneLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
+// get all layout name 
+const getAllLayoutName = asyncHandler(async (req, res, next) => {
+  // Get the campaignID from request parameters
+  const campaignID = req.params?.campaignID;
+  if (!campaignID) {
+    return next(new ErrorHandler("Missing Campaign Id", 400));
+  }
+
+  try {
+    // Find all layout names for the specific campaign
+    const layoutNames = await Layout.findAll({
+      where: { 
+        campaignID: campaignID 
+      },
+      attributes: ['layoutID', 'name', 'isInitial'], // Select specific attributes
+      order: [['createdAt', 'ASC']] // Optional: order by creation time
+    });
+
+    return res.status(200).json({
+      success: true,
+      totalLayouts: layoutNames.length,
+      layoutNames: layoutNames.map(layout => ({
+        id: layout.layoutID,
+        name: layout.name,
+        isInitial: layout.isInitial
+      }))
+    });
+  } catch (error) {
+    console.error("Error fetching layout names:", error);
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
 // Update a layout
 const updateLayout = asyncHandler(async (req, res, next) => {
   try {
@@ -237,6 +270,7 @@ const deleteLayout = asyncHandler(async (req, res, next) => {
 module.exports = {
   createLayout,
   getAllLayout,
+  getAllLayoutName,
   getOneLayout,
   updateLayout,
   deleteLayout,

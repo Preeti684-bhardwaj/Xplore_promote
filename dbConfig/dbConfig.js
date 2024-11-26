@@ -50,16 +50,18 @@ db.layouts.belongsTo(db.campaigns, {
 });
 
 // Establish relationship between Campaign and EndUser
-db.campaigns.hasMany(db.endUsers, {
+db.campaigns.belongsToMany(db.endUsers, {
+  through: 'CampaignEndUser', // Sequelize automatically manages this table
   foreignKey: 'campaignID',
+  otherKey: 'endUserID',
   as: 'endUsers',
-  onDelete: 'CASCADE' // Optional: deletes associated end users when campaign is deleted
 });
 
-db.campaigns.belongsTo(db.endUsers, {
-  foreignKey: 'userID', // Foreign key in Campaign table
-  as: 'user', // Alias for the relationship
-  onDelete: 'CASCADE', // Optional: deletes the campaign when its user is deleted
+db.endUsers.belongsToMany(db.campaigns, {
+  through: 'CampaignEndUser',
+  foreignKey: 'endUserID',
+  otherKey: 'campaignID',
+  as: 'campaigns',
 });
 
 // db.advertisements.hasMany(db.layouts, {
