@@ -692,18 +692,24 @@ const googleLogin = asyncHandler(async (req, res, next) => {
 
 //----------contact us----------------------------
 const contactUs = asyncHandler(async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+
   try {
     const {
+      name,
+      email,
       countryCode,
       phone,
       address,
       otherDetails,
       visitorId,
       deviceId,
+      campaignID
     } = req.body;
+
     // 1. Input Validation
     // Validate required fields existence
-    const requiredFields = ["name", "email"];
+    const requiredFields = ["name", "email", "deviceId"];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
     if (missingFields.length > 0) {
       return next(
@@ -713,10 +719,12 @@ const contactUs = asyncHandler(async (req, res, next) => {
         )
       );
     }
-    if (!visitorId && !deviceId) {
-      return next(
-        new ErrorHandler("Either Visitor ID or Device ID required", 400)
-      );
+
+    // Check campaign existence
+    const campaign = await Campaign.findByPk(campaignID, { transaction });
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Campaign not found", 404));
     }
 
     // 2. Input Sanitization
@@ -726,10 +734,13 @@ const contactUs = asyncHandler(async (req, res, next) => {
     // Validate name
     const nameError = isValidLength(sanitizedName);
     if (nameError) {
+      await transaction.rollback();
       return next(new ErrorHandler(nameError, 400));
     }
+
     // Validate email format
     if (!isValidEmail(sanitizedEmail)) {
+      await transaction.rollback();
       return next(new ErrorHandler("Invalid email", 400));
     }
 
@@ -740,6 +751,7 @@ const contactUs = asyncHandler(async (req, res, next) => {
     if (phone || countryCode) {
       // If one is provided, both must be provided
       if (!phone || !countryCode) {
+        await transaction.rollback();
         return next(
           new ErrorHandler(
             "Both country code and phone number are required",
@@ -754,6 +766,7 @@ const contactUs = asyncHandler(async (req, res, next) => {
       );
 
       if (!phoneValidationResult.isValid) {
+        await transaction.rollback();
         return next(new ErrorHandler(phoneValidationResult.message, 400));
       }
 
@@ -761,30 +774,54 @@ const contactUs = asyncHandler(async (req, res, next) => {
       cleanedCountryCode = phoneValidationResult.cleanedCode;
     }
 
-    // 7. Database operations with transaction
-    const result = await sequelize.transaction(async (t) => {
-      // Check for existing user with proper indexing
-      const whereClause = {
-        [Op.or]: [
-          { deviceId: { [Op.contains]: [deviceId] } },
-          { visitorIds: { [Op.contains]: [visitorId] } },
-        ],
-      };
-      let existingUser = await EndUser.findOne({
-        where: whereClause,
-        transaction: t,
-        lock: true,
-      });
+    // Find existing user with deviceId or visitorId
+    const whereClause = {
+      [Op.or]: [
+        { deviceId: { [Op.contains]: [deviceId] } },
+        ...(visitorId 
+          ? [{ visitorIds: { [Op.contains]: [visitorId] } }] 
+          : [])
+      ]
+    };
 
-      if (existingUser) {
-        // Update only fields that are empty or not set
+    let existingUser = await EndUser.findOne({
+      where: whereClause,
+      transaction,
+      lock: true,
+    });
+
+    let user;
+    let isNew = false;
+
+    if (existingUser) {
+      // Check if email is different
+      if (existingUser.email.toLowerCase() !== sanitizedEmail) {
+        // Create a new user if email is different
+        user = await EndUser.create(
+          {
+            name: sanitizedName,
+            email: sanitizedEmail,
+            phone: cleanedPhone,
+            countryCode: cleanedCountryCode,
+            deviceId: [deviceId],
+            visitorIds: visitorId ? [visitorId] : [],
+            address: address,
+            otherDetails,
+            authProvider: "local",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          { transaction }
+        );
+        isNew = true;
+      } else {
+        // Update existing user with new data
         const updatedFields = {
-          name: existingUser.name || sanitizedName,
-          email: existingUser.email || sanitizedEmail,
-          phone: existingUser.phone || cleanedPhone,
-          countryCode: existingUser.countryCode || cleanedCountryCode,
-          address: existingUser.address || address,
-          otherDetails: existingUser.otherDetails || otherDetails,
+          name: sanitizedName,
+          phone: cleanedPhone || existingUser.phone,
+          countryCode: cleanedCountryCode || existingUser.countryCode,
+          address: address || existingUser.address,
+          otherDetails: otherDetails || existingUser.otherDetails,
         };
 
         // Safely handle deviceId and visitorIds as arrays
@@ -796,14 +833,16 @@ const contactUs = asyncHandler(async (req, res, next) => {
             deviceId,
           ]),
         ];
-        const updatedVisitorIds = [
-          ...new Set([
-            ...(Array.isArray(existingUser.visitorIds)
-              ? existingUser.visitorIds
-              : []),
-            visitorId,
-          ]),
-        ];
+        const updatedVisitorIds = visitorId
+          ? [
+              ...new Set([
+                ...(Array.isArray(existingUser.visitorIds)
+                  ? existingUser.visitorIds
+                  : []),
+                visitorId,
+              ]),
+            ]
+          : existingUser.visitorIds;
 
         await existingUser.update(
           {
@@ -812,51 +851,53 @@ const contactUs = asyncHandler(async (req, res, next) => {
             visitorIds: updatedVisitorIds,
             updatedAt: new Date(),
           },
-          { transaction: t }
+          { transaction }
         );
-        return {
-          user: existingUser,
-          isNew: false,
-        };
+        user = existingUser;
       }
-
-      // Create new user if none exists
-      const newUser = await EndUser.create(
+    } else {
+      // Create new user if no existing user found
+      user = await EndUser.create(
         {
           name: sanitizedName,
           email: sanitizedEmail,
           phone: cleanedPhone,
           countryCode: cleanedCountryCode,
           deviceId: [deviceId],
-          visitorIds: [visitorId],
-          address: address?.trim(),
-          otherDetails,
+          visitorIds: visitorId ? [visitorId] : [],
+          address: address,
+          otherDetails: otherDetails,
           authProvider: "local",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-        { transaction: t }
+        { transaction }
       );
+      isNew = true;
+    }
 
-      return {
-        user: newUser,
-        isNew: true,
-      };
-    });
+    // Associate user with campaign
+    await user.addCampaign(campaignID, { transaction });
 
     // 4. Response Handling
-    const userData = await EndUser.findByPk(result.user.id, {
+    const userData = await EndUser.findByPk(user.id, {
       attributes: ["id", "name", "email", "phone", "countryCode", "createdAt"],
+      transaction
     });
+
+    // Commit transaction
+    await transaction.commit();
 
     return res.status(200).json({
       success: true,
-      message: result.isNew
+      message: isNew
         ? "New Contact Us Form Submitted successfully"
         : "Contact Us Form updated/submitted successfully",
       data: userData,
     });
   } catch (error) {
+    // Rollback transaction in case of error
+    await transaction.rollback();
     return next(new ErrorHandler(error.message, 500));
   }
 });
@@ -889,8 +930,18 @@ const getUserByToken = asyncHandler(async (req, res, next) => {
 
 // ----isInterestedProducts--------------------------------
 const updateInterestedProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
-    const { visitorId, deviceId, productName } = req.body;
+    const { visitorId, deviceId, productName, campaignID } = req.body;
+
+    // Validate required inputs
+    if (!deviceId) {
+      return res.status(400).json({
+        success: false,
+        message: "Device ID is required",
+      });
+    }
 
     if (!productName) {
       return res.status(400).json({
@@ -899,43 +950,63 @@ const updateInterestedProduct = async (req, res) => {
       });
     }
 
-    if (!visitorId && !deviceId) {
+    if (!campaignID) {
       return res.status(400).json({
         success: false,
-        message: "Either visitorId or deviceId is required",
+        message: "Campaign ID is required",
+      });
+    }
+
+    // Check if campaign exists
+    const campaign = await Campaign.findByPk(campaignID, { transaction });
+    if (!campaign) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Campaign not found",
       });
     }
 
     // Build the query condition based on provided ID
     const whereCondition = {
-      [Op.or]: [],
+      deviceId: { [Op.contains]: [deviceId] },
+      ...(visitorId ? { 
+        [Op.or]: [
+          { visitorIds: { [Op.contains]: [visitorId] } }
+        ] 
+      } : {})
     };
-
-    if (visitorId) {
-      whereCondition[Op.or].push({
-        visitorIds: {
-          [Op.contains]: [visitorId],
-        },
-      });
-    }
-
-    if (deviceId) {
-      whereCondition[Op.or].push({
-        deviceId: {
-          [Op.contains]: [deviceId],
-        },
-      });
-    }
 
     // Find the user
     const user = await EndUser.findOne({
       where: whereCondition,
+      include: [
+        {
+          model: Campaign,
+          as: "campaigns",
+          through: {
+            where: { campaignID: campaignID },
+          },
+        },
+      ],
+      transaction,
     });
 
+    // Check if user is registered for this specific campaign
     if (!user) {
+      await transaction.rollback();
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "User not found or not registered for this campaign",
+      });
+    }
+
+    // Check if user is already registered for this campaign
+    if (user.campaigns.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "You are not registered for this campaign",
       });
     }
 
@@ -944,39 +1015,38 @@ const updateInterestedProduct = async (req, res) => {
 
     // Check if product name already exists
     if (currentProducts.includes(productName)) {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: `You have already shown interest in this product: ${productName}`,
       });
     }
 
-    // Check if product name already exists
-    if (!currentProducts.includes(productName)) {
-      // Update the array with the new product name
-      const updatedProducts = [...currentProducts, productName];
+    // Update the array with the new product name
+    const updatedProducts = [...currentProducts, productName];
 
-      // Update the user record
-      await user.update({
-        isInterestedProducts: updatedProducts,
-      });
-      console.log("Updated user:", user);
-      return res.status(200).json({
-        success: true,
-        message: "Product interest updated successfully",
-        data: {
-          isInterestedProduct: updatedProducts,
-        },
-      });
-    }
+    // Update the user record
+    await user.update({
+      isInterestedProducts: updatedProducts,
+      ...(visitorId && !user.visitorIds.includes(visitorId) 
+        ? { visitorIds: [...new Set([...user.visitorIds, visitorId])] } 
+        : {})
+    }, { transaction });
+
+    // Commit transaction
+    await transaction.commit();
 
     return res.status(200).json({
       success: true,
-      message: "Product already exists in interests",
+      message: "Product interest updated successfully",
       data: {
-        isInterestedProduct: currentProducts,
+        isInterestedProduct: updatedProducts,
       },
     });
+
   } catch (error) {
+    // Rollback transaction in case of error
+    await transaction.rollback();
     console.error("Error updating product interest:", error);
     return res.status(500).json({
       success: false,
