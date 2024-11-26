@@ -1,13 +1,10 @@
 const db = require("../dbConfig/dbConfig.js");
 const EndUser = db.endUsers;
 const Campaign = db.campaigns;
-const {Op } = require("sequelize");
+const { Op } = require("sequelize");
 const sequelize = db.sequelize;
 const { phoneValidation } = require("../utils/phoneValidation.js");
-const {
-  isValidEmail,
-  isValidLength,
-} = require("../validators/validation.js");
+const { isValidEmail, isValidLength } = require("../validators/validation.js");
 const {
   generateToken,
   validateAppleToken,
@@ -20,20 +17,20 @@ require("dotenv").config();
 //   Region
 // } =require('@fingerprintjs/fingerprintjs-pro-server-api')
 // const {FINGERPRINT_SECRETKEY,FINGERPRINT_REGION} = process.env
-const { OAuth2Client } = require('google-auth-library');
-const {ENDUSER_CLIENT_ID} = process.env
+const { OAuth2Client } = require("google-auth-library");
+const { ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } = process.env;
 const googleClient = new OAuth2Client({
-  clientId: ENDUSER_CLIENT_ID
+  clientId: ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
 });
 
 async function verifyGoogleLogin(idToken) {
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: idToken,
-      audience: ENDUSER_CLIENT_ID
-  });
-  const payload = ticket.getPayload();
-  return payload
+      audience: ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    return payload;
   } catch (error) {
     console.error("Error verifying Google token:", error);
     return null;
@@ -42,106 +39,152 @@ async function verifyGoogleLogin(idToken) {
 
 // ---------------save visitor and campaign id--------------------------------
 const saveVisitorAndCampaign = async (req, res) => {
-  const { visitorId, deviceId, campaignID } = req.body; // Extract visitor ID from request body
- // Check if either visitorId or deviceId is provided
- if ((!visitorId && !deviceId) || !campaignID) {
-  return res.status(400).json({
-    error: 'Either Visitor ID or Device ID, and Campaign ID are required.',
-  });
-}
+  const { visitorId, deviceId, campaignID } = req.body;
+
+  // Validate required inputs
+  if (!deviceId || !campaignID) {
+    return res.status(400).json({
+      error: "Device ID and Campaign ID are required.",
+    });
+  }
+
+  // Start a database transaction for data integrity
+  const transaction = await sequelize.transaction();
+
   try {
     // Check if the campaign exists
-    const campaign = await Campaign.findByPk(campaignID);
+    const campaign = await Campaign.findByPk(campaignID, { transaction });
     if (!campaign) {
+      await transaction.rollback();
       return res.status(404).json({
-        error: 'Campaign not found.',
+        error: "Campaign not found.",
       });
     }
 
-    let existingUser;
-    const identifierToUse = visitorId || deviceId;
-    const identifierType = visitorId ? 'visitorIds' : 'deviceIds';
-
-    // Check if the user exists with either visitorId or deviceId
-    if (visitorId) {
-      existingUser = await EndUser.findOne({
-        where: { visitorIds: { [Op.contains]: [visitorId] } },
-      });
-    } else {
-      existingUser = await EndUser.findOne({
-        where: { deviceIds: { [Op.contains]: [deviceId] } },
-      });
-    }
+    // Look for existing users with either deviceId or visitorId
+    let existingUser = await EndUser.findOne({
+      where: {
+        [Op.or]: [
+          { deviceId: { [Op.contains]: [deviceId] } },
+          ...(visitorId
+            ? [{ visitorIds: { [Op.contains]: [visitorId] } }]
+            : []),
+        ],
+      },
+      include: [
+        {
+          model: Campaign,
+          as: "campaigns",
+          through: {
+            where: { campaignID: campaignID },
+          },
+        },
+      ],
+      transaction,
+    });
 
     if (existingUser) {
-      // If using a new type of ID that this user doesn't have yet, add it to their record
-      if (!existingUser[identifierType].includes(identifierToUse)) {
-        const updatedIds = [...existingUser[identifierType], identifierToUse];
-        await existingUser.update({
-          [identifierType]: updatedIds
+      // Check if user is already associated with the campaign
+      if (existingUser.campaigns && existingUser.campaigns.length > 0) {
+        await transaction.rollback();
+        return res.status(409).json({
+          error: "User is already registered for this campaign.",
+          user: existingUser,
         });
       }
 
-      // Update the campaign with the existing user's ID
-      await Campaign.update(
-        { userID: existingUser.id },
-        { where: { id: campaignID } }
-      );
+      // Update existing user's identifiers
+      const updateData = {
+        deviceId: existingUser.deviceId.includes(deviceId)
+          ? existingUser.deviceId
+          : [...new Set([...existingUser.deviceId, deviceId])],
+        visitorIds:
+          visitorId && !existingUser.visitorIds.includes(visitorId)
+            ? [...new Set([...existingUser.visitorIds, visitorId])]
+            : existingUser.visitorIds,
+      };
+
+      // Update user with new identifiers
+      await existingUser.update(updateData, { transaction });
+
+      // Associate user with campaign using the junction table
+      await existingUser.addCampaign(campaign, { transaction });
+
+      await transaction.commit();
 
       return res.status(200).json({
-        message: 'Campaign updated with existing user ID.',
+        message: "Existing user associated with campaign.",
         user: existingUser,
-        campaign: await Campaign.findByPk(campaignID)
+        campaign: campaign,
       });
     }
 
-    // If no existing user found, create a new user
-    const newUser = await EndUser.create({
-      visitorIds: visitorId ? [visitorId] : [],
-      deviceIds: deviceId ? [deviceId] : [],
-    });
-
-    // Update the campaign with the new user's ID
-    await Campaign.update(
-      { userID: newUser.id },
-      { where: { id: campaignID } }
+    // Create new user if no existing user found
+    const newUser = await EndUser.create(
+      {
+        deviceId: [deviceId],
+        visitorIds: visitorId ? [visitorId] : [],
+      },
+      { transaction }
     );
 
-    // Fetch the updated campaign
-    const updatedCampaign = await Campaign.findByPk(campaignID);
+    // Associate new user with campaign using the junction table
+    await newUser.addCampaign(campaign, { transaction });
+
+    await transaction.commit();
 
     return res.status(201).json({
-      message: 'New user created and campaign updated successfully.',
+      message: "New user created and associated with campaign.",
       user: newUser,
-      campaign: updatedCampaign
+      campaign: campaign,
     });
-
   } catch (error) {
-    console.error('Error saving user and campaign:', error);
+    await transaction.rollback();
+    console.error("Error saving user and campaign:", error);
     return res.status(500).json({
-      error: 'An error occurred while saving user and Campaign ID.',
-      details: error.message
+      error: "An error occurred while saving user and Campaign ID.",
+      details: error.message,
     });
   }
 };
+// userDetails
+// const userDetails = asyncHandler(async (req, res, next) => {
+//   try {
+//     const {
+//       name,
+//       countryCode,
+//       phone,
+//       email,
+//       address,
+//       otherDetails,
+//       visitorId,
+//       deviceId,
+//     } = req.body;
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
 //  ---------------apple signin---------------------------------
 const appleLogin = asyncHandler(async (req, res, next) => {
-  // Start database transaction
   const transaction = await sequelize.transaction();
 
   try {
     const authHeader = req.headers["authorization"];
-    const idToken = authHeader?.startsWith('Bearer ') 
-      ? authHeader.substring(7) 
+    const idToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
       : authHeader;
-    const { email, name, appleUserId, visitorId, deviceId } = req.body;
+    const { email, name, appleUserId, visitorId, deviceId, campaignID } =
+      req.body;
 
-    // Validate required inputs
-    if (!visitorId && !deviceId) {
-      return next(
-        new ErrorHandler("Either visitor ID or device ID is required", 400)
-      );
-    }
+   // Validate required inputs
+   if (!deviceId || !campaignID) {
+    return next(
+      new ErrorHandler(
+        "Device ID and Campaign ID are required",
+        400
+      )
+    );
+  }
     if (!idToken) {
       return next(new ErrorHandler("Authorization token is required", 401));
     }
@@ -160,25 +203,63 @@ const appleLogin = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Failed to validate Apple token", 401));
     }
 
-    // Build the where clause based on provided IDs
-    const whereClause = [];
-    if (deviceId) {
-      whereClause.push({ deviceId: { [Op.contains]: [deviceId] } });
-    }
-    if (visitorId) {
-      whereClause.push({ visitorIds: { [Op.contains]: [visitorId] } });
+    // Check if campaign exists
+    const campaign = await Campaign.findByPk(campaignID, { transaction });
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Campaign not found", 404));
     }
 
-    // Find user by deviceId or visitorId
-    let user = await EndUser.findOne({
+     // Find existing user by deviceId or visitorId
+     let existingUser = await EndUser.findOne({
       where: {
-        [Op.or]: whereClause,
+        [Op.or]: [
+          { deviceId: { [Op.contains]: [deviceId] } },
+          ...(visitorId
+            ? [{ visitorIds: { [Op.contains]: [visitorId] } }]
+            : []),
+        ],
       },
+      include: [
+        {
+          model: Campaign,
+          as: "campaigns",
+          through: {
+            where: { campaignID: campaignID },
+          },
+        },
+      ],
       transaction,
     });
 
-    // If user found by device/visitor ID, update with Apple credentials
-    if (user) {
+    // Check if user is already registered for this specific campaign
+    if (existingUser && existingUser.campaigns.length > 0) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler("You are already registered for this campaign", 400)
+      );
+    }
+
+    let user;
+    // Scenario handling
+   // Scenario handling
+   if (existingUser) {
+    // Scenario: Email is different - create a new user
+    if (email && email.toLowerCase() !== existingUser.email) {
+      user = await EndUser.create(
+        {
+          appleUserId: decodedToken.sub || appleUserId,
+          email: email.toLowerCase(),
+          name: name?.trim(),
+          authProvider: "apple",
+          deviceId: existingUser.deviceId,
+          visitorIds: existingUser.visitorIds,
+          isEmailVerified: true,
+        },
+        { transaction }
+      );
+    } else {
+      // Update existing user
       const updates = {
         appleUserId: decodedToken.sub || appleUserId,
         email: (decodedToken.email || email)?.toLowerCase(),
@@ -187,83 +268,322 @@ const appleLogin = asyncHandler(async (req, res, next) => {
           : name?.trim(),
         authProvider: "apple",
         isEmailVerified: true,
+        deviceId: [...new Set([...existingUser.deviceId, deviceId])],
+        visitorIds: visitorId
+          ? [...new Set([...existingUser.visitorIds, visitorId])]
+          : existingUser.visitorIds,
       };
 
-      // Validate email if provided
-      if (updates.email && !isValidEmail(updates.email)) {
-        await transaction.rollback();
-        return next(new ErrorHandler("Invalid email format", 400));
-      }
+      await existingUser.update(updates, { transaction });
+      user = existingUser;
+    }
 
-      // Validate name if provided
-      if (updates.name) {
-        const sanitizedName = updates.name.replace(/\s+/g, " ");
-        const nameError = isValidLength(sanitizedName);
-        if (nameError) {
-          await transaction.rollback();
-          return next(new ErrorHandler(nameError, 400));
-        }
-        updates.name = sanitizedName;
-      }
-
-      await user.update(updates, { transaction });
-    } else {
-      // If no user found by device/visitor ID, try finding by appleUserId
-      user = await EndUser.findOne({
-        where: { appleUserId: decodedToken.sub || appleUserId },
-        transaction,
-      });
-
-      if (user) {
-        // Existing Apple user - add new device/visitor ID
-        const updates = {
-          deviceId: deviceId
-            ? [...new Set([...user.deviceId, deviceId])]
-            : user.deviceId,
-          visitorIds: visitorId
-            ? [...new Set([...user.visitorIds, visitorId])]
-            : user.visitorIds,
-            isEmailVerified: true,
-        };
-        await user.update(updates, { transaction });
-      } else {
-        // New user - create account
-        if (!email && !decodedToken.email) {
-          await transaction.rollback();
-          return next(new ErrorHandler("Email is required for new users", 400));
-        }
-
-        if (!name && !decodedToken.name) {
-          await transaction.rollback();
-          return next(new ErrorHandler("Name is required for new users", 400));
-        }
-
-        const userEmail = (decodedToken.email || email).trim().toLowerCase();
-        if (!isValidEmail(userEmail)) {
-          await transaction.rollback();
-          return next(new ErrorHandler("Invalid email format", 400));
-        }
-
-        const userName = decodedToken.name
+    // Associate user with campaign
+    await user.addCampaign(campaignID, { transaction });
+  } else {
+    // New user creation
+    user = await EndUser.create(
+      {
+        appleUserId: decodedToken.sub || appleUserId,
+        email: (decodedToken.email || email).trim().toLowerCase(),
+        name: decodedToken.name
           ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`.trim()
-          : name.trim();
-        const sanitizedName = userName.replace(/\s+/g, " ");
+          : name.trim(),
+        authProvider: "apple",
+        deviceId: [deviceId],
+        visitorIds: visitorId ? [visitorId] : [],
+        isEmailVerified: true,
+      },
+      { transaction }
+    );
 
-        const nameError = isValidLength(sanitizedName);
-        if (nameError) {
-          await transaction.rollback();
-          return next(new ErrorHandler(nameError, 400));
+    // Associate user with campaign
+    await user.addCampaign(campaignId, { transaction });
+  }
+
+  // Generate authentication token
+  const tokenPayload = {
+    type: "USER",
+    obj: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      appleUserId: user.appleUserId,
+    },
+  };
+  const accessToken = generateToken(tokenPayload);
+
+  // Commit transaction
+  await transaction.commit();
+
+  // Return success response
+  return res.status(200).json({
+    success: true,
+    message:
+      user.createdAt === user.updatedAt
+        ? "Signup successful"
+        : "Login successful",
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        appleUserId: user.appleUserId,
+        deviceId: user.deviceId,
+        visitorIds: user.visitorIds,
+        isEmailVerified: user.isEmailVerified,
+      },
+      token: accessToken,
+    },
+  });
+} catch (error) {
+  await transaction.rollback();
+  console.error("Apple auth error:", error);
+  return next(new ErrorHandler("Authentication failed", error.status || 500));
+}
+});
+
+//----------------Add phone number--------------------------------------------------
+const applePhone = asyncHandler(async (req, res, next) => {
+  try {
+    const { countryCode, phone } = req.body;
+    const userId = req.endUser?.id;
+
+    // Input validation
+    if (!countryCode) {
+      return next(new ErrorHandler("Country code is required", 400));
+    }
+    if (!phone) {
+      return next(new ErrorHandler("Missing phone number", 400));
+    }
+
+    if (!userId) {
+      return next(new ErrorHandler("Invalid authentication token", 401));
+    }
+
+    // Validate phone number
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
+
+    if (!phoneValidationResult.isValid) {
+      return next(new ErrorHandler(phoneValidationResult.message, 400));
+    }
+
+    const { formattedPhone } = phoneValidationResult;
+
+    // Find and validate user
+    const user = await EndUser.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    if (!user.isEmailVerified) {
+      return next(
+        new ErrorHandler(
+          "Email not verified. Please verify your email first.",
+          403
+        )
+      );
+    }
+
+    // Check for duplicate phone number across all users using formatted phone
+    const existingPhoneUser = await EndUser.findOne({
+      where: {
+        phone: formattedPhone,
+        id: { [Op.ne]: userId }, // Exclude current user
+      },
+    });
+
+    if (existingPhoneUser) {
+      return next(
+        new ErrorHandler(
+          "Phone number already registered to another account",
+          409
+        )
+      );
+    }
+
+    if (user.phone) {
+      return next(
+        new ErrorHandler("Phone number already exists for this user", 409)
+      );
+    }
+
+    // Update phone number with retry logic
+    let retries = 3;
+    let updateError;
+
+    while (retries > 0) {
+      try {
+        await user.update({
+          phone: formattedPhone, // Store the formatted phone number
+        });
+        updateError = null;
+        break;
+      } catch (error) {
+        updateError = error;
+        retries--;
+        if (retries > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
         }
+      }
+    }
 
+    if (updateError) {
+      console.error(
+        "Failed to update phone number after retries:",
+        updateError
+      );
+      throw updateError;
+    }
+
+    // Audit log for phone number update
+    console.log(`Phone number updated for user ID: ${user.id}`);
+
+    return res.status(200).json({
+      status: true,
+      message: "Phone number added successfully",
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: formattedPhone,
+      },
+    });
+  } catch (error) {
+    console.error("Phone update error:", error);
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+//----------------- google signin--------------------------------
+const googleLogin = asyncHandler(async (req, res, next) => {
+  // Start database transaction
+  const transaction = await sequelize.transaction();
+  try {
+    // Get token and required fields from request
+    const authHeader = req.headers["authorization"];
+    const idToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : authHeader;
+    const { visitorId, deviceId, campaignID } = req.body;
+
+    // Validate required inputs
+    if (!deviceId || !campaignID) {
+      return next(
+        new ErrorHandler(
+          "Device ID and Campaign ID are required",
+          400
+        )
+      );
+    }
+
+    if (!idToken || idToken === "null") {
+      return next(new ErrorHandler("Authorization token is required", 401));
+    }
+
+    // Verify Google token
+    let googlePayload;
+    try {
+      googlePayload = await verifyGoogleLogin(idToken);
+      if (!googlePayload?.sub) {
+        return next(
+          new ErrorHandler("Invalid Google account information", 400)
+        );
+      }
+    } catch (error) {
+      if (error.message.includes("Token used too late")) {
+        return next(
+          new ErrorHandler(
+            "Authentication token has expired. Please login again.",
+            401
+          )
+        );
+      }
+      return next(new ErrorHandler("Failed to validate Google token", 401));
+    }
+    // Check if campaign exists
+    const campaign = await Campaign.findByPk(campaignID, { transaction });
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+    
+    // Find existing user by deviceId or visitorId
+    let existingUser = await EndUser.findOne({
+      where: {
+        [Op.or]: [
+          { deviceId: { [Op.contains]: [deviceId] } },
+          ...(visitorId
+            ? [{ visitorIds: { [Op.contains]: [visitorId] } }]
+            : []),
+        ],
+      },
+      include: [
+        {
+          model: Campaign,
+          as: "campaigns",
+          through: {
+            where: { campaignID: campaignID },
+          },
+        },
+      ],
+      transaction,
+    });
+
+    // Check if user is already registered for this specific campaign
+    if (existingUser && existingUser.campaigns.length > 0) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler("You are already registered for this campaign", 400)
+      );
+    }
+
+    const userEmail = googlePayload.email?.trim().toLowerCase();
+    const sanitizedName = googlePayload.name?.trim().replace(/\s+/g, " ");
+
+    // Validate email and name
+    if (!userEmail) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler("Email is required from Google account", 400)
+      );
+    }
+    if (!sanitizedName) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler("Name is required from Google account", 400)
+      );
+    }
+    if (!isValidEmail(userEmail)) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid email format", 400));
+    }
+    const nameError = isValidLength(sanitizedName);
+    if (nameError) {
+      await transaction.rollback();
+      return next(new ErrorHandler(nameError, 400));
+    }
+
+    let user;
+    // Scenario handling
+    if (existingUser) {
+      // Check if email is different
+      if (existingUser.email !== userEmail) {
+        // Create a new user with the new email
         try {
           user = await EndUser.create(
             {
-              appleUserId: decodedToken.sub || appleUserId,
+              googleUserId: googlePayload.sub,
               email: userEmail,
               name: sanitizedName,
-              authProvider: "apple",
-              deviceId: [deviceId],
-              visitorIds: [visitorId],
+              authProvider: "google",
+              deviceId: existingUser.deviceId,
+              visitorIds: existingUser.visitorIds,
               isEmailVerified: true,
             },
             { transaction }
@@ -280,308 +600,51 @@ const appleLogin = asyncHandler(async (req, res, next) => {
           }
           throw dbError;
         }
-      }
-    }
-
-    // Generate authentication token
-    const tokenPayload = {
-      type: "USER",
-      obj: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        appleUserId: user.appleUserId,
-      },
-    };
-    const accessToken = generateToken(tokenPayload);
-
-    // Commit transaction
-    await transaction.commit();
-
-    // Return success response
-    return res.status(200).json({
-      success: true,
-      message:
-        user.createdAt === user.updatedAt
-          ? "Signup successful"
-          : "Login successful",
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          appleUserId: user.appleUserId,
-          deviceId: user.deviceId,
-          visitorIds: user.visitorIds,
-          isEmailVerified: user.isEmailVerified,
-        },
-        token: accessToken,
-      },
-    });
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Apple auth error:", error);
-    return next(new ErrorHandler("Authentication failed", error.status || 500));
-  }
-});
-
-//----------------Add phone number--------------------------------------------------
-const applePhone = asyncHandler(async (req, res, next) => {
-    try {
-      const { countryCode, phone } = req.body;
-      const userId = req.endUser?.id;
-  
-      // Input validation
-      if (!countryCode) {
-        return next(new ErrorHandler("Country code is required", 400));
-      }
-      if (!phone) {
-        return next(new ErrorHandler("Missing phone number", 400));
-      }
-  
-      if (!userId) {
-        return next(new ErrorHandler("Invalid authentication token", 401));
-      }
-  
-      // Validate phone number
-      const phoneValidationResult = phoneValidation.validatePhone(
-        countryCode,
-        phone
-      );
-  
-      if (!phoneValidationResult.isValid) {
-        return next(new ErrorHandler(phoneValidationResult.message, 400));
-      }
-  
-      const { formattedPhone } = phoneValidationResult;
-  
-      // Find and validate user
-      const user = await EndUser.findOne({
-        where: { id: userId },
-      });
-  
-      if (!user) {
-        return next(new ErrorHandler("User not found", 404));
-      }
-  
-      if (!user.isEmailVerified) {
-        return next(
-          new ErrorHandler(
-            "Email not verified. Please verify your email first.",
-            403
-          )
-        );
-      }
-  
-      // Check for duplicate phone number across all users using formatted phone
-      const existingPhoneUser = await EndUser.findOne({
-        where: {
-          phone: formattedPhone,
-          id: { [Op.ne]: userId }, // Exclude current user
-        },
-      });
-  
-      if (existingPhoneUser) {
-        return next(
-          new ErrorHandler(
-            "Phone number already registered to another account",
-            409
-          )
-        );
-      }
-  
-      if (user.phone) {
-        return next(
-          new ErrorHandler("Phone number already exists for this user", 409)
-        );
-      }
-  
-      // Update phone number with retry logic
-      let retries = 3;
-      let updateError;
-      
-      while (retries > 0) {
-        try {
-          await user.update({
-            phone: formattedPhone, // Store the formatted phone number
-          });
-          updateError = null;
-          break;
-        } catch (error) {
-          updateError = error;
-          retries--;
-          if (retries > 0) {
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
-          }
-        }
-      }
-  
-      if (updateError) {
-        console.error("Failed to update phone number after retries:", updateError);
-        throw updateError;
-      }
-  
-      // Audit log for phone number update
-      console.log(`Phone number updated for user ID: ${user.id}`);
-  
-      return res.status(200).json({
-        status: true,
-        message: "Phone number added successfully",
-        user: {
-          id: user.id,
-          email: user.email,
-          phone: formattedPhone,
-        },
-      });
-    } catch (error) {
-      console.error("Phone update error:", error);
-      return next(new ErrorHandler(error.message, 500));
-    }
-  });
-
-//----------------- google signin-------------------------------- 
-const googleLogin = asyncHandler(async (req, res, next) => {
-  // Start database transaction
-  const transaction = await sequelize.transaction();
-  try {
-    // Get token and required fields from request
-    const authHeader = req.headers["authorization"];
-    const idToken = authHeader?.startsWith('Bearer ') 
-      ? authHeader.substring(7) 
-      : authHeader;
-    const { visitorId, deviceId } = req.body;
-
-    // Validate required inputs
-    if (!visitorId && !deviceId) {
-      return next(new ErrorHandler("Either visitor ID or device ID is required", 400));
-    }
-    if (!idToken || idToken === "null") {
-      return next(new ErrorHandler("Authorization token is required", 401));
-    }
-
-    // Verify Google token
-    let googlePayload;
-    try {
-      googlePayload = await verifyGoogleLogin(idToken);
-      if (!googlePayload?.sub) {
-        return next(new ErrorHandler("Invalid Google account information", 400));
-      }
-    } catch (error) {
-      if (error.message.includes('Token used too late')) {
-        return next(new ErrorHandler("Authentication token has expired. Please login again.", 401));
-      }
-      return next(new ErrorHandler("Failed to validate Google token", 401));
-    }
-
-    // Build the where clause based on provided IDs
-    const whereClause = [];
-    if (deviceId) {
-      whereClause.push({ deviceId: { [Op.contains]: [deviceId] } });
-    }
-    if (visitorId) {
-      whereClause.push({ visitorIds: { [Op.contains]: [visitorId] } });
-    }
-
-    // Find user by deviceId or visitorId
-    let user = await EndUser.findOne({
-      where: {
-        [Op.or]: whereClause,
-      },
-      transaction,
-    });
-
-    // If user found by device/visitor ID, update with Google credentials
-    if (user) {
-      const updates = {
-        googleUserId: googlePayload.sub,
-        email: googlePayload.email?.toLowerCase(),
-        name: googlePayload.name?.trim(),
-        authProvider: "google",
-        isEmailVerified: true,
-      };
-
-      // Validate email if provided
-      if (updates.email && !isValidEmail(updates.email)) {
-        await transaction.rollback();
-        return next(new ErrorHandler("Invalid email format", 400));
-      }
-
-      // Validate name if provided
-      if (updates.name) {
-        const sanitizedName = updates.name.replace(/\s+/g, " ");
-        const nameError = isValidLength(sanitizedName);
-        if (nameError) {
-          await transaction.rollback();
-          return next(new ErrorHandler(nameError, 400));
-        }
-        updates.name = sanitizedName;
-      }
-
-      await user.update(updates, { transaction });
-    } else {
-      // If no user found by device/visitor ID, try finding by googleUserId
-      user = await EndUser.findOne({
-        where: { googleUserId: googlePayload.sub },
-        transaction,
-      });
-
-      if (user) {
-        // Existing Google user - add new device/visitor ID
+      } else {
+        // Update existing user
         const updates = {
-          deviceId: deviceId
-            ? [...new Set([...user.deviceId, deviceId])]
-            : user.deviceId,
+          googleUserId: googlePayload.sub,
+          deviceId: [...new Set([...existingUser.deviceId, deviceId])],
           visitorIds: visitorId
-            ? [...new Set([...user.visitorIds, visitorId])]
-            : user.visitorIds,
+            ? [...new Set([...existingUser.visitorIds, visitorId])]
+            : existingUser.visitorIds,
           isEmailVerified: true,
         };
-        await user.update(updates, { transaction });
-      } else {
-        // New user - create account
-        if (!googlePayload.email) {
-          await transaction.rollback();
-          return next(new ErrorHandler("Email is required from Google account", 400));
-        }
+        await existingUser.update(updates, { transaction });
+        user = existingUser;
+      }
 
-        if (!googlePayload.name) {
-          await transaction.rollback();
-          return next(new ErrorHandler("Name is required from Google account", 400));
-        }
+      // Associate user with campaign
+      await user.addCampaign(campaignID, { transaction });
+    } else {
+      // Completely new user
+      try {
+        user = await EndUser.create(
+          {
+            googleUserId: googlePayload.sub,
+            email: userEmail,
+            name: sanitizedName,
+            authProvider: "google",
+            deviceId: [deviceId],
+            visitorIds: visitorId ? [visitorId] : [],
+            isEmailVerified: true,
+          },
+          { transaction }
+        );
 
-        const userEmail = googlePayload.email.trim().toLowerCase();
-        if (!isValidEmail(userEmail)) {
-          await transaction.rollback();
-          return next(new ErrorHandler("Invalid email format", 400));
-        }
-
-        const sanitizedName = googlePayload.name.trim().replace(/\s+/g, " ");
-        const nameError = isValidLength(sanitizedName);
-        if (nameError) {
-          await transaction.rollback();
-          return next(new ErrorHandler(nameError, 400));
-        }
-
-        try {
-          user = await EndUser.create(
-            {
-              googleUserId: googlePayload.sub,
-              email: userEmail,
-              name: sanitizedName,
-              authProvider: "google",
-              deviceId: deviceId ? [deviceId] : [],
-              visitorIds: visitorId ? [visitorId] : [],
-              isEmailVerified: true,
-            },
-            { transaction }
+        // Associate user with campaign
+        await user.addCampaign(campaignID, { transaction });
+      } catch (dbError) {
+        await transaction.rollback();
+        if (dbError.name === "SequelizeUniqueConstraintError") {
+          return next(
+            new ErrorHandler(
+              "Email already registered with another account",
+              409
+            )
           );
-        } catch (dbError) {
-          await transaction.rollback();
-          if (dbError.name === "SequelizeUniqueConstraintError") {
-            return next(new ErrorHandler("Email already registered with another account", 409));
-          }
-          throw dbError;
         }
+        throw dbError;
       }
     }
 
@@ -603,7 +666,10 @@ const googleLogin = asyncHandler(async (req, res, next) => {
     // Return success response
     return res.status(200).json({
       success: true,
-      message: user.createdAt === user.updatedAt ? "Signup successful" : "Login successful",
+      message:
+        user.createdAt === user.updatedAt
+          ? "Signup successful"
+          : "Login successful",
       data: {
         user: {
           id: user.id,
@@ -628,10 +694,8 @@ const googleLogin = asyncHandler(async (req, res, next) => {
 const contactUs = asyncHandler(async (req, res, next) => {
   try {
     const {
-      name,
       countryCode,
       phone,
-      email,
       address,
       otherDetails,
       visitorId,
@@ -649,8 +713,10 @@ const contactUs = asyncHandler(async (req, res, next) => {
         )
       );
     }
-    if(!visitorId && !deviceId){
-      return next(new ErrorHandler("Either Visitor ID or Device ID required", 400));
+    if (!visitorId && !deviceId) {
+      return next(
+        new ErrorHandler("Either Visitor ID or Device ID required", 400)
+      );
     }
 
     // 2. Input Sanitization
@@ -723,10 +789,20 @@ const contactUs = asyncHandler(async (req, res, next) => {
 
         // Safely handle deviceId and visitorIds as arrays
         const updatedDeviceIds = [
-          ...new Set([...(Array.isArray(existingUser.deviceId) ? existingUser.deviceId : []), deviceId]),
+          ...new Set([
+            ...(Array.isArray(existingUser.deviceId)
+              ? existingUser.deviceId
+              : []),
+            deviceId,
+          ]),
         ];
         const updatedVisitorIds = [
-          ...new Set([...(Array.isArray(existingUser.visitorIds) ? existingUser.visitorIds : []), visitorId]),
+          ...new Set([
+            ...(Array.isArray(existingUser.visitorIds)
+              ? existingUser.visitorIds
+              : []),
+            visitorId,
+          ]),
         ];
 
         await existingUser.update(
@@ -790,7 +866,16 @@ const getUserByToken = asyncHandler(async (req, res, next) => {
   try {
     const id = req.user?.id;
     const user = await EndUser.findByPk(id, {
-        attributes: ["id", "name", "email","countryCode","phone","address","otherDetails", "createdAt"],
+      attributes: [
+        "id",
+        "name",
+        "email",
+        "countryCode",
+        "phone",
+        "address",
+        "otherDetails",
+        "createdAt",
+      ],
     });
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
@@ -805,100 +890,99 @@ const getUserByToken = asyncHandler(async (req, res, next) => {
 // ----isInterestedProducts--------------------------------
 const updateInterestedProduct = async (req, res) => {
   try {
-      const { visitorId, deviceId, productName } = req.body;
+    const { visitorId, deviceId, productName } = req.body;
 
-      if (!productName) {
-          return res.status(400).json({
-              success: false,
-              message: 'Product name is required'
-          });
-      }
-
-      if (!visitorId && !deviceId) {
-          return res.status(400).json({
-              success: false,
-              message: 'Either visitorId or deviceId is required'
-          });
-      }
-
-      // Build the query condition based on provided ID
-      const whereCondition = {
-          [Op.or]: []
-      };
-
-      if (visitorId) {
-          whereCondition[Op.or].push({
-              visitorIds: {
-                  [Op.contains]: [visitorId]
-              }
-          });
-      }
-
-      if (deviceId) {
-          whereCondition[Op.or].push({
-              deviceId: {
-                  [Op.contains]: [deviceId]
-              }
-          });
-      }
-
-      // Find the user
-      const user = await EndUser.findOne({
-          where: whereCondition
+    if (!productName) {
+      return res.status(400).json({
+        success: false,
+        message: "Product name is required",
       });
+    }
 
-      if (!user) {
-          return res.status(404).json({
-              success: false,
-              message: 'User not found'
-          });
-      }
+    if (!visitorId && !deviceId) {
+      return res.status(400).json({
+        success: false,
+        message: "Either visitorId or deviceId is required",
+      });
+    }
 
-      // Get current interested products array or initialize if null
-      let currentProducts = user.isInterestedProducts || [];
+    // Build the query condition based on provided ID
+    const whereCondition = {
+      [Op.or]: [],
+    };
 
-        // Check if product name already exists
-        if (currentProducts.includes(productName)) {
-          return res.status(400).json({
-              success: false,
-              message: `You have already shown interest in this product: ${productName}`
-          });
-      }
+    if (visitorId) {
+      whereCondition[Op.or].push({
+        visitorIds: {
+          [Op.contains]: [visitorId],
+        },
+      });
+    }
 
-      // Check if product name already exists
-      if (!currentProducts.includes(productName)) {
-          // Update the array with the new product name
-          const updatedProducts = [...currentProducts, productName];
+    if (deviceId) {
+      whereCondition[Op.or].push({
+        deviceId: {
+          [Op.contains]: [deviceId],
+        },
+      });
+    }
 
-          // Update the user record
-          await user.update({
-            isInterestedProducts: updatedProducts
-          });
-          console.log('Updated user:', user);
-          return res.status(200).json({
-              success: true,
-              message: 'Product interest updated successfully',
-              data: {
-                  isInterestedProduct: updatedProducts
-              }
-          });
-      }
+    // Find the user
+    const user = await EndUser.findOne({
+      where: whereCondition,
+    });
 
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Get current interested products array or initialize if null
+    let currentProducts = user.isInterestedProducts || [];
+
+    // Check if product name already exists
+    if (currentProducts.includes(productName)) {
+      return res.status(400).json({
+        success: false,
+        message: `You have already shown interest in this product: ${productName}`,
+      });
+    }
+
+    // Check if product name already exists
+    if (!currentProducts.includes(productName)) {
+      // Update the array with the new product name
+      const updatedProducts = [...currentProducts, productName];
+
+      // Update the user record
+      await user.update({
+        isInterestedProducts: updatedProducts,
+      });
+      console.log("Updated user:", user);
       return res.status(200).json({
-          success: true,
-          message: 'Product already exists in interests',
-          data: {
-              isInterestedProduct: currentProducts
-          }
+        success: true,
+        message: "Product interest updated successfully",
+        data: {
+          isInterestedProduct: updatedProducts,
+        },
       });
+    }
 
+    return res.status(200).json({
+      success: true,
+      message: "Product already exists in interests",
+      data: {
+        isInterestedProduct: currentProducts,
+      },
+    });
   } catch (error) {
-      console.error('Error updating product interest:', error);
-      return res.status(500).json({
-          success: false,
-          message: 'Internal server error',
-          error: error.message
-      });
+    console.error("Error updating product interest:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
 //--------------------Update user-----------------------------
