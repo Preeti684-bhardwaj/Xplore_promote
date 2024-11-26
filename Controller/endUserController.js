@@ -138,8 +138,16 @@ const saveVisitorAndCampaign = async (req, res) => {
 
     return res.status(201).json({
       message: "New user created and associated with campaign.",
-      user: newUser,
-      campaign: campaign,
+      user: {
+        name: newUser.name,
+        email: newUser.email,
+        countryCode: newUser.countryCode,
+        phone: newUser.phone
+      },
+      campaign: {
+        campaignID: campaign.campaignID,
+        name: campaign.name
+      },
     });
   } catch (error) {
     await transaction.rollback();
