@@ -93,7 +93,7 @@ const saveVisitorAndCampaign = async (req, res) => {
             name: existingUser.name,
             email: existingUser.email,
             countryCode: existingUser.countryCode,
-            phone: existingUser.phone,
+            phone: existingUser.phone
           },
         });
       }
@@ -101,18 +101,15 @@ const saveVisitorAndCampaign = async (req, res) => {
       // Update existing user's identifiers
       const updateData = {
         deviceId: Array.isArray(existingUser.deviceId)
-          ? existingUser.deviceId.includes(deviceId)
-            ? existingUser.deviceId
-            : [...new Set([...existingUser.deviceId, deviceId])]
+          ? (existingUser.deviceId.includes(deviceId)
+              ? existingUser.deviceId
+              : [...new Set([...existingUser.deviceId, deviceId])])
           : [deviceId],
-        visitorIds:
-          Array.isArray(existingUser.visitorIds) && visitorId
-            ? existingUser.visitorIds.includes(visitorId)
+        visitorIds: Array.isArray(existingUser.visitorIds) && visitorId
+          ? (existingUser.visitorIds.includes(visitorId)
               ? existingUser.visitorIds
-              : [...new Set([...existingUser.visitorIds, visitorId])]
-            : visitorId
-            ? [visitorId]
-            : [],
+              : [...new Set([...existingUser.visitorIds, visitorId])])
+          : (visitorId ? [visitorId] : []),
       };
 
       // Update user with new identifiers
@@ -129,11 +126,11 @@ const saveVisitorAndCampaign = async (req, res) => {
           name: existingUser.name,
           email: existingUser.email,
           countryCode: existingUser.countryCode,
-          phone: existingUser.phone,
+          phone: existingUser.phone
         },
         campaign: {
           campaignID: campaign.campaignID,
-          name: campaign.name,
+          name: campaign.name
         },
       });
     }
@@ -158,11 +155,11 @@ const saveVisitorAndCampaign = async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         countryCode: newUser.countryCode,
-        phone: newUser.phone,
+        phone: newUser.phone
       },
       campaign: {
         campaignID: campaign.campaignID,
-        name: campaign.name,
+        name: campaign.name
       },
     });
   } catch (error) {
@@ -206,7 +203,10 @@ const appleLogin = asyncHandler(async (req, res, next) => {
     // Validate required inputs
     if (!deviceId || !campaignID) {
       return next(
-        new ErrorHandler("Device ID and Campaign ID are required", 400)
+        new ErrorHandler(
+          "Device ID and Campaign ID are required",
+          400
+        )
       );
     }
     if (!idToken) {
@@ -262,23 +262,19 @@ const appleLogin = asyncHandler(async (req, res, next) => {
       // Check if user is already registered for this specific campaign
       if (existingUser.campaigns.length > 0) {
         // Check if email or name can be updated
-        const canUpdateEmail =
-          !existingUser.email || existingUser.email === null;
+        const canUpdateEmail = !existingUser.email || existingUser.email === null;
         const canUpdateName = !existingUser.name || existingUser.name === null;
 
         if (!canUpdateEmail && !canUpdateName) {
           await transaction.rollback();
           return next(
-            new ErrorHandler(
-              "You are already registered for this campaign",
-              400
-            )
+            new ErrorHandler("You are already registered for this campaign", 400)
           );
         }
 
         // Prepare updates
         const updates = {};
-
+        
         // Update email if applicable
         if (canUpdateEmail && email) {
           updates.email = email.toLowerCase();
@@ -286,7 +282,9 @@ const appleLogin = asyncHandler(async (req, res, next) => {
         } else if (!canUpdateEmail && email) {
           // If email exists and can't be updated, throw error
           await transaction.rollback();
-          return next(new ErrorHandler("Email cannot be updated", 400));
+          return next(
+            new ErrorHandler("Email cannot be updated", 400)
+          );
         }
 
         // Update name if applicable
@@ -295,7 +293,9 @@ const appleLogin = asyncHandler(async (req, res, next) => {
         } else if (!canUpdateName && name) {
           // If name exists and can't be updated, throw error
           await transaction.rollback();
-          return next(new ErrorHandler("Name cannot be updated", 400));
+          return next(
+            new ErrorHandler("Name cannot be updated", 400)
+          );
         }
 
         // Update user if there are updates
@@ -520,7 +520,10 @@ const googleLogin = asyncHandler(async (req, res, next) => {
     // Validate required inputs
     if (!deviceId || !campaignID) {
       return next(
-        new ErrorHandler("Device ID and Campaign ID are required", 400)
+        new ErrorHandler(
+          "Device ID and Campaign ID are required",
+          400
+        )
       );
     }
 
@@ -554,7 +557,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       await transaction.rollback();
       return next(new ErrorHandler("Campaign not found", 404));
     }
-
+    
     // Find existing user by deviceId or visitorId
     let existingUser = await EndUser.findOne({
       where: {
@@ -632,37 +635,14 @@ const googleLogin = asyncHandler(async (req, res, next) => {
           );
         } catch (dbError) {
           await transaction.rollback();
+          console.log(dbError.message);
           if (dbError.name === "SequelizeUniqueConstraintError") {
-            // Fetch the existing user by email
-            const userEmail = googlePayload.email?.trim().toLowerCase();
-            const existingAccount = await EndUser.findOne({
-              where: { email: userEmail },
-            });
-
-            if (existingAccount) {
-              return next(
-                new ErrorHandler(
-                  "Email already registered with another account",
-                  409,
-                  {
-                    user: {
-                      id: existingAccount.id,
-                      email: existingAccount.email,
-                      name: existingAccount.name,
-                      googleUserId: existingAccount.googleUserId,
-                    },
-                  }
-                )
-              );
-            } else {
-              // If somehow no user is found (should not happen), send a generic error
-              return next(
-                new ErrorHandler(
-                  "Email already registered with another account",
-                  409
-                )
-              );
-            }
+            return next(
+              new ErrorHandler(
+                "Email already registered with another account",
+                409
+              )
+            );
           }
           throw dbError;
         }
@@ -770,7 +750,7 @@ const contactUs = asyncHandler(async (req, res, next) => {
       otherDetails,
       visitorId,
       deviceId,
-      campaignID,
+      campaignID
     } = req.body;
 
     // 1. Input Validation
@@ -844,8 +824,10 @@ const contactUs = asyncHandler(async (req, res, next) => {
     const whereClause = {
       [Op.or]: [
         { deviceId: { [Op.contains]: [deviceId] } },
-        ...(visitorId ? [{ visitorIds: { [Op.contains]: [visitorId] } }] : []),
-      ],
+        ...(visitorId 
+          ? [{ visitorIds: { [Op.contains]: [visitorId] } }] 
+          : [])
+      ]
     };
 
     let existingUser = await EndUser.findOne({
@@ -946,7 +928,7 @@ const contactUs = asyncHandler(async (req, res, next) => {
     // 4. Response Handling
     const userData = await EndUser.findByPk(user.id, {
       attributes: ["id", "name", "email", "phone", "countryCode", "createdAt"],
-      transaction,
+      transaction
     });
 
     // Commit transaction
@@ -1034,11 +1016,11 @@ const updateInterestedProduct = async (req, res) => {
     // Build the query condition based on provided ID
     const whereCondition = {
       deviceId: { [Op.contains]: [deviceId] },
-      ...(visitorId
-        ? {
-            [Op.or]: [{ visitorIds: { [Op.contains]: [visitorId] } }],
-          }
-        : {}),
+      ...(visitorId ? { 
+        [Op.or]: [
+          { visitorIds: { [Op.contains]: [visitorId] } }
+        ] 
+      } : {})
     };
 
     // Find the user
@@ -1090,15 +1072,12 @@ const updateInterestedProduct = async (req, res) => {
     const updatedProducts = [...currentProducts, productName];
 
     // Update the user record
-    await user.update(
-      {
-        isInterestedProducts: updatedProducts,
-        ...(visitorId && !user.visitorIds.includes(visitorId)
-          ? { visitorIds: [...new Set([...user.visitorIds, visitorId])] }
-          : {}),
-      },
-      { transaction }
-    );
+    await user.update({
+      isInterestedProducts: updatedProducts,
+      ...(visitorId && !user.visitorIds.includes(visitorId) 
+        ? { visitorIds: [...new Set([...user.visitorIds, visitorId])] } 
+        : {})
+    }, { transaction });
 
     // Commit transaction
     await transaction.commit();
@@ -1110,6 +1089,7 @@ const updateInterestedProduct = async (req, res) => {
         isInterestedProduct: updatedProducts,
       },
     });
+
   } catch (error) {
     // Rollback transaction in case of error
     await transaction.rollback();
