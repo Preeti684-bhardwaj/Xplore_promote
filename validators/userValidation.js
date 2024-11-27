@@ -95,7 +95,7 @@ const createOrUpdateUser = async (
   transaction // Pass the transaction object
 ) => {
   try {
-    const appleId = decodedAppleId || appleUserId;
+    const appleId = appleUserId || decodedAppleId;
     if (!appleId) {
       return {
         success: false,
@@ -133,8 +133,8 @@ const createOrUpdateUser = async (
       user = await User.create(
         {
           appleUserId: appleId,
-          email: decodedToken.email || email,
-          name: userName || name,
+          email: email || decodedToken.email,
+          name:  name || userName,
           isEmailVerified: true,
           authProvider: "apple",
           IsActive: true,
