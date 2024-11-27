@@ -91,7 +91,8 @@ const createOrUpdateUser = async (
   name,
   appleUserId,
   decodedAppleId,
-  decodedToken
+  decodedToken,
+  transaction // Pass the transaction object
 ) => {
   try {
     const appleId = decodedAppleId || appleUserId;
@@ -105,28 +106,15 @@ const createOrUpdateUser = async (
 
     let user = await User.findOne({
       where: { appleUserId: appleId },
+      transaction, // Include transaction
     });
 
     if (!user) {
-      if (!email ) {
+      if (!email || !name || !appleUserId) {
         return {
           success: false,
           status: 400,
-          message: "Email is required",
-        };
-      }
-      if (!name) {
-        return {
-          success: false,
-          status: 400,
-          message: "Name is required",
-        };
-      }
-      if(!appleUserId) {
-        return {
-          success: false,
-          status: 400,
-          message: "Apple User ID is required",
+          message: "Email, name and appleUserId are required",
         };
       }
 
@@ -142,19 +130,24 @@ const createOrUpdateUser = async (
         ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`
         : null;
 
-      user = await User.create({
-        appleUserId: appleId,
-        email: decodedToken.email || email,
-        name: userName || name,
-        isEmailVerified: true,
-        authProvider: "apple",
-        IsActive: true,
-      });
+      user = await User.create(
+        {
+          appleUserId: appleId,
+          email: decodedToken.email || email,
+          name: userName || name,
+          isEmailVerified: true,
+          authProvider: "apple",
+          IsActive: true,
+        },
+        { transaction } // Include transaction
+      );
+
       if (!user) {
-        return res.status(500).json({
+        return {
           success: false,
+          status: 500,
           message: "Failed to create a new user",
-        });
+        };
       }
     }
 
@@ -165,20 +158,17 @@ const createOrUpdateUser = async (
         message: "User account is inactive",
       };
     }
-    return res.status(200).json({
+
+    return {
       success: true,
-      message: "User found or created successfully",
       data: user,
-    });
+    };
   } catch (error) {
     console.error("User creation/update error:", error);
-    return {
-      success: false,
-      status: 500,
-      message: error.message || "Failed to process user account",
-    };
+    throw error; // Ensure error bubbles up for transaction rollback
   }
 };
+
 
 module.exports = {
   generateToken,

@@ -1,6 +1,7 @@
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const { Op } = require("sequelize");
+const sequelize = db.sequelize;
 require("dotenv").config();
 const {generateToken,createOrUpdateUser,validateAppleToken}=require('../validators/userValidation.js')
 const {
@@ -10,26 +11,32 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
 // ---------------apple signin---------------------------------
-const appleLogin =asyncHandler(async (req, res,next) => {
+const appleLogin = asyncHandler(async (req, res, next) => {
+  const transaction = await sequelize.transaction(); // Start a transaction
   try {
     const authHeader = req.headers["authorization"];
     const idToken = authHeader?.startsWith("Bearer ")
       ? authHeader.substring(7)
       : authHeader;
-    const {email,name,appleUserId} = req.body;
+
+    const { email, name, appleUserId } = req.body;
     const decodedToken = validateAppleToken(idToken);
-    console.log("decodedToken",decodedToken)
+    console.log("decodedToken", decodedToken);
+
+    // Pass the transaction to the createOrUpdateUser function
     const userResponse = await createOrUpdateUser(
       email,
       name,
       appleUserId,
       decodedToken.sub,
-      decodedToken
+      decodedToken,
+      transaction
     );
 
     // Check if the response indicates an error
     if (!userResponse.success) {
       console.error("User creation/update error:", userResponse.message);
+      await transaction.rollback(); // Rollback the transaction
       return res.status(userResponse.status).json({
         success: false,
         message: userResponse.message,
@@ -41,18 +48,20 @@ const appleLogin =asyncHandler(async (req, res,next) => {
     console.log("appleUserId", decodedToken.sub);
 
     const obj = {
-      type: 'USER',
+      type: "USER",
       obj: user,
     };
     const accessToken = generateToken(obj);
-    console.log("user after createorupdatefunction",user)
+    console.log("user after createOrUpdateUser function", user);
 
     // Audit log for successful login
     console.log(`Successful Apple login for user ID: ${user.appleUserId}`);
 
+    await transaction.commit(); // Commit the transaction
+
     return res.status(200).json({
       status: true,
-      message: 'Login successful',
+      message: "Login successful",
       user: {
         id: user.id,
         email: user.email,
@@ -62,8 +71,9 @@ const appleLogin =asyncHandler(async (req, res,next) => {
       token: accessToken,
     });
   } catch (error) {
-    console.error('Apple login error:', error);
-    return next(new ErrorHandler( error.message,500));
+    console.error("Apple login error:", error);
+    await transaction.rollback(); // Rollback the transaction on error
+    return next(new ErrorHandler(error.message, 500));
   }
 });
 
