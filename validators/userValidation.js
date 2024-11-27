@@ -104,42 +104,51 @@ const createOrUpdateUser = async (
       };
     }
 
+    // Add detailed logging to understand the token structure
+    console.log('Decoded Token:', JSON.stringify(decodedToken, null, 2));
+
+    // Determine email with multiple fallback options
+    const userEmail = 
+      email || 
+      decodedToken.email 
+
+    // More flexible name generation
+    const userName = 
+      name || 
+      (decodedToken.name 
+        ? (
+            // Handle different possible name structures
+            (decodedToken.name.firstName && decodedToken.name.lastName) 
+              ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`
+              : (decodedToken.name.firstName || decodedToken.name.lastName || null)
+          )
+        : null); 
+
+    // Validate email if provided
+    if (userEmail && !isValidEmail(userEmail)) {
+      return {
+        success: false,
+        status: 400,
+        message: "Invalid email format",
+      };
+    }
+
     let user = await User.findOne({
       where: { appleUserId: appleId },
-      transaction, // Include transaction
+      transaction,
     });
 
     if (!user) {
-      if (!email || !name || !appleUserId) {
-        return {
-          success: false,
-          status: 400,
-          message: "Email, name and appleUserId are required",
-        };
-      }
-
-      if (decodedToken.email && !isValidEmail(decodedToken.email)) {
-        return {
-          success: false,
-          status: 400,
-          message: "Invalid email format",
-        };
-      }
-
-      const userName = decodedToken.name
-        ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`
-        : null;
-
       user = await User.create(
         {
           appleUserId: appleId,
-          email: email || decodedToken.email,
-          name:  name || userName,
-          isEmailVerified: true,
+          email: userEmail,
+          name: userName,
+          isEmailVerified: decodedToken.email_verified || false,
           authProvider: "apple",
           IsActive: true,
         },
-        { transaction } // Include transaction
+        { transaction }
       );
 
       if (!user) {
