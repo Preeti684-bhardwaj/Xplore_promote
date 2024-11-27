@@ -27,6 +27,7 @@ console.log("appleUserId",decodedToken.sub);
       obj: user,
     };
     const accessToken = generateToken(obj);
+    console.log("user after createorupdatefunction",user)
 
     // Audit log for successful login
     console.log(`Successful Apple login for user ID: ${user.appleUserId}`);
