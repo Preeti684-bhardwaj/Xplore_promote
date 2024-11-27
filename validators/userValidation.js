@@ -94,13 +94,26 @@ const createOrUpdateUser = async (
   decodedToken
 ) => {
   try {
+    const appleId = decodedAppleId || appleUserId;
+    if (!appleId) {
+      return {
+        success: false,
+        status: 400,
+        message: "Apple User ID is required",
+      };
+    }
+
     let user = await User.findOne({
-      where: { appleUserId: decodedAppleId || appleUserId },
+      where: { appleUserId: appleId },
     });
+
     if (!user) {
-      
-      if(!email || !name || !appleUserId){
-        return next(new ErrorHandler('Email, name and appleUserId are required', 400));
+      if (!email || !name || !appleUserId) {
+        return {
+          success: false,
+          status: 400,
+          message: "Email, name and appleUserId are required",
+        };
       }
 
       if (decodedToken.email && !isValidEmail(decodedToken.email)) {
@@ -116,13 +129,19 @@ const createOrUpdateUser = async (
         : null;
 
       user = await User.create({
-        appleUserId: decodedAppleId || appleUserId,
+        appleUserId: appleId,
         email: decodedToken.email || email,
         name: userName || name,
         isEmailVerified: true,
         authProvider: "apple",
         IsActive: true,
       });
+      if (!user) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to create a new user",
+        });
+      }
     }
 
     if (!user.IsActive) {
@@ -132,8 +151,11 @@ const createOrUpdateUser = async (
         message: "User account is inactive",
       };
     }
-
-    return user;
+    return res.status(200).json({
+      success: true,
+      message: "User found or created successfully",
+      data: user,
+    });
   } catch (error) {
     console.error("User creation/update error:", error);
     return {

@@ -12,7 +12,10 @@ const asyncHandler = require("../utils/asyncHandler.js");
 // ---------------apple signin---------------------------------
 const appleLogin =asyncHandler(async (req, res,next) => {
   try {
-    const idToken = req.headers['authorization'];
+    const authHeader = req.headers["authorization"];
+    const idToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : authHeader;
     const {email,name,appleUserId} = req.body;
     const decodedToken = validateAppleToken(idToken);
     console.log("decodedToken",decodedToken)
