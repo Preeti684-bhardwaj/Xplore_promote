@@ -19,8 +19,26 @@ const appleLogin =asyncHandler(async (req, res,next) => {
     const {email,name,appleUserId} = req.body;
     const decodedToken = validateAppleToken(idToken);
     console.log("decodedToken",decodedToken)
-    const user = await createOrUpdateUser(email,name,appleUserId,decodedToken.sub, decodedToken);
-console.log("appleUserId",decodedToken.sub);
+    const userResponse = await createOrUpdateUser(
+      email,
+      name,
+      appleUserId,
+      decodedToken.sub,
+      decodedToken
+    );
+
+    // Check if the response indicates an error
+    if (!userResponse.success) {
+      console.error("User creation/update error:", userResponse.message);
+      return res.status(userResponse.status).json({
+        success: false,
+        message: userResponse.message,
+      });
+    }
+
+    const user = userResponse.data;
+
+    console.log("appleUserId", decodedToken.sub);
 
     const obj = {
       type: 'USER',
