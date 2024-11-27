@@ -95,6 +95,8 @@ const createOrUpdateUser = async (
   transaction // Pass the transaction object
 ) => {
   try {
+    console.log("requestname",name);
+    
     const appleId = appleUserId || decodedAppleId;
     if (!appleId) {
       return {
