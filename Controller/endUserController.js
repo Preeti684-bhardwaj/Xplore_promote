@@ -635,7 +635,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
           );
         } catch (dbError) {
           await transaction.rollback();
-          console.log(dbError.message);
+          console.log(dbError);
           if (dbError.name === "SequelizeUniqueConstraintError") {
             return next(
               new ErrorHandler(
