@@ -643,8 +643,8 @@ const googleLogin = asyncHandler(async (req, res, next) => {
           visitorIds: visitorId ? [visitorId] : [],
           isEmailVerified: true,
         },
-        { transaction }
-      );            
+        { transaction }
+      );          
     }
 
     // Generate authentication token

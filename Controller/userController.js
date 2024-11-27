@@ -1,6 +1,8 @@
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const QRSession = db.qrSessions;
+const EndUser = db.endUsers;
+const Campaign = db.campaigns;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail.js");
@@ -57,113 +59,6 @@ const KALEYRA_CONFIG = {
 //   console.log(event)
 // })
 
-
-//----------register user-------------------------
-// const registerUser = asyncHandler(async (req, res, next) => {
-//   try {
-//     const { name, phone, email, password } = req.body;
-//     // Validate all required fields
-//     if ([name, phone, email, password].some((field) => field?.trim() === "")) {
-//       return next(new ErrorHandler("All fields are required", 400));
-//     }
-//     // Validate input fields
-//     if (!name) {
-//       return next(new ErrorHandler("Name is missing", 400));
-//     }
-//     if (!phone) {
-//       return next(new ErrorHandler("Phone is missing", 400));
-//     }
-//     if (!email) {
-//       return next(new ErrorHandler("Email is missing", 400));
-//     }
-//     if (!password) {
-//       return next(new ErrorHandler("Password is missing", 400));
-//     }
-//     // Sanitize name: trim and reduce multiple spaces to a single space
-//     name.trim().replace(/\s+/g, " ");
-//     // Convert the email to lowercase for case-insensitive comparison
-//     const lowercaseEmail = email.toLowerCase();
-
-//     // Validate name
-//     const nameError = isValidLength(name);
-//     if (nameError) {
-//       return next(new ErrorHandler(nameError, 400));
-//     }
-
-//     const phoneError = isPhoneValid(phone);
-//     if (phoneError) {
-//       return next(new ErrorHandler(phoneError, 400));
-//     }
-
-//     // Validate email format
-//     if (!isValidEmail(email)) {
-//       return next(new ErrorHandler("Invalid email", 400));
-//     }
-
-//     // Check for existing user with the provided email or phone
-//     const existingUser = await User.findOne({
-//       where: {
-//         [Op.or]: [{ email: lowercaseEmail }, { phone: phone }],
-//       },
-//     });
-
-//     if (existingUser) {
-//       if (existingUser.isEmailVerified) {
-//         // If the user is already verified, block the attempt to create a new account
-//         if (
-//           existingUser.email.toLowerCase() === lowercaseEmail &&
-//           existingUser.phone === phone
-//         ) {
-//           return next(new ErrorHandler("Account already exists", 409));
-//         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
-//           return next(new ErrorHandler("Email already in use", 409));
-//         } else {
-//           return next(new ErrorHandler("Phone number already in use", 409));
-//         }
-//       } else {
-//         // Update the existing user's record with the new email and generate a new verification token
-//         if (
-//           existingUser.email.toLowerCase() === lowercaseEmail &&
-//           existingUser.phone === phone
-//         ) {
-//           return next(new ErrorHandler("Account already exists", 409));
-//         } else if (existingUser.email.toLowerCase() === lowercaseEmail) {
-//           return next(new ErrorHandler("Email already in use", 409));
-//         } else {
-//           return next(new ErrorHandler("Phone number already in use", 409));
-//         }
-//       }
-//     }
-//     // If no existing user found, validate the password and create a new user
-//     const passwordValidationResult = isValidPassword(password);
-//     if (passwordValidationResult) {
-//       return next(new ErrorHandler(passwordValidationResult, 400));
-//     }
-//     const hashedPassword = await hashPassword(password);
-//     // Create a new user if no existing user is found
-//     const user = await User.create({
-//       name,
-//       phone,
-//       email,
-//       password: hashedPassword,
-//       authProvider: "local",
-//     });
-
-//     const userData = await User.findByPk(user.id, {
-//       attributes: {
-//         exclude: ["password", "otp", "otpExpire", "isEmailVerified"],
-//       },
-//     });
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "User registered successfully",
-//       data: userData,
-//     });
-//   } catch (error) {
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
 
 const registerUser = asyncHandler(async (req, res, next) => {
   try {
@@ -1462,6 +1357,63 @@ const logoutAll = asyncHandler(async (req, res, next) => {
   }
 });
 
+//----------------get enduser details----------------------------------------
+const getEndUserDetails = asyncHandler(async (req, res, next) => {
+  try {
+    const id = req.user?.id;
+    const campaignID = req.params.campaignID;
+    
+    // First, verify the user exists
+    const user = await User.findByPk(id);
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+    
+    // Find the campaign and include its associated end users
+    const campaign = await Campaign.findOne({
+      where: { campaignID },
+      include: [{
+        model: EndUser,
+        as: 'endUsers',
+        through: {
+          attributes: [] // Exclude junction table attributes if not needed
+        },
+        attributes: [
+          'id', 
+          'name', 
+          'email', 
+          'phone', 
+          'countryCode', 
+          'address', 
+          'otherDetails',
+          'isEmailVerified',
+          'authProvider',
+          'isInterestedProducts'
+        ]
+      }]
+    });
+    
+    // Check if the campaign exists and belongs to the user
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+    
+    // Optional: Additional check to ensure the campaign was created by the user
+    if (campaign.createdBy !== id) {
+      return next(new ErrorHandler("Unauthorized to access this campaign's end users", 403));
+    }
+    
+    // Return the end users associated with this campaign
+    res.status(200).json({
+      success: true,
+      count: campaign.endUsers.length,
+      endUsers: campaign.endUsers
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
 module.exports = {
   registerUser,
   phoneVerification,
@@ -1479,4 +1431,5 @@ module.exports = {
   getInsta,
   logout,
   logoutAll,
+  getEndUserDetails
 };
