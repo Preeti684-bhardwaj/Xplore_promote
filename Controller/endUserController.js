@@ -614,84 +614,37 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(nameError, 400));
     }
 
-    let user;
-    // Scenario handling
-    if (existingUser) {
-      // Check if email is different
-      if (existingUser.email !== userEmail) {
-        // Create a new user with the new email
-        try {
-          user = await EndUser.create(
-            {
-              googleUserId: googlePayload.sub,
-              email: userEmail,
-              name: sanitizedName,
-              authProvider: "google",
-              deviceId: existingUser.deviceId,
-              visitorIds: existingUser.visitorIds,
-              isEmailVerified: true,
-            },
-            { transaction }
-          );
-        } catch (dbError) {
-          await transaction.rollback();
-          console.log(dbError);
-          if (dbError.name === "SequelizeUniqueConstraintError") {
-            return next(
-              new ErrorHandler(
-                "Email already registered with another account",
-                409
-              )
-            );
-          }
-          throw dbError;
-        }
-      } else {
-        // Update existing user
-        const updates = {
-          googleUserId: googlePayload.sub,
-          deviceId: [...new Set([...existingUser.deviceId, deviceId])],
-          visitorIds: visitorId
-            ? [...new Set([...existingUser.visitorIds, visitorId])]
-            : existingUser.visitorIds,
-          isEmailVerified: true,
-        };
-        await existingUser.update(updates, { transaction });
-        user = existingUser;
-      }
-
-      // Associate user with campaign
-      await user.addCampaign(campaignID, { transaction });
+    let user = await EndUser.findOne({
+      where: { googleUserId: googlePayload.sub },
+      transaction
+    });
+    
+    if (user) {
+      // User with this Google ID exists, update the user
+      const updates = {
+        email: userEmail,
+        name: sanitizedName,
+        deviceId: [...new Set([...user.deviceId, deviceId])],
+        visitorIds: visitorId
+          ? [...new Set([...user.visitorIds, visitorId])]
+          : user.visitorIds,
+        isEmailVerified: true,
+      };
+      await user.update(updates, { transaction });
     } else {
-      // Completely new user
-      try {
-        user = await EndUser.create(
-          {
-            googleUserId: googlePayload.sub,
-            email: userEmail,
-            name: sanitizedName,
-            authProvider: "google",
-            deviceId: [deviceId],
-            visitorIds: visitorId ? [visitorId] : [],
-            isEmailVerified: true,
-          },
-          { transaction }
-        );
-
-        // Associate user with campaign
-        await user.addCampaign(campaignID, { transaction });
-      } catch (dbError) {
-        await transaction.rollback();
-        if (dbError.name === "SequelizeUniqueConstraintError") {
-          return next(
-            new ErrorHandler(
-              "Email already registered with another account",
-              409
-            )
-          );
-        }
-        throw dbError;
-      }
+      // No user with this Google ID, create new user
+      user = await EndUser.create(
+        {
+          googleUserId: googlePayload.sub,
+          email: userEmail,
+          name: sanitizedName,
+          authProvider: "google",
+          deviceId: [deviceId],
+          visitorIds: visitorId ? [visitorId] : [],
+          isEmailVerified: true,
+        },
+        { transaction }
+      );            
     }
 
     // Generate authentication token
