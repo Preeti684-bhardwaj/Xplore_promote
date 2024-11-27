@@ -108,11 +108,25 @@ const createOrUpdateUser = async (
     });
 
     if (!user) {
-      if (!email || !name || !appleUserId) {
+      if (!email ) {
         return {
           success: false,
           status: 400,
-          message: "Email, name and appleUserId are required",
+          message: "Email is required",
+        };
+      }
+      if (!name) {
+        return {
+          success: false,
+          status: 400,
+          message: "Name is required",
+        };
+      }
+      if(!appleUserId) {
+        return {
+          success: false,
+          status: 400,
+          message: "Apple User ID is required",
         };
       }
 
