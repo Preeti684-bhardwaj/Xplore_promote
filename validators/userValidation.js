@@ -95,8 +95,8 @@ const createOrUpdateUser = async (
   transaction // Pass the transaction object
 ) => {
   try {
-    console.log("requestname",name);
-    
+    console.log("requestname", name);
+
     const appleId = appleUserId || decodedAppleId;
     if (!appleId) {
       return {
@@ -107,24 +107,10 @@ const createOrUpdateUser = async (
     }
 
     // Add detailed logging to understand the token structure
-    console.log('Decoded Token:', JSON.stringify(decodedToken, null, 2));
+    console.log("Decoded Token:", JSON.stringify(decodedToken, null, 2));
 
     // Determine email with multiple fallback options
-    const userEmail = 
-      email || 
-      decodedToken.email 
-
-    // More flexible name generation
-    const userName = 
-      name || 
-      (decodedToken.name 
-        ? (
-            // Handle different possible name structures
-            (decodedToken.name.firstName && decodedToken.name.lastName) 
-              ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`
-              : (decodedToken.name.firstName || decodedToken.name.lastName || null)
-          )
-        : null); 
+    const userEmail = email || decodedToken.email;
 
     // Validate email if provided
     if (userEmail && !isValidEmail(userEmail)) {
@@ -141,6 +127,7 @@ const createOrUpdateUser = async (
     });
 
     if (!user) {
+      const userName = name;
       user = await User.create(
         {
           appleUserId: appleId,
@@ -179,7 +166,6 @@ const createOrUpdateUser = async (
     throw error; // Ensure error bubbles up for transaction rollback
   }
 };
-
 
 module.exports = {
   generateToken,
