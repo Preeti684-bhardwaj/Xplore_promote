@@ -29,7 +29,7 @@ console.log("appleUserId",decodedToken.sub);
     const accessToken = generateToken(obj);
 
     // Audit log for successful login
-    console.log(`Successful Apple login for user ID: ${user.id}`);
+    console.log(`Successful Apple login for user ID: ${user.appleUserId}`);
 
     return res.status(200).json({
       status: true,
