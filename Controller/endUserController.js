@@ -261,6 +261,23 @@ const appleLogin = asyncHandler(async (req, res, next) => {
     if (existingUser) {
       // Check if user is already registered for this specific campaign
       if (existingUser.campaigns.length > 0) {
+        if(existingUser.appleUserId==appleUserId){
+          return res.status(200).json({
+            success: false,
+            message: "User already exists with this Apple User ID",
+            data: {
+              user: {
+                id: existingUser.id,
+                email: existingUser.email,
+                name: existingUser.name,
+                appleUserId: existingUser.appleUserId,
+                deviceId: existingUser.deviceId,
+                visitorIds: existingUser.visitorIds,
+                isEmailVerified: existingUser.isEmailVerified,
+              },
+            },
+          });
+        }
         // Check if email or name can be updated
         const canUpdateEmail =
           !existingUser.email || existingUser.email === null;
