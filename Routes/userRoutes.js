@@ -17,7 +17,8 @@ const {
     getUserByToken,
     getInsta,
     logout,
-    logoutAll
+    logoutAll,
+    getEndUserDetails
 } = require("../Controller/userController");
 const {appleLogin,getUserByAppleUserId,applePhone}=require('../Controller/appleSigin')
 const {googleLogin,googlePhone}=require('../Controller/googleSignin')
@@ -35,6 +36,8 @@ router.post("/sendPhoneOtp",sendPhoneOtp)
 router.post("/phoneVerification", phoneVerification)
 router.get("/getUserDetails",verifyJWt,authorize(["USER"]),verifySession,getUserDetails)
 router.get("/getUserByToken",verifyJWt,authorize(["USER"]),verifySession,getUserByToken)
+// get end user details
+router.get("/getEndUserDetails/:campaignID",verifyJWt,authorize(["USER"]),verifySession,getEndUserDetails)
 router.put('/updateUser', 
     verifyJWt,authorize(["USER"]), 
     upload.fields([
