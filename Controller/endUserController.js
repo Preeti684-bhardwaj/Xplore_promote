@@ -93,7 +93,7 @@ const saveVisitorAndCampaign = async (req, res) => {
             name: existingUser.name,
             email: existingUser.email,
             countryCode: existingUser.countryCode,
-            phone: existingUser.phone
+            phone: existingUser.phone,
           },
         });
       }
@@ -101,15 +101,18 @@ const saveVisitorAndCampaign = async (req, res) => {
       // Update existing user's identifiers
       const updateData = {
         deviceId: Array.isArray(existingUser.deviceId)
-          ? (existingUser.deviceId.includes(deviceId)
-              ? existingUser.deviceId
-              : [...new Set([...existingUser.deviceId, deviceId])])
+          ? existingUser.deviceId.includes(deviceId)
+            ? existingUser.deviceId
+            : [...new Set([...existingUser.deviceId, deviceId])]
           : [deviceId],
-        visitorIds: Array.isArray(existingUser.visitorIds) && visitorId
-          ? (existingUser.visitorIds.includes(visitorId)
+        visitorIds:
+          Array.isArray(existingUser.visitorIds) && visitorId
+            ? existingUser.visitorIds.includes(visitorId)
               ? existingUser.visitorIds
-              : [...new Set([...existingUser.visitorIds, visitorId])])
-          : (visitorId ? [visitorId] : []),
+              : [...new Set([...existingUser.visitorIds, visitorId])]
+            : visitorId
+            ? [visitorId]
+            : [],
       };
 
       // Update user with new identifiers
@@ -126,11 +129,11 @@ const saveVisitorAndCampaign = async (req, res) => {
           name: existingUser.name,
           email: existingUser.email,
           countryCode: existingUser.countryCode,
-          phone: existingUser.phone
+          phone: existingUser.phone,
         },
         campaign: {
           campaignID: campaign.campaignID,
-          name: campaign.name
+          name: campaign.name,
         },
       });
     }
@@ -155,11 +158,11 @@ const saveVisitorAndCampaign = async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         countryCode: newUser.countryCode,
-        phone: newUser.phone
+        phone: newUser.phone,
       },
       campaign: {
         campaignID: campaign.campaignID,
-        name: campaign.name
+        name: campaign.name,
       },
     });
   } catch (error) {
@@ -203,10 +206,7 @@ const appleLogin = asyncHandler(async (req, res, next) => {
     // Validate required inputs
     if (!deviceId || !campaignID) {
       return next(
-        new ErrorHandler(
-          "Device ID and Campaign ID are required",
-          400
-        )
+        new ErrorHandler("Device ID and Campaign ID are required", 400)
       );
     }
     if (!idToken) {
@@ -262,19 +262,23 @@ const appleLogin = asyncHandler(async (req, res, next) => {
       // Check if user is already registered for this specific campaign
       if (existingUser.campaigns.length > 0) {
         // Check if email or name can be updated
-        const canUpdateEmail = !existingUser.email || existingUser.email === null;
+        const canUpdateEmail =
+          !existingUser.email || existingUser.email === null;
         const canUpdateName = !existingUser.name || existingUser.name === null;
 
         if (!canUpdateEmail && !canUpdateName) {
           await transaction.rollback();
           return next(
-            new ErrorHandler("You are already registered for this campaign", 400)
+            new ErrorHandler(
+              "You are already registered for this campaign",
+              400
+            )
           );
         }
 
         // Prepare updates
         const updates = {};
-        
+
         // Update email if applicable
         if (canUpdateEmail && email) {
           updates.email = email.toLowerCase();
@@ -282,9 +286,7 @@ const appleLogin = asyncHandler(async (req, res, next) => {
         } else if (!canUpdateEmail && email) {
           // If email exists and can't be updated, throw error
           await transaction.rollback();
-          return next(
-            new ErrorHandler("Email cannot be updated", 400)
-          );
+          return next(new ErrorHandler("Email cannot be updated", 400));
         }
 
         // Update name if applicable
@@ -293,9 +295,7 @@ const appleLogin = asyncHandler(async (req, res, next) => {
         } else if (!canUpdateName && name) {
           // If name exists and can't be updated, throw error
           await transaction.rollback();
-          return next(
-            new ErrorHandler("Name cannot be updated", 400)
-          );
+          return next(new ErrorHandler("Name cannot be updated", 400));
         }
 
         // Update user if there are updates
@@ -520,10 +520,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
     // Validate required inputs
     if (!deviceId || !campaignID) {
       return next(
-        new ErrorHandler(
-          "Device ID and Campaign ID are required",
-          400
-        )
+        new ErrorHandler("Device ID and Campaign ID are required", 400)
       );
     }
 
@@ -557,7 +554,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       await transaction.rollback();
       return next(new ErrorHandler("Campaign not found", 404));
     }
-    
+
     // Find existing user by deviceId or visitorId
     let existingUser = await EndUser.findOne({
       where: {
@@ -616,9 +613,9 @@ const googleLogin = asyncHandler(async (req, res, next) => {
 
     let user = await EndUser.findOne({
       where: { googleUserId: googlePayload.sub },
-      transaction
+      transaction,
     });
-    
+
     if (user) {
       // User with this Google ID exists, update the user
       const updates = {
@@ -643,8 +640,8 @@ const googleLogin = asyncHandler(async (req, res, next) => {
           visitorIds: visitorId ? [visitorId] : [],
           isEmailVerified: true,
         },
-        { transaction }
-      );          
+        { transaction }
+      );
     }
 
     // Generate authentication token
@@ -703,12 +700,12 @@ const contactUs = asyncHandler(async (req, res, next) => {
       otherDetails,
       visitorId,
       deviceId,
-      campaignID
+      campaignID,
     } = req.body;
 
     // 1. Input Validation
     // Validate required fields existence
-    const requiredFields = ["name", "email", "deviceId"];
+    const requiredFields = ["name", "email", "deviceId", "campaignID"];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
     if (missingFields.length > 0) {
       return next(
@@ -773,14 +770,19 @@ const contactUs = asyncHandler(async (req, res, next) => {
       cleanedCountryCode = phoneValidationResult.cleanedCode;
     }
 
+    // Prepare contact info
+    const contactInfo = {};
+    if (sanitizedName) contactInfo.name = sanitizedName;
+    if (sanitizedEmail) contactInfo.email = sanitizedEmail;
+    if (cleanedPhone) contactInfo.phone = cleanedPhone;
+    if (cleanedCountryCode) contactInfo.countryCode = cleanedCountryCode;
+
     // Find existing user with deviceId or visitorId
     const whereClause = {
       [Op.or]: [
         { deviceId: { [Op.contains]: [deviceId] } },
-        ...(visitorId 
-          ? [{ visitorIds: { [Op.contains]: [visitorId] } }] 
-          : [])
-      ]
+        ...(visitorId ? [{ visitorIds: { [Op.contains]: [visitorId] } }] : []),
+      ],
     };
 
     let existingUser = await EndUser.findOne({
@@ -793,32 +795,16 @@ const contactUs = asyncHandler(async (req, res, next) => {
     let isNew = false;
 
     if (existingUser) {
-      // Check if email is different
-      if (existingUser.email.toLowerCase() !== sanitizedEmail) {
-        // Create a new user if email is different
-        user = await EndUser.create(
-          {
-            name: sanitizedName,
-            email: sanitizedEmail,
-            phone: cleanedPhone,
-            countryCode: cleanedCountryCode,
-            deviceId: [deviceId],
-            visitorIds: visitorId ? [visitorId] : [],
-            address: address,
-            otherDetails,
-            authProvider: "local",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          { transaction }
-        );
-        isNew = true;
-      } else {
-        // Update existing user with new data
+      // Check if user already has this campaign
+      const hasCampaign = await existingUser.hasCampaign(campaignID, { transaction });
+      
+      if (hasCampaign) {
+        // Update existing user for the same campaign
         const updatedFields = {
-          name: sanitizedName,
-          phone: cleanedPhone || existingUser.phone,
-          countryCode: cleanedCountryCode || existingUser.countryCode,
+          contactInfo: {
+            ...(existingUser.contactInfo || {}),
+            ...contactInfo
+          },
           address: address || existingUser.address,
           otherDetails: otherDetails || existingUser.otherDetails,
         };
@@ -853,13 +839,30 @@ const contactUs = asyncHandler(async (req, res, next) => {
           { transaction }
         );
         user = existingUser;
+      } else {
+        // Create a new user entry for the new campaign
+        user = await EndUser.create(
+          {
+            contactInfo,
+            phone: cleanedPhone,
+            countryCode: cleanedCountryCode,
+            deviceId: [deviceId],
+            visitorIds: visitorId ? [visitorId] : [],
+            address: address,
+            otherDetails: otherDetails,
+            authProvider: "local",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          { transaction }
+        );
+        isNew = true;
       }
     } else {
       // Create new user if no existing user found
       user = await EndUser.create(
         {
-          name: sanitizedName,
-          email: sanitizedEmail,
+          contactInfo,
           phone: cleanedPhone,
           countryCode: cleanedCountryCode,
           deviceId: [deviceId],
@@ -880,7 +883,7 @@ const contactUs = asyncHandler(async (req, res, next) => {
 
     // 4. Response Handling
     const userData = await EndUser.findByPk(user.id, {
-      attributes: ["id", "name", "email", "phone", "countryCode", "createdAt"],
+      attributes: ["id", "contactInfo", "phone", "countryCode", "createdAt"],
       transaction
     });
 
@@ -969,11 +972,11 @@ const updateInterestedProduct = async (req, res) => {
     // Build the query condition based on provided ID
     const whereCondition = {
       deviceId: { [Op.contains]: [deviceId] },
-      ...(visitorId ? { 
-        [Op.or]: [
-          { visitorIds: { [Op.contains]: [visitorId] } }
-        ] 
-      } : {})
+      ...(visitorId
+        ? {
+            [Op.or]: [{ visitorIds: { [Op.contains]: [visitorId] } }],
+          }
+        : {}),
     };
 
     // Find the user
@@ -1025,12 +1028,15 @@ const updateInterestedProduct = async (req, res) => {
     const updatedProducts = [...currentProducts, productName];
 
     // Update the user record
-    await user.update({
-      isInterestedProducts: updatedProducts,
-      ...(visitorId && !user.visitorIds.includes(visitorId) 
-        ? { visitorIds: [...new Set([...user.visitorIds, visitorId])] } 
-        : {})
-    }, { transaction });
+    await user.update(
+      {
+        isInterestedProducts: updatedProducts,
+        ...(visitorId && !user.visitorIds.includes(visitorId)
+          ? { visitorIds: [...new Set([...user.visitorIds, visitorId])] }
+          : {}),
+      },
+      { transaction }
+    );
 
     // Commit transaction
     await transaction.commit();
@@ -1042,7 +1048,6 @@ const updateInterestedProduct = async (req, res) => {
         isInterestedProduct: updatedProducts,
       },
     });
-
   } catch (error) {
     // Rollback transaction in case of error
     await transaction.rollback();
