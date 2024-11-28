@@ -46,6 +46,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ARRAY(DataTypes.STRING),
         unique: true,
       },
+      contactInfo: {
+        type: DataTypes.JSON
+      },
       createdAt: DataTypes.DATE,
       updatedAt: DataTypes.DATE,
     });
