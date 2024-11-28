@@ -56,6 +56,9 @@ const verifyJWt = async (req, res, next) => {
 
     next();
   } catch (error) {
+    if(error.message == "jwt expired"){
+      return next(new ErrorHandler("Token expired", 401));
+    }
     return next(new ErrorHandler(error.message, 500));
   }
 };
