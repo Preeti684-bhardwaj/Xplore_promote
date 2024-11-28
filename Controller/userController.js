@@ -375,103 +375,23 @@ const phoneVerification = asyncHandler(async (req, res, next) => {
   }
 });
 //-----------send OTP-------------------------------
-// const sendOtp = asyncHandler(async (req, res, next) => {
-//   try {
-//     const { email } = req.body;
-
-//     // Check if the email field is provided and not empty after trimming
-//     if (!email || email.trim() === "") {
-//       return next(new ErrorHandler("Please provide email", 400));
-//     }
-
-//     // Validate email format
-//     if (!isValidEmail(email)) {
-//       return next(new ErrorHandler("Invalid email", 400));
-//     }
-
-//     // Convert the email to lowercase for case-insensitive comparison
-//     const lowercaseEmail = email.toLowerCase().trim();
-
-//     const user = await User.findOne({
-//       where: { email: lowercaseEmail },
-//     });
-
-//     if (!user) {
-//       return next(new ErrorHandler("User not found", 404));
-//     }
-
-//     const otp = generateOtp();
-
-//     /*
-//     Hi
-//     To complete your verification, please use the One-Time Password (OTP) provided below.
-//     This OTP is for single use and will expire after 15 minutes for security reasons.
-//     Your verification code for Xplore Promote is: {OTP}
-//     Please do not share this OTP with anyone. If you did not request this, please reach out to our support team immediately.
-//     Best regards,
-//     Xplore Promote Team
-//     */
-
-//     // Create HTML content for the email
-//     const htmlContent = `
-//   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-//     <h2>One-Time Password (OTP) Verification</h2>
-//     <p>Dear ${user.name},</p>
-//     <p>Your verification code for Xplore Promote is:</p>
-//     <h1 style="font-size: 32px; background-color: #f0f0f0; padding: 10px; display: inline-block;">${otp}</h1>
-//     <p>This code is valid for 15 minutes.</p>
-//     <p>If you didn't request this code, please ignore this email.</p>
-//     <p>Best regards,<br>Xplore Promote Team</p>
-//   </div>
-// `;
-//     try {
-//       await sendEmail({
-//         email: user.email,
-//         subject: `Xplore Promote: Your Verification Code`,
-//         html: htmlContent,
-//       });
-
-//       user.otp = otp;
-//       user.otpExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
-//       await user.save({ validate: false });
-
-//       return res.status(200).json({
-//         success: true,
-//         message: `OTP sent to ${user.email} successfully`,
-//         email: user.email,
-//       });
-//     } catch (emailError) {
-//       user.otp = null;
-//       user.otpExpire = null;
-//       await user.save({ validate: false });
-
-//       console.error("Failed to send OTP email:", emailError);
-//       return next(new ErrorHandler(error.message, 500));
-//     }
-//   } catch (error) {
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
 const sendOtp = asyncHandler(async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    // Validate input
+    // Check if the email field is provided and not empty after trimming
     if (!email || email.trim() === "") {
       return next(new ErrorHandler("Please provide email", 400));
     }
-    // if (!phone || phone.trim() === "") {
-    //   return next(new ErrorHandler("Please provide phone number", 400));
-    // }
 
     // Validate email format
     if (!isValidEmail(email)) {
       return next(new ErrorHandler("Invalid email", 400));
     }
 
+    // Convert the email to lowercase for case-insensitive comparison
     const lowercaseEmail = email.toLowerCase().trim();
 
-    // Find user
     const user = await User.findOne({
       where: { email: lowercaseEmail },
     });
@@ -479,209 +399,290 @@ const sendOtp = asyncHandler(async (req, res, next) => {
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
-    if (user.isEmailVerified) {
-      return next(new ErrorHandler("Verified User", 409));
-    }
-    const phone = user.phone;
-    // // Format phone number to include country code if not present
-    // const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
 
+    const otp = generateOtp();
+
+    /*
+    Hi
+    To complete your verification, please use the One-Time Password (OTP) provided below.
+    This OTP is for single use and will expire after 15 minutes for security reasons.
+    Your verification code for Xplore Promote is: {OTP}
+    Please do not share this OTP with anyone. If you did not request this, please reach out to our support team immediately.
+    Best regards,
+    Xplore Promote Team
+    */
+
+    // Create HTML content for the email
+    const htmlContent = `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2>One-Time Password (OTP) Verification</h2>
+    <p>Dear ${user.name},</p>
+    <p>Your verification code for Xplore Promote is:</p>
+    <h1 style="font-size: 32px; background-color: #f0f0f0; padding: 10px; display: inline-block;">${otp}</h1>
+    <p>This code is valid for 15 minutes.</p>
+    <p>If you didn't request this code, please ignore this email.</p>
+    <p>Best regards,<br>Xplore Promote Team</p>
+  </div>
+`;
     try {
-      // Call Kaleyra API to send OTP
-      const response = await axios({
-        method: "post",
-        url: `${KALEYRA_CONFIG.baseURL}/verify`,
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": KALEYRA_CONFIG.apiKey,
-        },
-        data: {
-          flow_id: KALEYRA_CONFIG.flowId,
-          to: {
-            mobile: phone,
-            email: lowercaseEmail,
-          },
-        },
+      await sendEmail({
+        email: user.email,
+        subject: `Xplore Promote: Your Verification Code`,
+        html: htmlContent,
       });
 
-      // Store verify_id in user record
-      user.otp = response.data.data.verify_id;
-      user.otpExpire = Date.now() + 5 * 60 * 1000; // 15 minutes
+      user.otp = otp;
+      user.otpExpire = Date.now() + 5 * 60 * 1000; // 5 minutes
       await user.save({ validate: false });
 
       return res.status(200).json({
         success: true,
-        message: `OTP sent successfully`,
+        message: `OTP sent to ${user.email} successfully`,
         email: user.email,
       });
-    } catch (error) {
-      // Handle Kaleyra API errors
-      if (error.response?.data?.error) {
-        const kaleyraError = error.response.data.error;
-        return next(new ErrorHandler(kaleyraError.message, 400));
-      }
-      throw error;
+    } catch (emailError) {
+      user.otp = null;
+      user.otpExpire = null;
+      await user.save({ validate: false });
+
+      console.error("Failed to send OTP email:", emailError);
+      return next(new ErrorHandler(error.message, 500));
     }
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
 });
-
-//---------User emailVerification------------------------------
-// const emailVerification = asyncHandler(async (req, res, next) => {
+// const sendOtp = asyncHandler(async (req, res, next) => {
 //   try {
-//     const { email, otp } = req.body;
+//     const { email } = req.body;
 
-//     // Validate the OTP
-//     if (!otp || otp.trim() === "") {
-//       return next(new ErrorHandler("OTP is required.", 400));
-//     }
-
+//     // Validate input
 //     if (!email || email.trim() === "") {
 //       return next(new ErrorHandler("Please provide email", 400));
 //     }
+//     // if (!phone || phone.trim() === "") {
+//     //   return next(new ErrorHandler("Please provide phone number", 400));
+//     // }
 
 //     // Validate email format
 //     if (!isValidEmail(email)) {
 //       return next(new ErrorHandler("Invalid email", 400));
 //     }
 
-//     // Convert the email to lowercase for case-insensitive comparison
 //     const lowercaseEmail = email.toLowerCase().trim();
 
+//     // Find user
 //     const user = await User.findOne({
 //       where: { email: lowercaseEmail },
 //     });
-//     console.log(user);
 
 //     if (!user) {
 //       return next(new ErrorHandler("User not found", 404));
 //     }
-
-//     // Check OTP validity
-//     if (user.otp !== otp) {
-//       return next(new ErrorHandler("Invalid OTP", 400));
+//     if (user.isEmailVerified) {
+//       return next(new ErrorHandler("Verified User", 409));
 //     }
-//     if (user.otpExpire < Date.now()) {
-//       return next(new ErrorHandler("OTP has expired", 400));
-//     }
+//     const phone = user.phone;
+//     // // Format phone number to include country code if not present
+//     // const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
 
-//     // Update user details
-//     user.isEmailVerified = true;
-//     user.otp = null;
-//     user.otpExpire = null;
-//     await user.save();
+//     try {
+//       // Call Kaleyra API to send OTP
+//       const response = await axios({
+//         method: "post",
+//         url: `${KALEYRA_CONFIG.baseURL}/verify`,
+//         headers: {
+//           "Content-Type": "application/json",
+//           "api-key": KALEYRA_CONFIG.apiKey,
+//         },
+//         data: {
+//           flow_id: KALEYRA_CONFIG.flowId,
+//           to: {
+//             mobile: phone,
+//             email: lowercaseEmail,
+//           },
+//         },
+//       });
 
-//     const obj = {
-//       type: "USER",
-//       obj: user,
-//     };
-//     const accessToken = generateToken(obj);
+//       // Store verify_id in user record
+//       user.otp = response.data.data.verify_id;
+//       user.otpExpire = Date.now() + 5 * 60 * 1000; // 15 minutes
+//       await user.save({ validate: false });
 
-//     return res.status(200).json({
-//       success: true,
-//       message: "Email verified successfully",
-//       data: {
-//         id: user.id,
-//         name: user.name,
+//       return res.status(200).json({
+//         success: true,
+//         message: `OTP sent successfully`,
 //         email: user.email,
-//         phone: user.phone,
-//       },
-//       token: accessToken,
-//     });
+//       });
+//     } catch (error) {
+//       // Handle Kaleyra API errors
+//       if (error.response?.data?.error) {
+//         const kaleyraError = error.response.data.error;
+//         return next(new ErrorHandler(kaleyraError.message, 400));
+//       }
+//       throw error;
+//     }
 //   } catch (error) {
 //     return next(new ErrorHandler(error.message, 500));
 //   }
 // });
 
+//---------User emailVerification------------------------------
 const emailVerification = asyncHandler(async (req, res, next) => {
   try {
     const { email, otp } = req.body;
 
-    // Validate input
+    // Validate the OTP
     if (!otp || otp.trim() === "") {
       return next(new ErrorHandler("OTP is required.", 400));
     }
+
     if (!email || email.trim() === "") {
       return next(new ErrorHandler("Please provide email", 400));
     }
+
+    // Validate email format
     if (!isValidEmail(email)) {
       return next(new ErrorHandler("Invalid email", 400));
     }
 
+    // Convert the email to lowercase for case-insensitive comparison
     const lowercaseEmail = email.toLowerCase().trim();
 
-    // Find user
     const user = await User.findOne({
       where: { email: lowercaseEmail },
     });
+    console.log(user);
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
 
-    // Check if verify_id exists and OTP hasn't expired
-    if (!user.otp) {
-      return next(new ErrorHandler("Please request a new OTP", 400));
+    // Check OTP validity
+    if (user.otp !== otp) {
+      return next(new ErrorHandler("Invalid OTP", 400));
     }
     if (user.otpExpire < Date.now()) {
       return next(new ErrorHandler("OTP has expired", 400));
     }
 
-    try {
-      // Validate OTP with Kaleyra
-      const response = await axios({
-        method: "post",
-        url: `${KALEYRA_CONFIG.baseURL}/verify/validate`,
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": KALEYRA_CONFIG.apiKey,
-        },
-        data: {
-          verify_id: user.otp,
-          otp: otp,
-        },
-      });
+    // Update user details
+    user.isEmailVerified = true;
+    user.otp = null;
+    user.otpExpire = null;
+    await user.save();
 
-      // Update user details
-      user.isEmailVerified = true;
-      user.otp = null;
-      user.otpExpire = null;
-      await user.save();
+    const obj = {
+      type: "USER",
+      obj: user,
+    };
+    const accessToken = generateToken(obj);
 
-      const obj = {
-        type: "USER",
-        obj: user,
-      };
-      const accessToken = generateToken(obj);
-
-      return res.status(200).json({
-        success: true,
-        message: "Verification successful",
-        data: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-        },
-        token: accessToken,
-      });
-    } catch (error) {
-      // Handle Kaleyra API errors
-      if (error.response?.data?.error) {
-        const kaleyraError = error.response.data.error;
-        return next(
-          new ErrorHandler(kaleyraError.message || "Invalid OTP", 400)
-        );
-      }
-      throw error;
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+      },
+      token: accessToken,
+    });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+ 
+// const emailVerification = asyncHandler(async (req, res, next) => {
+//   try {
+//     const { email, otp } = req.body;
+
+//     // Validate input
+//     if (!otp || otp.trim() === "") {
+//       return next(new ErrorHandler("OTP is required.", 400));
+//     }
+//     if (!email || email.trim() === "") {
+//       return next(new ErrorHandler("Please provide email", 400));
+//     }
+//     if (!isValidEmail(email)) {
+//       return next(new ErrorHandler("Invalid email", 400));
+//     }
+
+//     const lowercaseEmail = email.toLowerCase().trim();
+
+//     // Find user
+//     const user = await User.findOne({
+//       where: { email: lowercaseEmail },
+//     });
+
+//     if (!user) {
+//       return next(new ErrorHandler("User not found", 404));
+//     }
+
+//     // Check if verify_id exists and OTP hasn't expired
+//     if (!user.otp) {
+//       return next(new ErrorHandler("Please request a new OTP", 400));
+//     }
+//     if (user.otpExpire < Date.now()) {
+//       return next(new ErrorHandler("OTP has expired", 400));
+//     }
+
+//     try {
+//       // Validate OTP with Kaleyra
+//       const response = await axios({
+//         method: "post",
+//         url: `${KALEYRA_CONFIG.baseURL}/verify/validate`,
+//         headers: {
+//           "Content-Type": "application/json",
+//           "api-key": KALEYRA_CONFIG.apiKey,
+//         },
+//         data: {
+//           verify_id: user.otp,
+//           otp: otp,
+//         },
+//       });
+
+//       // Update user details
+//       user.isEmailVerified = true;
+//       user.otp = null;
+//       user.otpExpire = null;
+//       await user.save();
+
+//       const obj = {
+//         type: "USER",
+//         obj: user,
+//       };
+//       const accessToken = generateToken(obj);
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Verification successful",
+//         data: {
+//           id: user.id,
+//           name: user.name,
+//           email: user.email,
+//           phone: user.phone,
+//         },
+//         token: accessToken,
+//       });
+//     } catch (error) {
+//       // Handle Kaleyra API errors
+//       if (error.response?.data?.error) {
+//         const kaleyraError = error.response.data.error;
+//         return next(
+//           new ErrorHandler(kaleyraError.message || "Invalid OTP", 400)
+//         );
+//       }
+//       throw error;
+//     }
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
 
 //------------login user----------------------------------
+
 const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
