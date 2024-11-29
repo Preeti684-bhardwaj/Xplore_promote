@@ -174,45 +174,248 @@ const saveVisitorAndCampaign = async (req, res) => {
     });
   }
 };
-// userDetails
-// const userDetails = asyncHandler(async (req, res, next) => {
+
+//  ---------------apple signin---------------------------------
+// const appleLogin = asyncHandler(async (req, res, next) => {
+//   const transaction = await sequelize.transaction();
+
 //   try {
-//     const {
-//       name,
-//       countryCode,
-//       phone,
-//       email,
-//       address,
-//       otherDetails,
-//       visitorId,
-//       deviceId,
-//     } = req.body;
+//     const authHeader = req.headers["authorization"];
+//     const idToken = authHeader?.startsWith("Bearer ")
+//       ? authHeader.substring(7)
+//       : authHeader;
+//     const { email, name, appleUserId, visitorId, deviceId, campaignID } =
+//       req.body;
+
+//     // Validate required inputs
+//     if (!deviceId || !campaignID) {
+//       return next(
+//         new ErrorHandler("Device ID and Campaign ID are required", 400)
+//       );
+//     }
+//     if (!idToken) {
+//       return next(new ErrorHandler("Authorization token is required", 401));
+//     }
+//     if (!appleUserId) {
+//       return next(new ErrorHandler("Apple User ID is required", 400));
+//     }
+
+//     // Validate and decode Apple token
+//     let decodedToken;
+//     try {
+//       decodedToken = validateAppleToken(idToken);
+//       if (!decodedToken || !decodedToken.sub) {
+//         return next(new ErrorHandler("Invalid Apple token", 401));
+//       }
+//     } catch (tokenError) {
+//       return next(new ErrorHandler("Failed to validate Apple token", 401));
+//     }
+
+//     // Check if campaign exists
+//     const campaign = await Campaign.findByPk(campaignID, { transaction });
+//     if (!campaign) {
+//       await transaction.rollback();
+//       return next(new ErrorHandler("Campaign not found", 404));
+//     }
+
+//     // Find existing user by deviceId or visitorId
+//     let existingUser = await EndUser.findOne({
+//       where: {
+//         [Op.or]: [
+//           { deviceId: { [Op.contains]: [deviceId] } },
+//           ...(visitorId
+//             ? [{ visitorIds: { [Op.contains]: [visitorId] } }]
+//             : []),
+//         ],
+//       },
+//       include: [
+//         {
+//           model: Campaign,
+//           as: "campaigns",
+//           through: {
+//             where: { campaignID: campaignID },
+//           },
+//         },
+//       ],
+//       transaction,
+//     });
+
+//     let user;
+//     // Scenario handling
+//     if (existingUser) {
+//       // Check if user is already registered for this specific campaign
+//       if (existingUser.campaigns.length > 0) {
+//         if(existingUser.appleUserId==appleUserId){
+//           return res.status(200).json({
+//             success: false,
+//             message: "User already exists with this Apple User ID",
+//             data: {
+//               user: {
+//                 id: existingUser.id,
+//                 email: existingUser.email,
+//                 name: existingUser.name,
+//                 appleUserId: existingUser.appleUserId,
+//                 deviceId: existingUser.deviceId,
+//                 visitorIds: existingUser.visitorIds,
+//                 isEmailVerified: existingUser.isEmailVerified,
+//               },
+//             },
+//           });
+//         }
+//         // Check if email or name can be updated
+//         const canUpdateEmail =
+//           !existingUser.email || existingUser.email === null;
+//         const canUpdateName = !existingUser.name || existingUser.name === null;
+
+//         if (!canUpdateEmail && !canUpdateName) {
+//           await transaction.rollback();
+//           return next(
+//             new ErrorHandler(
+//               "You are already registered for this campaign",
+//               400
+//             )
+//           );
+//         }
+
+//         // Prepare updates
+//         const updates = {};
+
+//         // Update email if applicable
+//         if (canUpdateEmail && email) {
+//           updates.email = email.toLowerCase();
+//           updates.isEmailVerified = true;
+//         } else if (!canUpdateEmail && email) {
+//           // If email exists and can't be updated, throw error
+//           await transaction.rollback();
+//           return next(new ErrorHandler("Email cannot be updated", 400));
+//         }
+
+//         // Update name if applicable
+//         if (canUpdateName && name) {
+//           updates.name = name.trim();
+//         } else if (!canUpdateName && name) {
+//           // If name exists and can't be updated, throw error
+//           await transaction.rollback();
+//           return next(new ErrorHandler("Name cannot be updated", 400));
+//         }
+
+//         // Update user if there are updates
+//         if (Object.keys(updates).length > 0) {
+//           await existingUser.update(updates, { transaction });
+//         }
+
+//         user = existingUser;
+//       } else {
+//         // User exists but not registered for this campaign
+//         // Update user details
+//         const updates = {
+//           appleUserId: decodedToken.sub || appleUserId,
+//           ...(email && { email: email.toLowerCase(), isEmailVerified: true }),
+//           ...(name && { name: name.trim() }),
+//           deviceId: [...new Set([...existingUser.deviceId, deviceId])],
+//           visitorIds: visitorId
+//             ? [...new Set([...existingUser.visitorIds, visitorId])]
+//             : existingUser.visitorIds,
+//         };
+
+//         await existingUser.update(updates, { transaction });
+//         user = existingUser;
+//       }
+
+//       // Associate user with campaign if not already associated
+//       if (!existingUser.campaigns.length) {
+//         await user.addCampaign(campaignID, { transaction });
+//       }
+//     } else {
+//       // New user creation
+//       user = await EndUser.create(
+//         {
+//           appleUserId: decodedToken.sub || appleUserId,
+//           email: (decodedToken.email || email)?.trim().toLowerCase(),
+//           name: decodedToken.name
+//             ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`.trim()
+//             : name?.trim(),
+//           authProvider: "apple",
+//           deviceId: [deviceId],
+//           visitorIds: visitorId ? [visitorId] : [],
+//           isEmailVerified: true,
+//         },
+//         { transaction }
+//       );
+
+//       // Associate user with campaign
+//       await user.addCampaign(campaignID, { transaction });
+//     }
+
+//     // Generate authentication token
+//     const tokenPayload = {
+//       type: "USER",
+//       obj: {
+//         id: user.id,
+//         email: user.email,
+//         name: user.name,
+//         appleUserId: user.appleUserId,
+//       },
+//     };
+//     const accessToken = generateToken(tokenPayload);
+
+//     // Commit transaction
+//     await transaction.commit();
+
+//     // Return success response
+//     return res.status(200).json({
+//       success: true,
+//       message:
+//         user.createdAt === user.updatedAt
+//           ? "Signup successful"
+//           : "Login successful",
+//       data: {
+//         user: {
+//           id: user.id,
+//           email: user.email,
+//           name: user.name,
+//           appleUserId: user.appleUserId,
+//           deviceId: user.deviceId,
+//           visitorIds: user.visitorIds,
+//           isEmailVerified: user.isEmailVerified,
+//         },
+//         token: accessToken,
+//       },
+//     });
 //   } catch (error) {
-//     return next(new ErrorHandler(error.message, 500));
+//     await transaction.rollback();
+//     console.error("Apple auth error:", error);
+//     return next(new ErrorHandler("Authentication failed", error.status || 500));
 //   }
 // });
-//  ---------------apple signin---------------------------------
+
 const appleLogin = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
 
   try {
+    console.log("Apple login request received:", req.body);
+
     const authHeader = req.headers["authorization"];
     const idToken = authHeader?.startsWith("Bearer ")
       ? authHeader.substring(7)
       : authHeader;
+
     const { email, name, appleUserId, visitorId, deviceId, campaignID } =
       req.body;
 
     // Validate required inputs
     if (!deviceId || !campaignID) {
+      console.error("Validation error: Device ID or Campaign ID is missing");
       return next(
         new ErrorHandler("Device ID and Campaign ID are required", 400)
       );
     }
     if (!idToken) {
+      console.error("Validation error: Authorization token is missing");
       return next(new ErrorHandler("Authorization token is required", 401));
     }
     if (!appleUserId) {
+      console.error("Validation error: Apple User ID is missing");
       return next(new ErrorHandler("Apple User ID is required", 400));
     }
 
@@ -221,164 +424,208 @@ const appleLogin = asyncHandler(async (req, res, next) => {
     try {
       decodedToken = validateAppleToken(idToken);
       if (!decodedToken || !decodedToken.sub) {
+        console.error("Apple token validation failed:", decodedToken);
         return next(new ErrorHandler("Invalid Apple token", 401));
       }
+      console.log("Decoded Apple token:", decodedToken);
     } catch (tokenError) {
+      console.error("Error validating Apple token:", tokenError);
       return next(new ErrorHandler("Failed to validate Apple token", 401));
     }
 
     // Check if campaign exists
-    const campaign = await Campaign.findByPk(campaignID, { transaction });
-    if (!campaign) {
-      await transaction.rollback();
-      return next(new ErrorHandler("Campaign not found", 404));
+    let campaign;
+    try {
+      campaign = await Campaign.findByPk(campaignID, { transaction });
+      if (!campaign) {
+        console.error("Campaign not found with ID:", campaignID);
+        await transaction.rollback();
+        return next(new ErrorHandler("Campaign not found", 404));
+      }
+      console.log("Campaign found:", campaignID);
+    } catch (campaignError) {
+      console.error("Error fetching campaign:", campaignError);
+      throw new ErrorHandler("Error fetching campaign", 500);
     }
 
-    // Find existing user by deviceId or visitorId
-    let existingUser = await EndUser.findOne({
-      where: {
-        [Op.or]: [
-          { deviceId: { [Op.contains]: [deviceId] } },
-          ...(visitorId
-            ? [{ visitorIds: { [Op.contains]: [visitorId] } }]
-            : []),
-        ],
-      },
-      include: [
-        {
-          model: Campaign,
-          as: "campaigns",
-          through: {
-            where: { campaignID: campaignID },
-          },
-        },
-      ],
-      transaction,
-    });
-
     let user;
-    // Scenario handling
-    if (existingUser) {
-      // Check if user is already registered for this specific campaign
-      if (existingUser.campaigns.length > 0) {
-        if(existingUser.appleUserId==appleUserId){
-          return res.status(200).json({
-            success: false,
-            message: "User already exists with this Apple User ID",
-            data: {
-              user: {
-                id: existingUser.id,
-                email: existingUser.email,
-                name: existingUser.name,
-                appleUserId: existingUser.appleUserId,
-                deviceId: existingUser.deviceId,
-                visitorIds: existingUser.visitorIds,
-                isEmailVerified: existingUser.isEmailVerified,
-              },
+    try {
+      user = await EndUser.findOne({
+        where: { appleUserId },
+        include: [
+          {
+            model: Campaign,
+            as: "campaigns",
+            through: {
+              where: { campaignID },
             },
-          });
-        }
-        // Check if email or name can be updated
-        const canUpdateEmail =
-          !existingUser.email || existingUser.email === null;
-        const canUpdateName = !existingUser.name || existingUser.name === null;
+          },
+        ],
+        transaction,
+      });
 
-        if (!canUpdateEmail && !canUpdateName) {
-          await transaction.rollback();
-          return next(
-            new ErrorHandler(
-              "You are already registered for this campaign",
-              400
-            )
-          );
-        }
-
-        // Prepare updates
-        const updates = {};
-
-        // Update email if applicable
-        if (canUpdateEmail && email) {
-          updates.email = email.toLowerCase();
-          updates.isEmailVerified = true;
-        } else if (!canUpdateEmail && email) {
-          // If email exists and can't be updated, throw error
-          await transaction.rollback();
-          return next(new ErrorHandler("Email cannot be updated", 400));
-        }
-
-        // Update name if applicable
-        if (canUpdateName && name) {
-          updates.name = name.trim();
-        } else if (!canUpdateName && name) {
-          // If name exists and can't be updated, throw error
-          await transaction.rollback();
-          return next(new ErrorHandler("Name cannot be updated", 400));
-        }
-
-        // Update user if there are updates
-        if (Object.keys(updates).length > 0) {
-          await existingUser.update(updates, { transaction });
-        }
-
-        user = existingUser;
-      } else {
-        // User exists but not registered for this campaign
-        // Update user details
-        const updates = {
-          appleUserId: decodedToken.sub || appleUserId,
-          ...(email && { email: email.toLowerCase(), isEmailVerified: true }),
-          ...(name && { name: name.trim() }),
-          deviceId: [...new Set([...existingUser.deviceId, deviceId])],
-          visitorIds: visitorId
-            ? [...new Set([...existingUser.visitorIds, visitorId])]
-            : existingUser.visitorIds,
-        };
-
-        await existingUser.update(updates, { transaction });
-        user = existingUser;
+      if (user) {
+        // Step 2: If user exists, return the user details
+        console.log("User found with Apple User ID:", appleUserId);
+        await transaction.commit();
+        return res.status(200).json({
+          success: true,
+          message: "User exists with the provided Apple User ID",
+          data: {
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              appleUserId: user.appleUserId,
+              deviceId: user.deviceId,
+              visitorIds: user.visitorIds,
+              isEmailVerified: user.isEmailVerified,
+            },
+          },
+        });
       }
+    } catch (fetchError) {
+      console.error("Error fetching user by Apple User ID:", fetchError);
+      await transaction.rollback();
+      throw new ErrorHandler("Error fetching user", 500);
+    }
 
-      // Associate user with campaign if not already associated
-      if (!existingUser.campaigns.length) {
+    // Step 3: If no user found, proceed with existing logic
+    console.log("No user found with Apple User ID. Proceeding...");
+    // Check for existing user
+    let existingUser;
+    try {
+      existingUser = await EndUser.findOne({
+        where: {
+          [Op.or]: [
+            { deviceId: { [Op.contains]: [deviceId] } },
+            ...(visitorId
+              ? [{ visitorIds: { [Op.contains]: [visitorId] } }]
+              : []),
+          ],
+        },
+        include: [
+          {
+            model: Campaign,
+            as: "campaigns",
+            through: {
+              where: { campaignID: campaignID },
+            },
+          },
+        ],
+        transaction,
+      });
+      console.log(
+        "Existing user found:",
+        existingUser ? existingUser.id : null
+      );
+    } catch (userFetchError) {
+      console.error("Error fetching existing user:", userFetchError);
+      throw new ErrorHandler("Error fetching user", 500);
+    }
+
+    // let user;
+
+    try {
+      if (existingUser) {
+        // Logic for handling existing users
+        console.log("Handling existing user logic...");
+        if (existingUser.campaigns.length > 0) {
+          if (existingUser.appleUserId === appleUserId) {
+            console.log("User already registered for this campaign.");
+            return res.status(200).json({
+              success: false,
+              message: "User already exists with this Apple User ID",
+              data: {
+                user: {
+                  id: existingUser.id,
+                  email: existingUser.email,
+                  name: existingUser.name,
+                  appleUserId: existingUser.appleUserId,
+                  deviceId: existingUser.deviceId,
+                  visitorIds: existingUser.visitorIds,
+                  isEmailVerified: existingUser.isEmailVerified,
+                },
+              },
+            });
+          }
+          // Update email or name if possible
+          const canUpdateEmail =
+            !existingUser.email || existingUser.email === null;
+          const canUpdateName =
+            !existingUser.name || existingUser.name === null;
+
+          const updates = {};
+          if (canUpdateEmail && email) updates.email = email.toLowerCase();
+          if (canUpdateName && name) updates.name = name.trim();
+
+          if (Object.keys(updates).length > 0) {
+            await existingUser.update(updates, { transaction });
+          }
+          user = existingUser;
+        } else {
+          // Associate user with campaign if not already associated
+          const updates = {
+            appleUserId: decodedToken.sub || appleUserId,
+            ...(email && { email: email.toLowerCase(), isEmailVerified: true }),
+            ...(name && { name: name.trim() }),
+            deviceId: [...new Set([...existingUser.deviceId, deviceId])],
+            visitorIds: visitorId
+              ? [...new Set([...existingUser.visitorIds, visitorId])]
+              : existingUser.visitorIds,
+          };
+
+          await existingUser.update(updates, { transaction });
+          user = existingUser;
+
+          if (!existingUser.campaigns.length) {
+            await user.addCampaign(campaignID, { transaction });
+          }
+        }
+      } else {
+        // Create a new user
+        console.log("Creating new user...");
+        user = await EndUser.create(
+          {
+            appleUserId: decodedToken.sub || appleUserId,
+            email: (decodedToken.email || email)?.trim().toLowerCase(),
+            name: decodedToken.name
+              ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`.trim()
+              : name?.trim(),
+            authProvider: "apple",
+            deviceId: [deviceId],
+            visitorIds: visitorId ? [visitorId] : [],
+            isEmailVerified: true,
+          },
+          { transaction }
+        );
         await user.addCampaign(campaignID, { transaction });
       }
-    } else {
-      // New user creation
-      user = await EndUser.create(
-        {
-          appleUserId: decodedToken.sub || appleUserId,
-          email: (decodedToken.email || email)?.trim().toLowerCase(),
-          name: decodedToken.name
-            ? `${decodedToken.name.firstName} ${decodedToken.name.lastName}`.trim()
-            : name?.trim(),
-          authProvider: "apple",
-          deviceId: [deviceId],
-          visitorIds: visitorId ? [visitorId] : [],
-          isEmailVerified: true,
-        },
-        { transaction }
-      );
-
-      // Associate user with campaign
-      await user.addCampaign(campaignID, { transaction });
+    } catch (userHandlingError) {
+      console.error("Error handling user logic:", userHandlingError);
+      throw new ErrorHandler("Error processing user", 500);
     }
 
     // Generate authentication token
-    const tokenPayload = {
-      type: "USER",
-      obj: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        appleUserId: user.appleUserId,
-      },
-    };
-    const accessToken = generateToken(tokenPayload);
+    let accessToken;
+    try {
+      const tokenPayload = {
+        type: "USER",
+        obj: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          appleUserId: user.appleUserId,
+        },
+      };
+      accessToken = generateToken(tokenPayload);
+      console.log("Access token generated successfully.");
+    } catch (tokenGenerationError) {
+      console.error("Error generating token:", tokenGenerationError);
+      throw new ErrorHandler("Error generating access token", 500);
+    }
 
-    // Commit transaction
     await transaction.commit();
-
-    // Return success response
     return res.status(200).json({
       success: true,
       message:
@@ -400,8 +647,8 @@ const appleLogin = asyncHandler(async (req, res, next) => {
     });
   } catch (error) {
     await transaction.rollback();
-    console.error("Apple auth error:", error);
-    return next(new ErrorHandler("Authentication failed", error.status || 500));
+    console.error("Unhandled error in appleLogin:", error);
+    return next(new ErrorHandler("Authentication failed", 500));
   }
 });
 
@@ -813,14 +1060,16 @@ const contactUs = asyncHandler(async (req, res, next) => {
 
     if (existingUser) {
       // Check if user already has this campaign
-      const hasCampaign = await existingUser.hasCampaign(campaignID, { transaction });
-      
+      const hasCampaign = await existingUser.hasCampaign(campaignID, {
+        transaction,
+      });
+
       if (hasCampaign) {
         // Update existing user for the same campaign
         const updatedFields = {
           contactInfo: {
             ...(existingUser.contactInfo || {}),
-            ...contactInfo
+            ...contactInfo,
           },
           address: address || existingUser.address,
           otherDetails: otherDetails || existingUser.otherDetails,
@@ -900,8 +1149,25 @@ const contactUs = asyncHandler(async (req, res, next) => {
 
     // 4. Response Handling
     const userData = await EndUser.findByPk(user.id, {
-      attributes: ["id", "contactInfo", "phone", "countryCode", "createdAt"],
-      transaction
+      attributes: [
+        "id",
+        "name",
+        "email",
+        "countryCode",
+        "phone",
+        "address",
+        "otherDetails",
+        "visitorIds",
+        "deviceId",
+        "appleUserId",
+        "googleUserId",
+        "isEmailVerified",
+        "authProvider",
+        "isInterestedProducts",
+        "contactInfo",
+        "createdAt",
+      ],
+      transaction,
     });
 
     // Commit transaction
@@ -1016,7 +1282,7 @@ const updateInterestedProduct = async (req, res) => {
       await transaction.rollback();
       return res.status(404).json({
         success: false,
-        message: "User not found or not registered for this campaign",
+        message: "User not found",
       });
     }
 
