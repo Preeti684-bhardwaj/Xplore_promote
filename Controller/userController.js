@@ -59,7 +59,6 @@ const KALEYRA_CONFIG = {
 //   console.log(event)
 // })
 
-
 const registerUser = asyncHandler(async (req, res, next) => {
   try {
     const { name, countryCode, phone, email, password } = req.body;
@@ -598,7 +597,7 @@ const emailVerification = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
- 
+
 // const emailVerification = asyncHandler(async (req, res, next) => {
 //   try {
 //     const { email, otp } = req.body;
@@ -1368,52 +1367,65 @@ const getEndUserDetails = asyncHandler(async (req, res, next) => {
   try {
     const id = req.user?.id;
     const campaignID = req.params.campaignID;
-    
+
     // First, verify the user exists
     const user = await User.findByPk(id);
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
-    
+
     // Find the campaign and include its associated end users
     const campaign = await Campaign.findOne({
       where: { campaignID },
-      include: [{
-        model: EndUser,
-        as: 'endUsers',
-        through: {
-          attributes: [] // Exclude junction table attributes if not needed
+      include: [
+        {
+          model: EndUser,
+          as: "endUsers",
+          through: {
+            attributes: [], // Exclude junction table attributes if not needed
+          },
+          attributes: [
+            "id",
+            "name",
+            "email",
+            "countryCode",
+            "phone",
+            "address",
+            "otherDetails",
+            "visitorIds",
+            "deviceId",
+            "appleUserId",
+            "googleUserId",
+            "isEmailVerified",
+            "authProvider",
+            "isInterestedProducts",
+            "contactInfo",
+            "createdAt",
+          ],
         },
-        attributes: [
-          'id', 
-          'name', 
-          'email', 
-          'phone', 
-          'countryCode', 
-          'address', 
-          'otherDetails',
-          'isEmailVerified',
-          'authProvider',
-          'isInterestedProducts'
-        ]
-      }]
+      ],
     });
-    
+
     // Check if the campaign exists and belongs to the user
     if (!campaign) {
       return next(new ErrorHandler("Campaign not found", 404));
     }
-    
+
     // Optional: Additional check to ensure the campaign was created by the user
     if (campaign.createdBy !== id) {
-      return next(new ErrorHandler("Unauthorized to access this campaign's end users", 403));
+      return next(
+        new ErrorHandler(
+          "Unauthorized to access this campaign's end users",
+          403
+        )
+      );
     }
-    
+
     // Return the end users associated with this campaign
     res.status(200).json({
       success: true,
       count: campaign.endUsers.length,
-      endUsers: campaign.endUsers
+      endUsers: campaign.endUsers,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
@@ -1437,5 +1449,5 @@ module.exports = {
   getInsta,
   logout,
   logoutAll,
-  getEndUserDetails
+  getEndUserDetails,
 };
