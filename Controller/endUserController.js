@@ -18,16 +18,16 @@ require("dotenv").config();
 // } =require('@fingerprintjs/fingerprintjs-pro-server-api')
 // const {FINGERPRINT_SECRETKEY,FINGERPRINT_REGION} = process.env
 const { OAuth2Client } = require("google-auth-library");
-const { ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } = process.env;
+const { ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } = process.env;
 const googleClient = new OAuth2Client({
-  clientId: ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
+  clientId: ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
 });
 
 async function verifyGoogleLogin(idToken) {
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: idToken,
-      audience: ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
+      audience: ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
     });
     const payload = ticket.getPayload();
     return payload;
