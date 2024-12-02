@@ -779,9 +779,9 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
-    if (!user.isEmailVerified) {
-      return next(new ErrorHandler("User is not verified", 403));
-    }
+    // if (!user.isEmailVerified) {
+    //   return next(new ErrorHandler("User is not verified", 403));
+    // }
 
     // Get ResetPassword Token
     const otp = generateOtp(); // Assuming you have a method to generate the OTP
