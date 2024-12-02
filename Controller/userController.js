@@ -1363,6 +1363,75 @@ const logoutAll = asyncHandler(async (req, res, next) => {
 });
 
 //----------------get enduser details----------------------------------------
+// const getEndUserDetails = asyncHandler(async (req, res, next) => {
+//   try {
+//     const id = req.user?.id;
+//     const campaignID = req.params.campaignID;
+
+//     // First, verify the user exists
+//     const user = await User.findByPk(id);
+//     if (!user) {
+//       return next(new ErrorHandler("User not found", 404));
+//     }
+
+//     // Find the campaign and include its associated end users
+//     const campaign = await Campaign.findOne({
+//       where: { campaignID },
+//       include: [
+//         {
+//           model: EndUser,
+//           as: "endUsers",
+//           through: {
+//             attributes: [], // Exclude junction table attributes if not needed
+//           },
+//           attributes: [
+//             "id",
+//             "name",
+//             "email",
+//             "countryCode",
+//             "phone",
+//             "address",
+//             "otherDetails",
+//             "visitorIds",
+//             "deviceId",
+//             "appleUserId",
+//             "googleUserId",
+//             "isEmailVerified",
+//             "authProvider",
+//             "isInterestedProducts",
+//             "contactInfo",
+//             "createdAt",
+//           ],
+//         },
+//       ],
+//     });
+
+//     // Check if the campaign exists and belongs to the user
+//     if (!campaign) {
+//       return next(new ErrorHandler("Campaign not found", 404));
+//     }
+
+//     // Optional: Additional check to ensure the campaign was created by the user
+//     if (campaign.createdBy !== id) {
+//       return next(
+//         new ErrorHandler(
+//           "Unauthorized to access this campaign's end users",
+//           403
+//         )
+//       );
+//     }
+
+//     // Return the end users associated with this campaign
+//     res.status(200).json({
+//       success: true,
+//       count: campaign.endUsers.length,
+//       endUsers: campaign.endUsers,
+//     });
+//   } catch (error) {
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
+
 const getEndUserDetails = asyncHandler(async (req, res, next) => {
   try {
     const id = req.user?.id;
@@ -1398,7 +1467,6 @@ const getEndUserDetails = asyncHandler(async (req, res, next) => {
             "googleUserId",
             "isEmailVerified",
             "authProvider",
-            "isInterestedProducts",
             "contactInfo",
             "createdAt",
           ],
@@ -1421,11 +1489,32 @@ const getEndUserDetails = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Return the end users associated with this campaign
+    // Modify the end users to move isInterestedProducts inside contactInfo
+    const modifiedEndUsers = campaign.endUsers.map(endUser => {
+      // Create a deep clone of the endUser
+      const modifiedEndUser = JSON.parse(JSON.stringify(endUser));
+      
+      // If contactInfo exists and is an object, add isInterestedProducts
+      if (modifiedEndUser.contactInfo && typeof modifiedEndUser.contactInfo === 'object') {
+        modifiedEndUser.contactInfo.isInterestedProducts = endUser.isInterestedProducts;
+      } else {
+        // If contactInfo doesn't exist or isn't an object, create it
+        modifiedEndUser.contactInfo = {
+          isInterestedProducts: endUser.isInterestedProducts
+        };
+      }
+
+      // Delete the original isInterestedProducts field
+      delete modifiedEndUser.isInterestedProducts;
+
+      return modifiedEndUser;
+    });
+
+    // Return the modified end users associated with this campaign
     res.status(200).json({
       success: true,
-      count: campaign.endUsers.length,
-      endUsers: campaign.endUsers,
+      count: modifiedEndUsers.length,
+      endUsers: modifiedEndUsers,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
