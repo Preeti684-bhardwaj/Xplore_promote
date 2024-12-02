@@ -93,8 +93,8 @@ const createLayout = asyncHandler(async (req, res, next) => {
 
 // Get all layouts with pagination
 const getAllLayout = asyncHandler(async (req, res, next) => {
-  const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
-  const { limit, offset } = getPagination(page, size);
+  // const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
+  // const { limit, offset } = getPagination(page, size);
 
   // Get the campaignID from request parameters
   const campaignID = req.params?.campaignID;
@@ -109,8 +109,6 @@ const getAllLayout = asyncHandler(async (req, res, next) => {
   try {
     const data = await Layout.findAndCountAll({
       where: condition,
-      limit,
-      offset,
       include: [
         { model: Campaign, as: "campaign", attributes: ["campaignID"] },
       ],
@@ -124,9 +122,7 @@ const getAllLayout = asyncHandler(async (req, res, next) => {
       success: true,
       totalItems: data.count,
       layouts: data.rows,
-      initialLayout: initialLayout|| null, // Include the initial layout in response
-      currentPage: page ? +page : 0,
-      totalPages: Math.ceil(data.count / limit),
+      initialLayout: initialLayout || null, // Include the initial layout in response
     });
   } catch (error) {
     console.error("Error fetching layouts:", error);
