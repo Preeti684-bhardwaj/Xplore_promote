@@ -721,9 +721,16 @@ const loginUser = async (req, res, next) => {
         new ErrorHandler("Please verify your OTP before logging in", 403)
       );
     }
+
+    console.log(user);
+
     const obj = {
       type: "USER",
-      obj: user,
+      obj: {
+              id: user.id,
+              email: user.email,
+              name: user.name
+      },
     };
     const accessToken = generateToken(obj);
 
@@ -1059,7 +1066,9 @@ const updateUser = asyncHandler(async (req, res, next) => {
     }
     if (bodyData.profileLayoutJson) {
       if (typeof bodyData.profileLayoutJson !== "object") {
-        return next(new ErrorHandler("Profile layout must be a valid JSON object", 400));
+        return next(
+          new ErrorHandler("Profile layout must be a valid JSON object", 400)
+        );
       }
     }
 
@@ -1114,7 +1123,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
           typeof currentUser.userImages === "string"
             ? JSON.parse(currentUser.userImages)
             : currentUser.userImages || [];
-      
+
         // Only delete images if there are any
         if (Array.isArray(currentUserImages) && currentUserImages.length > 0) {
           await Promise.all(
@@ -1150,7 +1159,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
       }
 
       updateData.userImages = newUserImages;
-    }else {
+    } else {
       console.info("No user images provided for update.");
     }
 
@@ -1171,9 +1180,12 @@ const updateUser = asyncHandler(async (req, res, next) => {
           typeof currentUser.companyImages === "string"
             ? JSON.parse(currentUser.companyImages)
             : currentUser.companyImages || [];
-      
+
         // Only delete images if there are any
-        if (Array.isArray(currentCompanyImages) && currentCompanyImages.length > 0) {
+        if (
+          Array.isArray(currentCompanyImages) &&
+          currentCompanyImages.length > 0
+        ) {
           await Promise.all(
             currentCompanyImages.map((img) => deleteFile(img.fileName))
           );
@@ -1181,7 +1193,10 @@ const updateUser = asyncHandler(async (req, res, next) => {
           console.log("No company images provided for update.");
         }
       } catch (error) {
-        console.error("Error parsing or deleting current companyImages:", error);
+        console.error(
+          "Error parsing or deleting current companyImages:",
+          error
+        );
       }
 
       // Upload new images
@@ -1221,16 +1236,16 @@ const updateUser = asyncHandler(async (req, res, next) => {
     if (bodyData.companyWebsite) {
       updateData.companyWebsite = bodyData.companyWebsite;
     }
-      // New handling for profileLayoutJson
-      if (bodyData.profileLayoutJson) {
-        console.log("line 1226",bodyData.profileLayoutJson);
-        
-        // Stringify the JSON object to ensure it's stored correctly
-        updateData.profileLayoutJSon =JSON.stringify(bodyData.profileLayoutJson);
-      }
+    // New handling for profileLayoutJson
+    if (bodyData.profileLayoutJson) {
+      console.log("line 1226", bodyData.profileLayoutJson);
 
-      console.log(updateData);
-      
+      // Stringify the JSON object to ensure it's stored correctly
+      updateData.profileLayoutJSon = JSON.stringify(bodyData.profileLayoutJson);
+    }
+
+    console.log(updateData);
+
     // Update user in database
     const [num, [updatedUser]] = await User.update(updateData, {
       where: { id: userId },
@@ -1257,7 +1272,9 @@ const updateUser = asyncHandler(async (req, res, next) => {
         address: updatedUser.address,
         userWebsites: updatedUser.userWebsites,
         companyWebsite: updatedUser.companyWebsite,
-        profileLayoutJSon: updatedUser.profileLayoutJSon ? JSON.parse(updatedUser.profileLayoutJSon) : null,
+        profileLayoutJSon: updatedUser.profileLayoutJSon
+          ? JSON.parse(updatedUser.profileLayoutJSon)
+          : null,
         createdAt: updatedUser.createdAt,
         updatedAt: updatedUser.updatedAt,
       },
@@ -1393,11 +1410,11 @@ const getUserProfile = asyncHandler(async (req, res, next) => {
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
-   
+
     res.status(200).json({
       success: true,
-      message:"User Profile Layout",
-      ProfileLayout:user.profileLayoutJSon,
+      message: "User Profile Layout",
+      ProfileLayout: user.profileLayoutJSon,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
