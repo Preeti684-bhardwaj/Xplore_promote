@@ -1,6 +1,6 @@
 const db = require("../dbConfig/dbConfig");
 const User = db.users;
-const EndUser = db.endUsers;
+// const EndUser = db.endUsers;
 const QrSession = db.qrSessions;
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -90,7 +90,7 @@ const verifyEndUser = async (req, res, next) => {
     const userId = decodedToken.obj.obj.id;
 
     // find end user
-    const endUser = await EndUser.findOne({
+    const endUser = await User.findOne({
       where: { id: userId },
     });
     console.log(endUser);
