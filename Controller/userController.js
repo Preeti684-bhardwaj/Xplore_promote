@@ -1,10 +1,10 @@
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const QRSession = db.qrSessions;
-const EndUser = db.endUsers;
 const Campaign = db.campaigns;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
+const sequelize = db.sequelize;
 const sendEmail = require("../utils/sendEmail.js");
 const { phoneValidation } = require("../utils/phoneValidation.js");
 const { validateFiles } = require("../validators/campaignValidations.js");
@@ -72,8 +72,8 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Name is missing", 400));
     }
 
-   // if (!phone) {
-     // return next(new ErrorHandler("Phone is missing", 400));
+    // if (!phone) {
+    // return next(new ErrorHandler("Phone is missing", 400));
     //}
     if (!email) {
       return next(new ErrorHandler("Email is missing", 400));
@@ -91,7 +91,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     const nameError = isValidLength(name);
     if (nameError) {
       return next(new ErrorHandler(nameError, 400));
-  }
+    }
 
     // Validate phone if both country code and phone are provided
     let cleanedPhone = null;
@@ -120,7 +120,6 @@ const registerUser = asyncHandler(async (req, res, next) => {
       cleanedPhone = phoneValidationResult.cleanedPhone;
       cleanedCountryCode = phoneValidationResult.cleanedCode;
     }
-
 
     // Validate email format
     if (!isValidEmail(email)) {
@@ -181,7 +180,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     });
 
     const userData = await User.findByPk(user.id, {
-      attributes: ["id", "name", "email", "isEmailVerified"]
+      attributes: ["id", "name", "email", "isEmailVerified"],
     });
 
     return res.status(201).json({
@@ -888,7 +887,6 @@ const resetPassword = asyncHandler(async (req, res, next) => {
 // --------------getUserByquery----------------------------------
 const getUserDetails = asyncHandler(async (req, res, next) => {
   try {
-    const userId = req.user?.id;
     const { type } = req.query;
 
     // Validate user authentication
@@ -1023,7 +1021,7 @@ const getInsta = asyncHandler(async (req, res, next) => {
 //--------------------Update user-----------------------------
 const updateUser = asyncHandler(async (req, res, next) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id || req.headers["userid"];
     if (!userId) {
       return next(new ErrorHandler("User ID is required", 400));
     }
@@ -1047,7 +1045,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
       bodyData.name &&
       (typeof bodyData.name !== "string" || bodyData.name.trim() === "")
     ) {
-      return next(new ErrorHandler("Please provide a valid name", 400));
+      return next(new ErrorHandler("Please pnew rovide a valid name", 400));
     }
 
     if (bodyData.address && typeof bodyData.address !== "object") {
@@ -1057,6 +1055,11 @@ const updateUser = asyncHandler(async (req, res, next) => {
     if (bodyData.userWebsites) {
       if (!Array.isArray(bodyData.userWebsites)) {
         return next(new ErrorHandler("User websites must be an array", 400));
+      }
+    }
+    if (bodyData.profileLayoutJson) {
+      if (typeof bodyData.profileLayoutJson !== "object") {
+        return next(new ErrorHandler("Profile layout must be a valid JSON object", 400));
       }
     }
 
@@ -1098,7 +1101,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
       updateData.professionalEmail = newEmail;
     }
     // Handle userImages - REPLACE instead of append
-    if (req.files?.userImages) {
+    if (req.files?.userImages && Array.isArray(req.files.userImages)) {
       const fileError = validateFiles(req.files.userImages, "user images");
       if (fileError) {
         return next(new ErrorHandler(fileError, 400));
@@ -1111,11 +1114,15 @@ const updateUser = asyncHandler(async (req, res, next) => {
           typeof currentUser.userImages === "string"
             ? JSON.parse(currentUser.userImages)
             : currentUser.userImages || [];
-
-        // Delete existing images from CDN
-        await Promise.all(
-          currentUserImages.map((img) => deleteFile(img.fileName))
-        );
+      
+        // Only delete images if there are any
+        if (Array.isArray(currentUserImages) && currentUserImages.length > 0) {
+          await Promise.all(
+            currentUserImages.map((img) => deleteFile(img.fileName))
+          );
+        } else {
+          console.log("No user images provided for update.");
+        }
       } catch (error) {
         console.error("Error parsing or deleting current userImages:", error);
       }
@@ -1143,10 +1150,12 @@ const updateUser = asyncHandler(async (req, res, next) => {
       }
 
       updateData.userImages = newUserImages;
+    }else {
+      console.info("No user images provided for update.");
     }
 
     // Handle companyImages - REPLACE instead of append
-    if (req.files?.companyImages) {
+    if (req.files?.companyImages && Array.isArray(req.files.companyImages)) {
       const fileError = validateFiles(
         req.files.companyImages,
         "company images"
@@ -1162,16 +1171,17 @@ const updateUser = asyncHandler(async (req, res, next) => {
           typeof currentUser.companyImages === "string"
             ? JSON.parse(currentUser.companyImages)
             : currentUser.companyImages || [];
-
-        // Delete existing images from CDN
-        await Promise.all(
-          currentCompanyImages.map((img) => deleteFile(img.fileName))
-        );
+      
+        // Only delete images if there are any
+        if (Array.isArray(currentCompanyImages) && currentCompanyImages.length > 0) {
+          await Promise.all(
+            currentCompanyImages.map((img) => deleteFile(img.fileName))
+          );
+        } else {
+          console.log("No company images provided for update.");
+        }
       } catch (error) {
-        console.error(
-          "Error parsing or deleting current companyImages:",
-          error
-        );
+        console.error("Error parsing or deleting current companyImages:", error);
       }
 
       // Upload new images
@@ -1197,6 +1207,8 @@ const updateUser = asyncHandler(async (req, res, next) => {
       }
 
       updateData.companyImages = newCompanyImages;
+    } else {
+      console.info("No company images provided for update.");
     }
 
     // Handle other fields
@@ -1209,7 +1221,16 @@ const updateUser = asyncHandler(async (req, res, next) => {
     if (bodyData.companyWebsite) {
       updateData.companyWebsite = bodyData.companyWebsite;
     }
+      // New handling for profileLayoutJson
+      if (bodyData.profileLayoutJson) {
+        console.log("line 1226",bodyData.profileLayoutJson);
+        
+        // Stringify the JSON object to ensure it's stored correctly
+        updateData.profileLayoutJSon =JSON.stringify(bodyData.profileLayoutJson);
+      }
 
+      console.log(updateData);
+      
     // Update user in database
     const [num, [updatedUser]] = await User.update(updateData, {
       where: { id: userId },
@@ -1236,6 +1257,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
         address: updatedUser.address,
         userWebsites: updatedUser.userWebsites,
         companyWebsite: updatedUser.companyWebsite,
+        profileLayoutJSon: updatedUser.profileLayoutJSon ? JSON.parse(updatedUser.profileLayoutJSon) : null,
         createdAt: updatedUser.createdAt,
         updatedAt: updatedUser.updatedAt,
       },
@@ -1363,75 +1385,178 @@ const logoutAll = asyncHandler(async (req, res, next) => {
 });
 
 //----------------get enduser details----------------------------------------
-const getEndUserDetails = asyncHandler(async (req, res, next) => {
+const getUserProfile = asyncHandler(async (req, res, next) => {
   try {
-    const id = req.user?.id;
-    const campaignID = req.params.campaignID;
-
+    const id = req.params?.id;
     // First, verify the user exists
     const user = await User.findByPk(id);
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
-
-    // Find the campaign and include its associated end users
-    const campaign = await Campaign.findOne({
-      where: { campaignID },
-      include: [
-        {
-          model: EndUser,
-          as: "endUsers",
-          through: {
-            attributes: [], // Exclude junction table attributes if not needed
-          },
-          attributes: [
-            "id",
-            "name",
-            "email",
-            "countryCode",
-            "phone",
-            "address",
-            "otherDetails",
-            "visitorIds",
-            "deviceId",
-            "appleUserId",
-            "googleUserId",
-            "isEmailVerified",
-            "authProvider",
-            "isInterestedProducts",
-            "contactInfo",
-            "createdAt",
-          ],
-        },
-      ],
-    });
-
-    // Check if the campaign exists and belongs to the user
-    if (!campaign) {
-      return next(new ErrorHandler("Campaign not found", 404));
-    }
-
-    // Optional: Additional check to ensure the campaign was created by the user
-    if (campaign.createdBy !== id) {
-      return next(
-        new ErrorHandler(
-          "Unauthorized to access this campaign's end users",
-          403
-        )
-      );
-    }
-
-    // Return the end users associated with this campaign
+   
     res.status(200).json({
       success: true,
-      count: campaign.endUsers.length,
-      endUsers: campaign.endUsers,
+      message:"User Profile Layout",
+      ProfileLayout:user.profileLayoutJSon,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
 });
 
+// ---------------save visitor and campaign id--------------------------------
+
+const saveVisitorAndCampaign = async (req, res) => {
+  const { visitorId, deviceId, campaignID } = req.body;
+  console.log("line 1437", visitorId);
+
+  // Validate required inputs
+  if (!campaignID) {
+    return res.status(400).json({
+      success: false,
+      error: "Campaign ID is required.",
+    });
+  }
+
+  // Validate input identifiers
+  if (!visitorId && !deviceId) {
+    return res.status(400).json({
+      success: false,
+      error: "Either visitorId or deviceId must be provided.",
+    });
+  }
+
+  // Start a database transaction for data integrity
+  const transaction = await sequelize.transaction();
+
+  try {
+    // Check if the campaign exists
+    const campaign = await Campaign.findByPk(campaignID, { transaction });
+    if (!campaign) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        error: "Campaign not found.",
+      });
+    }
+
+    // Construct search conditions for finding existing user
+    const findUserConditions = {
+      where: {
+        [Op.or]: [
+          ...(deviceId ? [{ deviceId: { [Op.contains]: [deviceId] } }] : []),
+          ...(visitorId
+            ? [{ visitorIds: { [Op.contains]: [visitorId] } }]
+            : []),
+        ],
+      },
+      transaction,
+    };
+
+    // Log the visitorIds condition
+    // const orConditions = findUserConditions.where[Op.or];
+    // if (orConditions) {
+    //   orConditions.forEach(condition => {
+    //     if (condition.visitorIds) {
+    //       console.log("Visitor IDs condition:", condition.visitorIds);
+    //       console.log("Visitor ID in [Op.contains]:", condition.visitorIds[Op.contains]);
+    //     }
+    //   });
+    // }
+
+    // Look for existing users with either deviceId or visitorId
+    let existingUser = await User.findOne(findUserConditions);
+    console.log("existingUser", existingUser);
+
+    // If user exists
+    if (existingUser) {
+      // Check if user is already associated with the campaign
+      const isCampaignAssociated =
+        existingUser.campaigns && existingUser.campaigns.length > 0;
+
+      if (isCampaignAssociated) {
+        // User is already associated with the campaign
+        return res.status(200).json({
+          success: true,
+          message: "User is already registered for this campaign.",
+          user: {
+            id: existingUser.id,
+            name: existingUser.name,
+            email: existingUser.email,
+            countryCode: existingUser.countryCode,
+            phone: existingUser.phone,
+          },
+          campaign: {
+            campaignID: campaign.campaignID,
+            name: campaign.name,
+          },
+        });
+      } else {
+        // Associate user with the new campaign
+        await existingUser.addCampaign(campaign, { transaction });
+        await transaction.commit();
+
+        return res.status(200).json({
+          success: true,
+          message: "Existing user associated with campaign.",
+          user: {
+            id: existingUser.id,
+            name: existingUser.name,
+            email: existingUser.email,
+            countryCode: existingUser.countryCode,
+            phone: existingUser.phone,
+          },
+          campaign: {
+            campaignID: campaign.campaignID,
+            name: campaign.name,
+          },
+        });
+      }
+    }
+
+    const validDeviceId =
+      deviceId && typeof deviceId === "string" ? [deviceId] : [];
+    const validVisitorId =
+      visitorId && typeof visitorId === "string" ? [visitorId] : [];
+
+    const newUser = await User.create(
+      {
+        deviceId: validDeviceId,
+        visitorIds: validVisitorId,
+      },
+      { transaction }
+    );
+
+    // Associate new user with campaign
+    await newUser.addCampaign(campaign, { transaction });
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "New user created and associated with campaign.",
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        countryCode: newUser.countryCode,
+        phone: newUser.phone,
+      },
+      campaign: {
+        campaignID: campaign.campaignID,
+        name: campaign.name,
+      },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error in saveVisitorAndCampaign:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "An error occurred while processing the request.",
+    });
+  }
+};
 
 module.exports = {
   registerUser,
@@ -1450,5 +1575,6 @@ module.exports = {
   getInsta,
   logout,
   logoutAll,
-  getEndUserDetails,
+  getUserProfile,
+  saveVisitorAndCampaign,
 };

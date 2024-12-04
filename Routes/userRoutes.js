@@ -13,18 +13,22 @@ const {
     getUserById,
     updateUser,
     deleteUser,           
-    getUserDetails,
+    // getUserDetails,
     getUserByToken,
     getInsta,
     logout,
     logoutAll,
-    getEndUserDetails
+    getUserProfile,
+    saveVisitorAndCampaign
 } = require("../Controller/userController");
-const {appleLogin,getUserByAppleUserId,applePhone}=require('../Controller/appleSigin')
-const {googleLogin,googlePhone}=require('../Controller/googleSignin')
+const {appleLogin}=require('../Controller/appleSigin')
+const {googleLogin}=require('../Controller/googleSignin')
 const { verifyJWt, authorize, verifySession } = require("../middleware/auth");
+const {getContactDetails}= require("../Controller/contactUsController");
 
 
+
+// registration main app api
 router.post("/register",registerUser)
 router.post("/sendOtp",sendOtp)
 router.post("/signUp", emailVerification)
@@ -34,10 +38,10 @@ router.post("/password/reset/:userId",resetPassword)
 router.get("/getById/:id",getUserById)
 router.post("/sendPhoneOtp",sendPhoneOtp)
 router.post("/phoneVerification", phoneVerification)
-router.get("/getUserDetails",verifyJWt,authorize(["USER"]),verifySession,getUserDetails)
+// router.get("/getUserDetails",verifyJWt,authorize(["USER"]),verifySession,getUserDetails)
 router.get("/getUserByToken",verifyJWt,authorize(["USER"]),verifySession,getUserByToken)
-// get end user details
-router.get("/getEndUserDetails/:campaignID",verifyJWt,authorize(["USER"]),verifySession,getEndUserDetails)
+// get user profile layout
+router.get("/getUserProfile/:id",getUserProfile)
 router.put('/updateUser', 
     verifyJWt,authorize(["USER"]), 
     upload.fields([
@@ -50,16 +54,19 @@ router.delete('/deleteUser',verifyJWt,authorize(["USER"]),deleteUser)
 // logout user from web
 router.delete('/logout',verifyJWt,authorize(["USER"]),logout)
 router.delete('/logoutAll',verifyJWt,authorize(["USER"]),logoutAll)
-
 // redirection from insta
 router.get("/redirect",getInsta)
 // Apple Sign In routes
 router.post('/appleSignin', appleLogin);
-router.get('/getUserByAppleUserId/:appleUserId',getUserByAppleUserId)
-router.post('/apple/phone',verifyJWt,authorize(["USER"]),applePhone)
+// router.get('/getUserByAppleUserId/:appleUserId',getUserByAppleUserId)
+// router.post('/apple/phone',verifyJWt,authorize(["USER"]),applePhone)
 
 // Google Sign In routes
 router.post('/googleSignin', googleLogin);
-router.post('/google/phone',verifyJWt,authorize(["USER"]),googlePhone)
+// router.post('/google/phone',verifyJWt,authorize(["USER"]),googlePhone)
+
+// save visitor Id
+router.post("/saveVisitorAndCampaign",saveVisitorAndCampaign)
+router.get("/getSubmittedContact/:campaignID",getContactDetails)
 
 module.exports = router;

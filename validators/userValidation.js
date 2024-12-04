@@ -85,92 +85,245 @@ const validateAppleToken = (idToken) => {
   }
 };
 
-// Helper function to create or update user
-const createOrUpdateUser = async (
+
+// Process User
+async function processUser({
+  existingUser,
+  decodedToken,
   email,
   name,
   appleUserId,
-  decodedAppleId,
-  decodedToken,
-  transaction // Pass the transaction object
-) => {
-  try {
-    // console.log("requestname", name);
+  deviceId,
+  visitorId,
+  campaignID,
+  transaction,
+}) {
+  let user;
+  let userStatus = "existing";
 
-    const appleId = appleUserId || decodedAppleId;
-    if (!appleId) {
-      return {
-        success: false,
-        status: 400,
-        message: "Apple User ID is required",
-      };
-    }
-
-    // Add detailed logging to understand the token structure
-    console.log("Decoded Token:", JSON.stringify(decodedToken, null, 2));
-
-    // Determine email with multiple fallback options
-    const userEmail = email || decodedToken.email;
-
-    // Validate email if provided
-    if (userEmail && !isValidEmail(userEmail)) {
-      return {
-        success: false,
-        status: 400,
-        message: "Invalid email format",
-      };
-    }
-
-    let user = await User.findOne({
-      where: { appleUserId: appleId },
-      transaction,
-    });
-
-    if (!user) {
-      const userName = name;
-      user = await User.create(
+  if (existingUser) {
+    // Scenario 1: User exists with visitorId, but has null email, name, and appleUserId
+    if (!existingUser.email && !existingUser.name && !existingUser.appleUserId) {
+      user = await updateUserWithAppleDetails(
+        existingUser,
         {
-          appleUserId: appleId,
-          email: userEmail,
-          name: userName,
-          isEmailVerified: decodedToken.email_verified || false,
-          authProvider: "apple",
-          IsActive: true,
+          appleUserId: decodedToken.sub,
+          email,
+          name,
+          deviceId,
+          visitorId,
         },
-        { transaction }
+        campaignID,
+        transaction
       );
-
-      if (!user) {
-        return {
-          success: false,
-          status: 500,
-          message: "Failed to create a new user",
-        };
-      }
+    } 
+    // Scenario 2: User exists with Apple User ID
+    else if (existingUser.appleUserId) {
+      user = await updateExistingUserWithAppleId(
+        existingUser,
+        { deviceId, visitorId },
+        transaction
+      );
+    } 
+    // Scenario 3: User exists without Apple User ID
+    else {
+      user = await updateUserWithAppleDetails(
+        existingUser,
+        {
+          appleUserId: decodedToken.sub,
+          email,
+          name,
+          deviceId,
+          visitorId,
+        },
+        campaignID,
+        transaction
+      );
     }
-
-    if (!user.IsActive) {
-      return {
-        success: false,
-        status: 403,
-        message: "User account is inactive",
-      };
-    }
-
-    return {
-      success: true,
-      data: user,
-    };
-  } catch (error) {
-    console.error("User creation/update error:", error);
-    throw error; // Ensure error bubbles up for transaction rollback
+  } else {
+    // Scenario 4: Create new user
+    user = await createNewUser(
+      {
+        appleUserId: decodedToken.sub,
+        email,
+        name,
+        deviceId,
+        visitorId,
+      },
+      campaignID,
+      transaction
+    );
+    userStatus = "new";
   }
-};
+
+  return [user, userStatus];
+}
+
+// Update Existing User with Apple ID
+async function updateExistingUserWithAppleId(
+  user,
+  { deviceId, visitorId },
+  transaction
+) {
+  const updates = {};
+
+  // Add unique device IDs
+  if (deviceId && !user.deviceId.includes(deviceId)) {
+    updates.deviceId = [...new Set([...user.deviceId, deviceId])];
+  }
+
+  // Add unique visitor IDs
+  if (visitorId && !user.visitorIds.includes(visitorId)) {
+    updates.visitorIds = [...new Set([...user.visitorIds, visitorId])];
+  }
+
+  // Update if there are changes
+  if (Object.keys(updates).length > 0) {
+    return await user.update(updates, { transaction });
+  }
+
+  return user;
+}
+
+// Update User with Apple Details
+async function updateUserWithAppleDetails(
+  user,
+  { appleUserId, email, name, deviceId, visitorId },
+  campaignID,
+  transaction
+) {
+  const updates = {
+    appleUserId,
+    ...(email && {
+      email: email.toLowerCase(),
+      isEmailVerified: true,
+    }),
+    ...(name && { name: name.trim() }),
+    deviceId: [...new Set([...user.deviceId, deviceId])],
+    visitorIds: visitorId
+      ? [...new Set([...user.visitorIds, visitorId])]
+      : user.visitorIds,
+  };
+
+  await user.update(updates, { transaction });
+
+  // Add campaign if not already associated
+  if (!user.campaigns || user.campaigns.length === 0) {
+    await user.addCampaign(campaignID, { transaction });
+  }
+
+  return user;
+}
+
+// Create New User
+async function createNewUser(
+  { appleUserId, email, name, deviceId, visitorId },
+  campaignID,
+  transaction
+) {
+  const user = await User.create(
+    {
+      appleUserId,
+      email: email?.trim().toLowerCase(),
+      name: name?.trim(),
+      authProvider: "apple",
+      deviceId: [deviceId],
+      visitorIds: visitorId ? [visitorId] : [],
+      isEmailVerified: !!email,
+    },
+    { transaction }
+  );
+
+  await user.addCampaign(campaignID, { transaction });
+  return user;
+}
+// Determine User Message
+function getUserMessage(userStatus) {
+  return userStatus === "new" ? "Signup successful" : "Login successful";
+}
+
+// Format User Response
+function formatUserResponse(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    appleUserId: user.appleUserId,
+    deviceId: user.deviceId,
+    visitorIds: user.visitorIds,
+    isEmailVerified: user.isEmailVerified,
+  };
+}
+
+// Process User
+async function processgmailUser(existingUser, googlePayload, campaignID, transaction) {
+  // Validate email if present
+  if (googlePayload.email && !isValidEmail(googlePayload.email)) {
+    throw new ErrorHandler("Invalid email format from Google account", 400);
+  }
+
+  let user;
+  if (!existingUser) {
+    // Create new user
+    try {
+      user = await User.create({
+        email: googlePayload.email,
+        name: googlePayload.name,
+        googleUserId: googlePayload.sub,
+        isEmailVerified: true,
+        authProvider: "google",
+        IsActive: true,
+      }, { transaction });
+    } catch (error) {
+      if (error.name === "SequelizeUniqueConstraintError") {
+        throw new ErrorHandler("Account already exists with this email", 409);
+      }
+      throw error;
+    }
+  } else {
+    // Update existing user
+    user = await updategmailExistingUser(existingUser, googlePayload, transaction);
+
+    // Check if user is active
+    if (!user.IsActive) {
+      throw new ErrorHandler("This account has been deactivated", 403);
+    }
+  }
+
+  return user;
+}
+
+// Update Existing User
+async function updategmailExistingUser(existingUser, googlePayload, transaction) {
+  return await existingUser.update({
+    googleUserId: googlePayload.sub,
+    name: existingUser.name || googlePayload.name,
+  }, { transaction });
+}
+
+// Format User Response
+function formatgmailUserResponse(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    isEmailVerified: user.isEmailVerified,
+    phone: user.phone,
+  };
+}
 
 module.exports = {
   generateToken,
   generateOtp,
   hashPassword,
   validateAppleToken,
-  createOrUpdateUser,
+  // createOrUpdateUser,
+  processUser,
+  updateExistingUserWithAppleId,
+  updateUserWithAppleDetails,
+  createNewUser,
+  getUserMessage,
+  formatUserResponse,
+  processgmailUser,
+  formatgmailUserResponse
 };

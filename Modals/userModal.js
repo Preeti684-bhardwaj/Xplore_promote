@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       name: DataTypes.STRING,
       email: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       professionalEmail: DataTypes.STRING,
       countryCode: {
@@ -26,6 +26,9 @@ module.exports = (sequelize, DataTypes) => {
       visitorIds:{
         type: DataTypes.ARRAY(DataTypes.STRING)
       },
+      deviceId: {
+        type:DataTypes.ARRAY(DataTypes.STRING),
+      },  
       userImages: {
         type:DataTypes.JSON
       },
@@ -47,14 +50,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
-      isEmailVerified: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-      },
-      isPhoneVerified: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false,
-      },
       appleUserId: {
         type: DataTypes.STRING,
         unique: true,
@@ -63,9 +58,20 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         unique: true,
       },
+      isEmailVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      isPhoneVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       authProvider: {
         type: DataTypes.ENUM('local', 'apple','google'),
         defaultValue: 'local',
+      },
+      profileLayoutJSon:{
+      type: DataTypes.JSON
       },
       createdAt: DataTypes.DATE,
       updatedAt: DataTypes.DATE,

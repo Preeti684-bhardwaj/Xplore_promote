@@ -14,7 +14,7 @@ const sequelize = new Sequelize(env.database, env.username, env.password, {
     idle: env.pool.idle,
   },
   dialectOptions: {
-      ssl: {
+      ssl:{
         require: true,
         rejectUnauthorized: false // Use this if you're using a self-signed certificate
       }
@@ -27,7 +27,7 @@ db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 // Import models
-db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
+// db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
 db.admins=require("../Modals/adminModal.js")(sequelize,Sequelize);
 db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
@@ -35,6 +35,7 @@ db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
 db.layouts = require("../Modals/layoutModal.js")(sequelize, Sequelize);
 db.assets = require("../Modals/assetStore.js")(sequelize, Sequelize);
 db.qrSessions = require("../Modals/qrSessionModal.js")(sequelize, Sequelize);
+db.contacts=require("../Modals/contactDetailModal.js")(sequelize, Sequelize);
 
 // Define relationships
 db.campaigns.hasMany(db.layouts, {
@@ -50,16 +51,16 @@ db.layouts.belongsTo(db.campaigns, {
 });
 
 // Establish relationship between Campaign and EndUser
-db.campaigns.belongsToMany(db.endUsers, {
+db.campaigns.belongsToMany(db.users, {
   through: 'CampaignEndUser', // Sequelize automatically manages this table
   foreignKey: 'campaignID',
-  otherKey: 'endUserID',
-  as: 'endUsers',
+  otherKey: 'userID',
+  as: 'users',
 });
 
-db.endUsers.belongsToMany(db.campaigns, {
+db.users.belongsToMany(db.campaigns, {
   through: 'CampaignEndUser',
-  foreignKey: 'endUserID',
+  foreignKey: 'userID',
   otherKey: 'campaignID',
   as: 'campaigns',
 });
@@ -76,18 +77,18 @@ db.endUsers.belongsToMany(db.campaigns, {
 //   onDelete: 'CASCADE' // Optional: deletes layout when advertisement is deleted
 // });
 
-// User-Campaign relationship
-db.users.hasMany(db.campaigns, {
-  foreignKey: 'createdBy',
-  as: 'campaigns',
-  onDelete: 'CASCADE' // Optional: deletes campaign when user is deleted
-});
+// contact-Campaign relationship
+// db.contacts.hasMany(db.campaigns, {
+//   foreignKey: "contactId",
+//   as: 'campaigns',
+//   onDelete: 'CASCADE' // Optional: deletes campaign when user is deleted
+// });
 
-db.campaigns.belongsTo(db.users, {
-  foreignKey: 'createdBy',
-  as: 'creator',
-  onDelete: 'CASCADE' // Optional: deletes campaign when user is deleted
-});
+// db.campaigns.belongsTo(db.contacts, {
+//   foreignKey: 'contactId',
+//   as: 'contact',
+//   onDelete: 'CASCADE' // Optional: deletes campaign when user is deleted
+// });
 
 // User-AssetStore relationship
 db.users.hasOne(db.assets, {
