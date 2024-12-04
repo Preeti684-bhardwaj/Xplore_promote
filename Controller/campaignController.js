@@ -171,7 +171,7 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
     // const { page, size, name, startDate, endDate, status } = req.query;
     const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
     const { limit, offset } = getPagination(page, size);
- const userID=req.user.id
+    const userID = req.user.id;
     // Build filter conditions
     const condition = {
       createdBy: req.user.id,
@@ -241,7 +241,7 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
     if (!req.params?.id) {
       return next(new ErrorHandler("Missing Campaign Id", 400));
     }
-
+    const userID = req.user?.id;
     const campaign = await Campaign.findOne({
       where: {
         campaignID: req.params?.id,
@@ -255,8 +255,8 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
         },
         {
           model: User,
-          as: "creator",
-          attributes: ["id", "name", "email", "isEmailVerified"],
+          as: "users",
+          through: { where: { userID } },
         },
       ],
       order: [[{ model: Layout, as: "layouts" }, "createdAt", "ASC"]],
@@ -354,7 +354,7 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
       if (bodyData.timing) {
         const timingErrors = validateTiming(bodyData.timing);
         if (timingErrors.length > 0) {
-          return next(new ErrorHandler(timingErrors.join(', '), 400));
+          return next(new ErrorHandler(timingErrors.join(", "), 400));
         }
 
         updateData.timing = { ...campaign.timing, ...bodyData.timing };
