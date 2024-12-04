@@ -13,6 +13,7 @@ const { verifyJWt, authorize, verifySession } = require("../middleware/auth");
 
 // Update routes to use upload middleware
 router.post("/uploadContent", verifyJWt,authorize(["USER"]),verifySession, upload.array('files'), uploadContent);
+router.post("/uploadImage",upload.array('files'), uploadContent);
 router.get("/getAssets", verifyJWt,authorize(["USER"]),verifySession,getUploadedAssets);
 router.delete("/deleteContentCdn", deleteContentCdn);
 router.delete("/deleteContent", verifyJWt,authorize(["USER"]),verifySession,deleteContent);
