@@ -119,7 +119,58 @@ const uploadContent = asyncHandler(async (req, res, next) => {
   }
 });
 
+const uploadImage = asyncHandler(async (req, res, next) => {
+  try {
+    // Validate file request
+    if (!req.files || req.files.length === 0) {
+      return next(new ErrorHandler("No files uploaded", 400));
+    }
 
+    // Validate file type and size if needed
+    const fileError = validateFiles(req.files);
+    if (fileError) {
+      return next(new ErrorHandler(fileError, 400));
+    }
+
+    // Array to store upload results
+    const uploadResults = [];
+
+    // Process each uploaded file
+    for (const file of req.files) {
+      try {
+        // Upload to CDN
+        const cdnResult = await uploadFile(file);
+
+        // Prepare upload result
+        const uploadData = {
+          fileName: cdnResult.filename,
+          originalName: cdnResult.originalName,
+          fileType: cdnResult.type,
+          fileSize: cdnResult.size,
+          cdnUrl: cdnResult.url,
+          uploadedAt: new Date().toISOString(),
+        };
+
+        uploadResults.push(uploadData);
+      } catch (uploadError) {
+        console.error(`Error uploading file ${file.originalname}:`, uploadError);
+        // Optional: you can choose to stop processing or continue
+        return next(new ErrorHandler(`Failed to upload ${file.originalname}`, 500));
+      }
+    }
+
+    // Respond with upload results
+    return res.status(200).json({
+      success: true,
+      message: `Successfully uploaded ${uploadResults.length} file(s)`,
+      data: uploadResults
+    });
+
+  } catch (error) {
+    console.error("Upload Content Error:", error);
+    return next(new ErrorHandler("Upload failed", 500));
+  }
+});
 
 
 // const uploadContent = asyncHandler(async (req, res, next) => {
@@ -359,5 +410,6 @@ module.exports = {
   getUploadedAssets,
   deleteContentCdn,
   deleteContent,
+  uploadImage,
   getFiles
 };
