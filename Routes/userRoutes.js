@@ -21,8 +21,8 @@ const {
     getUserProfile,
     saveVisitorAndCampaign
 } = require("../Controller/userController");
-const {appleLogin}=require('../Controller/appleSigin')
-const {googleLogin}=require('../Controller/googleSignin')
+const {appleLogin,googleLogin}=require('../Controller/MainUserController')
+// const {googleLogin}=require('../Controller/googleSignin')
 const { verifyJWt, authorize, verifySession } = require("../middleware/auth");
 const {getContactDetails}= require("../Controller/contactUsController");
 

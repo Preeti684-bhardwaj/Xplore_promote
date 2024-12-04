@@ -171,7 +171,7 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
     // const { page, size, name, startDate, endDate, status } = req.query;
     const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
     const { limit, offset } = getPagination(page, size);
-
+ const userID=req.user.id
     // Build filter conditions
     const condition = {
       createdBy: req.user.id,
@@ -196,8 +196,8 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
         },
         {
           model: User,
-          as: "creator",
-          attributes: ["id", "name", "email", "isEmailVerified"],
+          as: "users",
+          through: { where: { userID } },
         },
       ],
       order: [["createdDate", "DESC"]],

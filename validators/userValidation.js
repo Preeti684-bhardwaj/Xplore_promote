@@ -312,12 +312,87 @@ function formatgmailUserResponse(user) {
   };
 }
 
+
+const createOrUpdateUser = async (
+    email,
+    name,
+    appleUserId,
+    decodedAppleId,
+    decodedToken,
+    transaction // Pass the transaction object
+  ) => {
+    try {
+      const appleId = appleUserId || decodedAppleId;
+      if (!appleId) {
+        return {
+          success: false,
+          status: 400,
+          message: "Apple User ID is required",
+        };
+      }
+      // Add detailed logging to understand the token structure
+      console.log("Decoded Token:", JSON.stringify(decodedToken, null, 2));
+      // Determine email with multiple fallback options
+      const userEmail = email || decodedToken.email;
+      // Validate email if provided
+      if (userEmail && !isValidEmail(userEmail)) {
+        return {
+          success: false,
+          status: 400,
+          message: "Invalid email format",
+        };
+      }
+      let user = await User.findOne({
+        where: { appleUserId: appleId },
+        transaction,
+      });
+  
+      if (!user) {
+        const userName = name;
+        user = await User.create(
+          {
+            appleUserId: appleId,
+            email: userEmail,
+            name: userName,
+            isEmailVerified: decodedToken.email_verified || false,
+            authProvider: "apple",
+            IsActive: true,
+          },
+          { transaction }
+        );
+  
+        if (!user) {
+          return {
+            success: false,
+            status: 500,
+            message: "Failed to create a new user",
+          };
+        }
+      }
+      // Check if user is active
+      // if (!user.IsActive) {
+      //   return {
+      //     success: false,
+      //     status: 403,
+      //     message: "User account is inactive",
+      //   };
+      // }
+      return {
+        success: true,
+        data: user,
+      };
+    } catch (error) {
+      console.error("User creation/update error:", error);
+      throw error; // Ensure error bubbles up for transaction rollback
+    }
+  };
+
 module.exports = {
   generateToken,
   generateOtp,
   hashPassword,
   validateAppleToken,
-  // createOrUpdateUser,
+  createOrUpdateUser,
   processUser,
   updateExistingUserWithAppleId,
   updateUserWithAppleDetails,

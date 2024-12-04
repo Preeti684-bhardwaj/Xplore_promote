@@ -13,7 +13,7 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const { isValidEmail, isPhoneValid } = require("../validators/validation.js");
 const {
-  generateToken,
+  // generateToken,
   processgmailUser,
   formatgmailUserResponse,
 } = require("../validators/userValidation.js");
@@ -144,24 +144,24 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       campaignID,
       transaction
     );
-    // Generate authentication token
-    let accessToken;
-    try {
-      const tokenPayload = {
-        type: "USER",
-        obj: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          googleUserId: user.googleUserId,
-        },
-      };
-      accessToken = generateToken(tokenPayload);
-      console.log("Access token generated successfully.");
-    } catch (tokenGenerationError) {
-      console.error("Error generating token:", tokenGenerationError);
-       return next(new ErrorHandler("Error generating access token", 500));
-    }
+    // // Generate authentication token
+    // let accessToken;
+    // try {
+    //   const tokenPayload = {
+    //     type: "USER",
+    //     obj: {
+    //       id: user.id,
+    //       email: user.email,
+    //       name: user.name,
+    //       googleUserId: user.googleUserId,
+    //     },
+    //   };
+    //   accessToken = generateToken(tokenPayload);
+    //   console.log("Access token generated successfully.");
+    // } catch (tokenGenerationError) {
+    //   console.error("Error generating token:", tokenGenerationError);
+    //    return next(new ErrorHandler("Error generating access token", 500));
+    // }
     // Commit transaction
     await transaction.commit();
 
@@ -169,8 +169,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
     return res.status(200).json({
       status: true,
       message: existingUser ? "Login successful" : "Signup successful",
-      user: formatgmailUserResponse(user),
-      token: accessToken,
+      user: formatgmailUserResponse(user)
     });
   } catch (error) {
     // Rollback transaction

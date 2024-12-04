@@ -5,7 +5,7 @@ const { Op } = require("sequelize");
 const sequelize = db.sequelize;
 require("dotenv").config();
 const {
-  generateToken,
+  // generateToken,
   processUser,
   // generateUserToken,
   getUserMessage,
@@ -101,23 +101,23 @@ const appleLogin = asyncHandler(async (req, res, next) => {
       transaction,
     });
      // Generate authentication token
-     let accessToken;
-     try {
-       const tokenPayload = {
-         type: "USER",
-         obj: {
-           id: user.id,
-           email: user.email,
-           name: user.name,
-           appleUserId: user.appleUserId,
-         },
-       };
-       accessToken = generateToken(tokenPayload);
-       console.log("Access token generated successfully.");
-     } catch (tokenGenerationError) {
-       console.error("Error generating token:", tokenGenerationError);
-       return next(new ErrorHandler("Error generating access token", 500));
-     }
+    //  let accessToken;
+    //  try {
+    //    const tokenPayload = {
+    //      type: "USER",
+    //      obj: {
+    //        id: user.id,
+    //        email: user.email,
+    //        name: user.name,
+    //        appleUserId: user.appleUserId,
+    //      },
+    //    };
+    //   //  accessToken = generateToken(tokenPayload);
+    //   //  console.log("Access token generated successfully.");
+    //  } catch (tokenGenerationError) {
+    //    console.error("Error generating token:", tokenGenerationError);
+    //    return next(new ErrorHandler("Error generating access token", 500));
+    //  }
   
     // Commit transaction
     await transaction.commit();
@@ -127,8 +127,7 @@ const appleLogin = asyncHandler(async (req, res, next) => {
       success: true,
       message: getUserMessage(userStatus),
       data: {
-        user: formatUserResponse(user),
-        token: accessToken,
+        user: formatUserResponse(user)
       },
     });
   } catch (error) {

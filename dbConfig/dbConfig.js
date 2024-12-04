@@ -65,6 +65,17 @@ db.users.belongsToMany(db.campaigns, {
   as: 'campaigns',
 });
 
+ // If you want to track the creator separately
+//  db.campaigns.belongsTo(db.users, {
+//   foreignKey: 'createdBy',
+//   as: 'creator',
+// });
+
+// db.users.hasMany(db.campaigns, {
+//   foreignKey: 'createdBy',
+//   as: 'createdCampaigns',
+// });
+
 // db.advertisements.hasMany(db.layouts, {
 //   foreignKey: 'advertisementID',
 //   as: 'layouts',
@@ -78,7 +89,7 @@ db.users.belongsToMany(db.campaigns, {
 // });
 
 // contact-Campaign relationship
-// db.contacts.hasMany(db.campaigns, {
+// db.users.hasMany(db.campaigns, {
 //   foreignKey: "contactId",
 //   as: 'campaigns',
 //   onDelete: 'CASCADE' // Optional: deletes campaign when user is deleted
