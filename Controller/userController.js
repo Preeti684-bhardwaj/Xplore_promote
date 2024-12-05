@@ -1622,10 +1622,7 @@ const getUserShortUrl=asyncHandler(async (req, res, next) => {
     if (!userShortCode) {
       return next(new ErrorHandler("User Short Code not found", 404));
     }
-    return res.status(200).json({
-      success: true,
-      data: userShortCode.shortUrl,
-    });
+    return res.status(302).redirect(`https://pre.xplore.xircular.io/profile/${userShortCode.id}`);
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
