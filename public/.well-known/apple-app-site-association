@@ -10,6 +10,10 @@
                     {
                         "/": "/campaign/*",
                         "comment": "Matches any URL with a path that starts with /campaign/."
+                    },
+                    {
+                        "/": "/profile/*",
+                        "comment": "Matches any URL with a path that starts with /campaign/."
                     }
                 ]
             }
@@ -39,6 +43,10 @@
                 "components": [
                     {
                         "/": "/campaign/*",
+                        "comment": "Matches any URL with a path that starts with /campaign/."
+                    },
+                    {
+                        "/": "/profile/*",
                         "comment": "Matches any URL with a path that starts with /campaign/."
                     }
                 ]
