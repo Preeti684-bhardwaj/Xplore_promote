@@ -658,7 +658,9 @@ const getShortUrl=asyncHandler(async (req, res, next) => {
     if (!req.params?.shortCode) {
       return next(new ErrorHandler("Missing Short Code", 400));
     }
-    const campaignShortCode = await Campaign.findOne(req.params?.shortCode);
+    const campaignShortCode = await Campaign.findOne({
+      where: { shortCode: req.params.shortCode }
+    });
 
     if (!campaignShortCode) {
       return next(new ErrorHandler("Campaign Short Code not found", 404));

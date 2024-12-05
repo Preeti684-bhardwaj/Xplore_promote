@@ -1259,7 +1259,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
            where: {
              [Op.or]: [
                { shortCode: newShortCode },
-               { shortUrl: `http://xplr.live/${newShortCode}` }
+               { shortUrl: `http://xplr.live/profile/${newShortCode}` }
              ]
            }
          });
@@ -1273,7 +1273,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
        };
  
        shortCode = await generateUniqueShortCode();
-       shortUrl = `http://xplr.live/${shortCode}`;
+       shortUrl = `http://xplr.live/profile/${shortCode}`;
  
        updateData.shortCode = shortCode;
        updateData.shortUrl = shortUrl;
@@ -1617,7 +1617,7 @@ const getUserShortUrl=asyncHandler(async (req, res, next) => {
     if (!req.params?.shortCode) {
       return next(new ErrorHandler("Missing Short Code", 400));
     }
-    const userShortCode = await User.findOne(req.params?.shortCode);
+    const userShortCode = await User.findOne({where: { shortCode: req.params.shortCode }})
 
     if (!userShortCode) {
       return next(new ErrorHandler("User Short Code not found", 404));
