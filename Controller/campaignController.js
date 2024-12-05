@@ -1,6 +1,7 @@
 const db = require("../dbConfig/dbConfig.js");
 const Campaign = db.campaigns;
 const Layout = db.layouts;
+const { Op } = require("sequelize");
 const User = db.users;
 const { uploadFiles, deleteFile } = require("../utils/cdnImplementation.js");
 const {
