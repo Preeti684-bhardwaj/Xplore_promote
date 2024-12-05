@@ -314,6 +314,7 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
   try {
     let uploadedUrls = [];
     const campaignId = req.params?.id;
+    const userID=req.user?.id
 
     if (!campaignId) {
       return next(new ErrorHandler("Missing campaign Id", 400));
@@ -475,7 +476,11 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
             attributes: ["layoutID"],
             order: [["createdAt", "ASC"]],
           },
-          { model: User, as: "creator", attributes: ["id", "email"] },
+          {
+            model: User,
+            as: "users",
+            through: { where: { userID } },
+          },
         ],
       });
 
