@@ -17,4 +17,5 @@ router.get("/getOne/:id", verifyJWt,authorize(["USER"]),verifySession,getOneCamp
 router.put("/update/:id", verifyJWt,authorize(["USER"]),verifySession, upload.array('files'), updateCampaign);
 router.delete("/delete/:id", verifyJWt, authorize(["USER"]), verifySession,deleteCampaign);
 
+
 module.exports = router;

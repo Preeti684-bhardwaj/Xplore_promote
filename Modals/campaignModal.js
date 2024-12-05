@@ -51,6 +51,12 @@ module.exports = (sequelize, DataTypes) => {
       siteInfo: {
         type: DataTypes.JSON,
       },
+      shortUrl:{
+        type:DataTypes.STRING
+      },
+      shortCode:{
+        type:DataTypes.STRING
+      }
     },
     {
       timestamps: false, // Disable automatic createdAt and updatedAt fields

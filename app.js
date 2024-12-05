@@ -54,6 +54,8 @@ const campaignRouter = require('./Routes/campaignRoutes');
 const layoutRouter = require('./Routes/layoutRoutes');
 const contentRouter = require('./Routes/cdnRoutes');
 const qrRouter = require('./Routes/qrCodeRoutes');
+const {getShortUrl}=require('./Controller/campaignController')
+const {getUserShortUrl}=require('./Controller/userController')
 
 
 // Routes declaration
@@ -66,6 +68,8 @@ app.use("/v1/campaign", campaignRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
 app.use("/v1/qr", qrRouter);
+app.get("/:shortCode",getShortUrl);
+app.get("/profile/:shortCode",getUserShortUrl)
 
 // Middleware for error
 app.use(errorMiddleware);

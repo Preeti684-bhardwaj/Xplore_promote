@@ -373,7 +373,7 @@ const updateInterestedProduct = async (req, res, next) => {
 
   const getContactDetails = asyncHandler(async (req, res, next) => {
     try {
-      const id = req.user?.id ||req.headers["userid"];
+      const id = req.user?.id;
       const campaignID = req.params?.campaignID;
   
       // Pagination parameters

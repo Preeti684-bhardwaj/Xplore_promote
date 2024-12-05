@@ -13,6 +13,7 @@ const {
 } = require("../utils/campaignStatusManager.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
+const shortId = require("shortid");
 
 //--------------------Campaign operations----------------------------------
 const createCampaign = asyncHandler(async (req, res, next) => {
@@ -115,6 +116,21 @@ const createCampaign = asyncHandler(async (req, res, next) => {
         new ErrorHandler(`File upload failed: ${uploadError.message}`, 500)
       );
     }
+
+    // Generate short code
+    let shortCode = shortId.generate().toLowerCase();
+     // Ensure unique short code
+     const existingCode = await Campaign.findOne({ 
+      where: { 
+        shortCode:shortCode
+        } 
+    });
+    
+    if (existingCode) {
+      shortCode = shortId.generate().toLowerCase();
+    }
+     // Create short URL
+     const shortUrl = `http://xplr.live/${shortCode}`;
     // Prepare campaign data
     const campaignData = {
       name: data.name,
@@ -135,6 +151,7 @@ const createCampaign = asyncHandler(async (req, res, next) => {
       createdDate: new Date(),
       lastModifiedDate: new Date(),
       createdBy: req.user.id,
+      shortUrl:shortUrl,
       lastModifiedBy: req.user.id,
     };
     // Create campaign with transaction
@@ -636,10 +653,31 @@ const deleteCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
+const getShortUrl=asyncHandler(async (req, res, next) => {
+  try {
+    if (!req.params?.shortCode) {
+      return next(new ErrorHandler("Missing Short Code", 400));
+    }
+    const campaignShortCode = await Campaign.findOne(req.params?.shortCode);
+
+    if (!campaignShortCode) {
+      return next(new ErrorHandler("Campaign Short Code not found", 404));
+    }
+    return res.status(200).json({
+      success: true,
+      data: campaignShortCode.shortUrl,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+
+})
+
 module.exports = {
   createCampaign,
   getAllCampaign,
   getOneCampaign,
   updateCampaign,
   deleteCampaign,
+  getShortUrl
 };

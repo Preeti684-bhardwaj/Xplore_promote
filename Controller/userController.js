@@ -9,6 +9,7 @@ const sendEmail = require("../utils/sendEmail.js");
 const { phoneValidation } = require("../utils/phoneValidation.js");
 const { validateFiles } = require("../validators/campaignValidations.js");
 const { deleteQRSession } = require("../utils/qrService.js");
+const shortId = require("shortid");
 const {
   isValidEmail,
   isPhoneValid,
@@ -1245,7 +1246,39 @@ const updateUser = asyncHandler(async (req, res, next) => {
     }
 
     console.log(updateData);
-
+     // Handle shortCode and shortUrl generation
+     let shortCode = currentUser.shortCode;
+     let shortUrl = currentUser.shortUrl;
+ 
+     // If shortCode or shortUrl doesn't exist, generate new ones
+     if (!shortCode || !shortUrl) {
+       // Generate a new unique shortCode
+       const generateUniqueShortCode = async () => {
+         let newShortCode = shortId.generate().toLowerCase();
+         const existingUser = await User.findOne({
+           where: {
+             [Op.or]: [
+               { shortCode: newShortCode },
+               { shortUrl: `http://xplr.live/${newShortCode}` }
+             ]
+           }
+         });
+ 
+         // If shortCode or shortUrl already exists, regenerate
+         if (existingUser) {
+           return generateUniqueShortCode();
+         }
+ 
+         return newShortCode;
+       };
+ 
+       shortCode = await generateUniqueShortCode();
+       shortUrl = `http://xplr.live/${shortCode}`;
+ 
+       updateData.shortCode = shortCode;
+       updateData.shortUrl = shortUrl;
+     }
+ 
     // Update user in database
     const [num, [updatedUser]] = await User.update(updateData, {
       where: { id: userId },
@@ -1275,6 +1308,8 @@ const updateUser = asyncHandler(async (req, res, next) => {
         profileLayoutJSon: updatedUser.profileLayoutJSon
           ? JSON.parse(updatedUser.profileLayoutJSon)
           : null,
+        shortCode:shortCode,
+        shortUrl:shortUrl,
         createdAt: updatedUser.createdAt,
         updatedAt: updatedUser.updatedAt,
       },
@@ -1576,6 +1611,27 @@ const saveVisitorAndCampaign = async (req, res) => {
   }
 };
 
+
+const getUserShortUrl=asyncHandler(async (req, res, next) => {
+  try {
+    if (!req.params?.shortCode) {
+      return next(new ErrorHandler("Missing Short Code", 400));
+    }
+    const userShortCode = await User.findOne(req.params?.shortCode);
+
+    if (!userShortCode) {
+      return next(new ErrorHandler("User Short Code not found", 404));
+    }
+    return res.status(200).json({
+      success: true,
+      data: userShortCode.shortUrl,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+
+})
+
 module.exports = {
   registerUser,
   phoneVerification,
@@ -1595,4 +1651,5 @@ module.exports = {
   logoutAll,
   getUserProfile,
   saveVisitorAndCampaign,
+  getUserShortUrl
 };

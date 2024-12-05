@@ -73,6 +73,12 @@ module.exports = (sequelize, DataTypes) => {
       profileLayoutJSon:{
       type: DataTypes.JSON
       },
+      shortUrl:{
+        type:DataTypes.STRING
+      },
+      shortCode:{
+        type:DataTypes.STRING
+      },
       createdAt: DataTypes.DATE,
       updatedAt: DataTypes.DATE,
     });
