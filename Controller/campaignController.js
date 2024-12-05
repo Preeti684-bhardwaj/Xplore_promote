@@ -341,7 +341,8 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
         return next(new ErrorHandler(`Maximum ${1} files allowed`, 400));
       }
       try {
-        uploadedUrls = await uploadFiles(req.files);
+        // Directly assign to uploadedUrls which is now defined in the outer scope
+        uploadedUrls.push(...(await uploadFiles(req.files)));
         updateData.images = [...(campaign.images || []), ...uploadedUrls];
       } catch (uploadError) {
         console.error("File upload error:", uploadError);
