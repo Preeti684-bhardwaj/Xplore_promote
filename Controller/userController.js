@@ -727,9 +727,9 @@ const loginUser = async (req, res, next) => {
     const obj = {
       type: "USER",
       obj: {
-              id: user.id,
-              email: user.email,
-              name: user.name
+        id: user.id,
+        email: user.email,
+        name: user.name,
       },
     };
     const accessToken = generateToken(obj);
@@ -1411,10 +1411,11 @@ const getUserProfile = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("User not found", 404));
     }
 
+    const profileLayout = JSON.parse(user.profileLayoutJSon);
     res.status(200).json({
       success: true,
       message: "User Profile Layout",
-      ProfileLayout: user.profileLayoutJSon,
+      ProfileLayout: profileLayout,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
