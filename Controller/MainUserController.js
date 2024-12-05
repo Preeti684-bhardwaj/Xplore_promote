@@ -81,7 +81,11 @@ const appleLogin = asyncHandler(async (req, res, next) => {
     console.log("appleUserId", decodedToken.sub);
     const obj = {
       type: "USER",
-      obj: user,
+      obj:{
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
     };
   
     const accessToken = generateToken(obj);
@@ -191,7 +195,11 @@ const googleLogin =asyncHandler(async (req, res,next) => {
   
       const obj = {
         type: "USER",
-        obj: user,
+        obj:{
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
       };
       const accessToken = generateToken(obj);
       // Return response

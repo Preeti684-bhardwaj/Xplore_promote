@@ -16,7 +16,7 @@ const sequelize = new Sequelize(env.database, env.username, env.password, {
   dialectOptions: {
       ssl:{
         require: true,
-        rejectUnauthorized: false // Use this if you're using a self-signed certificate
+        rejectUnauthorized: false
       }
   }
 });
