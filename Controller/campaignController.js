@@ -666,10 +666,7 @@ const getShortUrl=asyncHandler(async (req, res, next) => {
     if (!campaignShortCode) {
       return next(new ErrorHandler("Campaign Short Code not found", 404));
     }
-    return res.status(200).json({
-      success: true,
-      data: campaignShortCode.shortUrl,
-    });
+    return res.status(302).redirect(`https://pre.xplore.xircular.io/campaign/${campaignShortCode.campaignID}`);
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
