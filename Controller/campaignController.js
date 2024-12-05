@@ -151,6 +151,7 @@ const createCampaign = asyncHandler(async (req, res, next) => {
       createdDate: new Date(),
       lastModifiedDate: new Date(),
       createdBy: req.user.id,
+      shortCode:shortCode,
       shortUrl:shortUrl,
       lastModifiedBy: req.user.id,
     };
