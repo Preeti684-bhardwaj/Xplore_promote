@@ -425,6 +425,39 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
 
     delete updateData.createdBy;
     delete updateData.campaignID;
+      // Handle shortCode and shortUrl generation
+      let shortCode = campaign.shortCode;
+      let shortUrl = campaign.shortUrl;
+  
+      // If shortCode or shortUrl doesn't exist, generate new ones
+      if (!shortCode || !shortUrl) {
+        // Generate a new unique shortCode
+        const generateUniqueShortCode = async () => {
+          let newShortCode = shortId.generate().toLowerCase();
+          const existingUser = await Campaign.findOne({
+            where: {
+              [Op.or]: [
+                { shortCode: newShortCode },
+                { shortUrl: `http://xplr.live/${newShortCode}` }
+              ]
+            }
+          });
+  
+          // If shortCode or shortUrl already exists, regenerate
+          if (existingUser) {
+            return generateUniqueShortCode();
+          }
+  
+          return newShortCode;
+        };
+  
+        shortCode = await generateUniqueShortCode();
+        shortUrl = `http://xplr.live/${shortCode}`;
+  
+        updateData.shortCode = shortCode;
+        updateData.shortUrl = shortUrl;
+      }
+  
 
     const [updated] = await Campaign.update(updateData, {
       where: { campaignID: req.params.id },
