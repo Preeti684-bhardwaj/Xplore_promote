@@ -131,7 +131,7 @@ const createCampaign = asyncHandler(async (req, res, next) => {
       shortCode = shortId.generate().toLowerCase();
     }
      // Create short URL
-     const shortUrl = `http://xplr.live/${shortCode}`;
+     const shortUrl = `https://xplr.live/${shortCode}`;
     // Prepare campaign data
     const campaignData = {
       name: data.name,
@@ -441,7 +441,7 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
             where: {
               [Op.or]: [
                 { shortCode: newShortCode },
-                { shortUrl: `http://xplr.live/${newShortCode}` }
+                { shortUrl: `https://xplr.live/${newShortCode}` }
               ]
             }
           });
@@ -455,7 +455,7 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
         };
   
         shortCode = await generateUniqueShortCode();
-        shortUrl = `http://xplr.live/${shortCode}`;
+        shortUrl = `https://xplr.live/${shortCode}`;
   
         updateData.shortCode = shortCode;
         updateData.shortUrl = shortUrl;

@@ -1261,7 +1261,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
            where: {
              [Op.or]: [
                { shortCode: newShortCode },
-               { shortUrl: `http://xplr.live/profile/${newShortCode}` }
+               { shortUrl: `https://xplr.live/profile/${newShortCode}` }
              ]
            }
          });
@@ -1275,7 +1275,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
        };
  
        shortCode = await generateUniqueShortCode();
-       shortUrl = `http://xplr.live/profile/${shortCode}`;
+       shortUrl = `https://xplr.live/profile/${shortCode}`;
  
        updateData.shortCode = shortCode;
        updateData.shortUrl = shortUrl;
