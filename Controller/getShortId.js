@@ -1,6 +1,7 @@
 const db = require("../dbConfig/dbConfig.js");
 const User = db.users;
 const Campaign = db.campaigns;
+const Layout = db.layouts;
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
