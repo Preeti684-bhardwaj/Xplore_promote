@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const env = {
   database: process.env.DATABASE,
-  username: "xploreuser",
+  username: "xploreliveuser",
   password: process.env.PASSWORD,
   host: process.env.HOST,
   dialect: process.env.DIALECT,
@@ -12,7 +12,7 @@ const env = {
     acquire: 90000,
     idle: 30000,
   },
-  port: 5432,
+  port: 5433,
 };
 
 module.exports = env;
