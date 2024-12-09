@@ -24,7 +24,10 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
           success: true,
           message: "User Profile Layout",
           type: "profile",
-          ProfileLayout: profileLayout,
+          profile:{
+            id:userShortCode.id,
+            layouts:[profileLayout],
+          }
         });
       }
   
@@ -52,9 +55,12 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
           success: true,
           message: "Campaign Layouts",
           type: "campaign",
-          totalItems: data.count,
-          layouts: data.rows,
-          initialLayout: initialLayout || null,
+          campaign:{
+            id:campaignID,
+            totalItems: data.count,
+            layouts: data.rows,
+            initialLayout: initialLayout || null,
+          }
         });
       }
   
