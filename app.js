@@ -54,6 +54,7 @@ const campaignRouter = require('./Routes/campaignRoutes');
 const layoutRouter = require('./Routes/layoutRoutes');
 const contentRouter = require('./Routes/cdnRoutes');
 const qrRouter = require('./Routes/qrCodeRoutes');
+const {getLayoutByShortCode}=require('./Controller/getShortId')
 
 
 
@@ -67,6 +68,7 @@ app.use("/v1/campaign", campaignRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
 app.use("/v1/qr", qrRouter);
+app.use("/v1/layout",getLayoutByShortCode)
 
 // Middleware for error
 app.use(errorMiddleware);
