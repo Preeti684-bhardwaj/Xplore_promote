@@ -101,9 +101,15 @@ const getAllLayout = asyncHandler(async (req, res, next) => {
   if (!campaignID) {
     return next(new ErrorHandler("Missing Campaign Id", 400));
   }
+  const campaign = await Campaign.findOne({
+    where: { campaignID: campaignID }
+  });
+  if(!campaign){
+    return next(new ErrorHandler("Campaign not found with this campaignID",404));
+  }
   // Create a condition to filter by campaignID and optionally by name
   const condition = {
-    campaignID: campaignID, // Include campaignID in the condition
+    campaignID: campaign.campaignID, // Include campaignID in the condition
   };
 
   try {
@@ -263,6 +269,52 @@ const deleteLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
+const getAllLayoutByShortCode = asyncHandler(async (req, res, next) => {
+  // const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
+  // const { limit, offset } = getPagination(page, size);
+
+  // Get the campaignID from request parameters
+  const campaignShortCode = req.params?.shortCode;
+  if (!campaignShortCode) {
+    return next(new ErrorHandler("Missing Campaign Code", 400));
+  }
+  const campaign = await Campaign.findOne({
+    where: { shortCode: campaignShortCode }
+  });
+  if(!campaign){
+    return next(new ErrorHandler("Campaign not found with this shortId",404));
+  }
+  const campaignID=campaign.campaignID
+  // Create a condition to filter by campaignID and optionally by name
+  const condition = {
+    campaignID: campaignID, // Include campaignID in the condition
+  };
+
+  try {
+    const data = await Layout.findAndCountAll({
+      where: condition,
+      include: [
+        { model: Campaign, as: "campaign", attributes: ["campaignID"] },
+      ],
+      order: [["createdAt", "ASC"]],
+    });
+    console.log(data.rows);
+    // Find the initial layout from the results
+    const initialLayout = data.rows.find((layout) => layout.isInitial === true);
+
+    return res.status(200).json({
+      success: true,
+      totalItems: data.count,
+      layouts: data.rows,
+      initialLayout: initialLayout || null, // Include the initial layout in response
+    });
+  } catch (error) {
+    console.error("Error fetching layouts:", error);
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+
 module.exports = {
   createLayout,
   getAllLayout,
@@ -270,4 +322,5 @@ module.exports = {
   getOneLayout,
   updateLayout,
   deleteLayout,
+  getAllLayoutByShortCode
 };

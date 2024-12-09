@@ -26,10 +26,12 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const axios = require("axios");
 // const {
+//   RequestError,
 //   FingerprintJsServerApiClient,
+//   TooManyRequestsError,
 //   Region
-// } =require('@fingerprintjs/fingerprintjs-pro-server-api')
-// const {FINGERPRINT_SECRETKEY,FINGERPRINT_REGION} = process.env
+// }  =require('@fingerprintjs/fingerprintjs-pro-server-api')
+// const {FINGERPRINT_SECRETKEY} = process.env
 require("dotenv").config();
 const {
   KALEYRA_BASE_URL,
@@ -48,7 +50,7 @@ const KALEYRA_CONFIG = {
 
 // const client = new FingerprintJsServerApiClient({
 //   apiKey:FINGERPRINT_SECRETKEY,
-//   region:Region.AP,
+//   region: Region.AP,
 // })
 
 // // // Get visit history of a specific visitor
@@ -1481,6 +1483,30 @@ const saveVisitorAndCampaign = async (req, res) => {
 
   // Start a database transaction for data integrity
   const transaction = await sequelize.transaction();
+  // try {
+  //   const visitorHistory = await client.getVisitorHistory(visitorId, {
+  //     limit: 10,
+  //   });
+  //   console.log(JSON.stringify(visitorHistory, null, 2));
+  //   console.log(response.response)
+  // } catch (error) {
+  //   // Ensure these error classes are imported or defined
+  //   if (error && typeof error === 'object') {
+  //     console.error('Error retrieving visitor history:', error);
+      
+  //     // More generic error handling
+  //     if (error.status) {
+  //       console.log('Error status:', error.status);
+  //     }
+      
+  //     // Check for rate limiting specifically
+  //     if (error.code === 'TOO_MANY_REQUESTS') {
+  //       // Implement retry logic
+  //       console.log('Rate limit exceeded. Retry after:', error.retryAfter);
+  //       // Implement retryLater or use a retry mechanism
+  //     }
+  //   }
+  // }
 
   try {
     // Check if the campaign exists
@@ -1622,7 +1648,13 @@ const getUserShortUrl=asyncHandler(async (req, res, next) => {
     if (!userShortCode) {
       return next(new ErrorHandler("User Short Code not found", 404));
     }
-    return res.status(302).redirect(`https://pre.xplore.xircular.io/profile/${userShortCode.id}`);
+    const profileLayout = JSON.parse(userShortCode.profileLayoutJSon);
+    res.status(200).json({
+      success: true,
+      message: "User Profile Layout",
+      type:"profile",
+      ProfileLayout: profileLayout,
+    });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }

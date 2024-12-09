@@ -20,6 +20,7 @@ const {
   logoutAll,
   getUserProfile,
   saveVisitorAndCampaign,
+  getUserShortUrl
 } = require("../Controller/userController");
 const { appleLogin, googleLogin } = require("../Controller/MainUserController");
 // const {googleLogin}=require('../Controller/googleSignin')
@@ -74,5 +75,5 @@ router.post("/googleSignin", googleLogin);
 // save visitor Id
 router.post("/saveVisitorAndCampaign", saveVisitorAndCampaign);
 router.get("/getSubmittedContact/:campaignID", verifyJWt,authorize(["USER"]),verifySession, getContactDetails);
-
+router.get("/profileLayout/:shortCode",getUserShortUrl)
 module.exports = router;

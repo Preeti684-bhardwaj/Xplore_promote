@@ -6,7 +6,8 @@ const {
     getOneLayout,
     getAllLayoutName,   
     updateLayout,
-    deleteLayout
+    deleteLayout,
+    getAllLayoutByShortCode
 } = require("../Controller/layoutController");
 const { verifyJWt,verifySession,authorize } = require("../middleware/auth");
 
@@ -17,5 +18,6 @@ router.get("/getAllLayoutName/:campaignID",getAllLayoutName)
 router.get("/getOne/:id",getOneLayout)
 router.put("/update/:id",verifyJWt,authorize(["USER"]),verifySession,updateLayout)
 router.delete("/delete/:id",verifyJWt,authorize(["USER"]),verifySession,deleteLayout)
+router.get("/getLayout/:shortCode",getAllLayoutByShortCode);
 
 module.exports = router;
