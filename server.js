@@ -45,6 +45,7 @@ passport.use('jwt', strategy);
 // database connection
 db.sequelize.sync({ alter: true })
     .then(() => {
+      // server connection
         const server = app.listen(process.env.PORT || 9190, () => {
             console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
         });
