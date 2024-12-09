@@ -17,6 +17,9 @@ module.exports = (sequelize, DataTypes) => {
       images: {
         type:DataTypes.ARRAY(DataTypes.JSON)
       },
+      createdBy: {
+        type: DataTypes.STRING,
+      },
       createdDate: {
         type: DataTypes.DATE,
       },
@@ -28,6 +31,10 @@ module.exports = (sequelize, DataTypes) => {
       },
       timing: {
         type: DataTypes.JSON,
+      },
+      campaignStatus: {
+        type: DataTypes.ENUM('Starting Soon','Upcoming', 'Ongoing','Completed','Ending Soon'),
+        defaultValue: 'Upcoming',
       },
       status: {
         type: DataTypes.JSON,
@@ -44,6 +51,12 @@ module.exports = (sequelize, DataTypes) => {
       siteInfo: {
         type: DataTypes.JSON,
       },
+      shortUrl:{
+        type:DataTypes.STRING
+      },
+      shortCode:{
+        type:DataTypes.STRING
+      }
     },
     {
       timestamps: false, // Disable automatic createdAt and updatedAt fields

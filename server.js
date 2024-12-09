@@ -3,13 +3,14 @@ const db = require("./dbConfig/dbConfig.js")
 require("dotenv").config({path:"./.env"})
 const passport = require('passport');
 const passportJWT = require('passport-jwt');
-const setupSocket = require('./Controller/socketSetup.js');
+const setupSocket = require('./utils/socketSetup.js');
 
 process.on("uncaughtException" , (err)=>{
     console.log(`Error: ${err.message}`)
     console.log(`Shutting down the server due to uncaught Exception`)
     process.exit(1)
 })
+
 // jwt verification 
 let ExtractJwt = passportJWT.ExtractJwt;
 let JwtStrategy = passportJWT.Strategy;
@@ -20,7 +21,7 @@ jwtOptions.secretOrKey = process.env.JWT_SECRET;
 jwtOptions.passReqToCallback = true;
 
 let strategy = new JwtStrategy(jwtOptions, function (req, jwt_payload, done) {
-  var Model = jwt_payload.obj.type === 'USER' ? db.users : null;
+  var Model = jwt_payload.obj.type === 'USER' ? db.users :  db.admins;
   
   Model.findOne({ where: { id: jwt_payload.obj.obj.id } })
     .then(user => {
@@ -41,12 +42,12 @@ let strategy = new JwtStrategy(jwtOptions, function (req, jwt_payload, done) {
 
 passport.use('jwt', strategy);
 
+
 // connectDB()
 // database connection
 db.sequelize.sync({ alter: true })
     .then(() => {
-      // server connection
-        const server = app.listen(process.env.PORT || 9190, () => {
+        const server = app.listen(process.env.PORT || 9191, () => {
             console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
         });
 

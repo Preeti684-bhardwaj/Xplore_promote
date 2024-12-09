@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { generateQR, verifyQRLogin } = require('../Controller/qrCodeController');
-const { verifyJWt } = require("../middleware/auth");
+const { generateQR, verifyQRLogin,getQrSession } = require('../Controller/qrCodeController');
+const { verifyJWt ,authorize, verifyUserAgent} = require("../middleware/auth");
 
-router.post('/generate', generateQR);
-router.post('/verify', verifyJWt,verifyQRLogin);
+router.post('/generate',verifyUserAgent,generateQR);
+router.post('/verify', verifyJWt,authorize(["USER"]),verifyQRLogin);
+router.get('/getSessions',verifyJWt,authorize(["USER"]),getQrSession)
 
 module.exports = router;

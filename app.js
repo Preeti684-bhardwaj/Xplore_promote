@@ -4,12 +4,14 @@ require("dotenv").config({ path: "./.env" });
 const app = express();
 const cors = require("cors");
 const path = require("path");
+const errorMiddleware = require("./middleware/Error")
 
 // Define the allowed origins
 const allowedOrigins = [
     "https://xplore-instant.vercel.app",
     "https://pre.xplore.xircular.io",
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "https://xplr.live"
 ];
 
 // Configure CORS middleware
@@ -45,21 +47,31 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes Imports
 const userRouter = require("./Routes/userRoutes");
+const adminRouter = require("./Routes/adminRoutes");
+const endUserRouter = require("./Routes/endUserRoutes");
 const notificationRouter = require("./Routes/notificationRoutes");
 const campaignRouter = require('./Routes/campaignRoutes');
 // const advertisementRouter = require('./Routes/advertisementRoutes');
 const layoutRouter = require('./Routes/layoutRoutes');
 const contentRouter = require('./Routes/cdnRoutes');
 const qrRouter = require('./Routes/qrCodeRoutes');
+const {getLayoutByShortCode}=require('./Controller/getShortId')
+
 
 
 // Routes declaration
 app.use("/v1/user", userRouter);
+app.use("/v1/admin", adminRouter);
+app.use("/v1/endUser", endUserRouter);
 app.use("/v1/apple", notificationRouter);
 app.use("/v1/campaign", campaignRouter);
 // app.use("/v1/advertisement", advertisementRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
 app.use("/v1/qr", qrRouter);
+app.use("/v1/viewLayout/:shortCode",getLayoutByShortCode)
+
+// Middleware for error
+app.use(errorMiddleware);
 
 module.exports = app;

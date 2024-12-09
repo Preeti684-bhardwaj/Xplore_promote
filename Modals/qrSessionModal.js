@@ -8,6 +8,13 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false,
         },
+        os:{
+            type: DataTypes.STRING
+        },
+        isActiveSession:{
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
         createdAt: {
             type: DataTypes.DATE,
             allowNull: false,
