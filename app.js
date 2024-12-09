@@ -68,7 +68,7 @@ app.use("/v1/campaign", campaignRouter);
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
 app.use("/v1/qr", qrRouter);
-app.use("/v1/viewLayout",getLayoutByShortCode)
+app.use("/v1/viewLayout/:shortCode",getLayoutByShortCode)
 
 // Middleware for error
 app.use(errorMiddleware);
