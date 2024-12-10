@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const db = require("../dbConfig/dbConfig");
 const {
-  createQRSession,
+  // createQRSession,
   getQRSession,
   deleteQRSession,
 //   isSocketConnected

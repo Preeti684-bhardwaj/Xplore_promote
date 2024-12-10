@@ -104,7 +104,7 @@ const deleteQRSession = async (channel, userId) => {
 
 module.exports = {
   isSocketConnected,
-  createQRSession,
+  // createQRSession,
   getQRSession,
   deleteQRSession,
 };
