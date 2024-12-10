@@ -17,6 +17,8 @@ const setupSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
+    console.log(`New connection from ${socket.handshake.headers.origin}`);
+    
     console.log("Client connected:", socket.id);
 
     socket.on("join-qr-channel", (channel) => {
