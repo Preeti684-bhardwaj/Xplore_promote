@@ -27,7 +27,23 @@ const generateQR = asyncHandler(async (req, res, next) => {
     const os = req.userOS;
 
     // Store QR session
-    await createQRSession(channelHash, token, os);
+    // await createQRSession(channelHash, token, os);
+    try {
+      await db.qrSessions.create({
+        channel:channelHash,
+        token:token,
+        os:os,
+        createdAt: new Date(),
+      });
+    } catch (error) {
+      console.error(`Failed to create QR session: ${error.message}`, {
+        channel,
+        token,
+        os,
+        errorStack: error.stack
+      });
+      return next(new ErrorHandler(error.message, 500));
+    }
 
     return res.status(200).json({
       success: true,
