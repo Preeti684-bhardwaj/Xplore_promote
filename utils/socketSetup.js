@@ -1,10 +1,10 @@
 const socketIO = require("socket.io");
 
 const allowedOrigins = [
-  "https://xplore-instant.vercel.app",
-  "https://pre.xplore.xircular.io",
+  // "https://xplore-instant.vercel.app",
+  // "https://pre.xplore.xircular.io",
+  "https://xplr.live",
   "http://localhost:5173",
-  "https://xplr.live"
 ];
 
 const setupSocket = (server) => {
