@@ -1,2 +1,4 @@
 /node_modules
 .env
+new_xplore_dumpfile.dump
+db_backup.dump

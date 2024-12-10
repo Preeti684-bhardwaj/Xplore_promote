@@ -10,7 +10,8 @@ const errorMiddleware = require("./middleware/Error")
 const allowedOrigins = [
     "https://xplore-instant.vercel.app",
     "https://pre.xplore.xircular.io",
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "https://xplr.live"
 ];
 
 // Configure CORS middleware
