@@ -12,7 +12,7 @@ const env = {
     acquire: 90000,
     idle: 30000,
   },
-  port: 5433,
+  port: 5432,
 };
 
 module.exports = env;

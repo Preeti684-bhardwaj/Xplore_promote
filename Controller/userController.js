@@ -689,7 +689,7 @@ const emailVerification = asyncHandler(async (req, res, next) => {
 
 //------------login user----------------------------------
 
-const loginUser = async (req, res, next) => {
+const loginUser = asyncHandler(async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -762,7 +762,7 @@ const loginUser = async (req, res, next) => {
       )
     );
   }
-};
+});
 
 // ---------------FORGET PASSWORD-----------------------------------------------------
 const forgotPassword = asyncHandler(async (req, res, next) => {
@@ -1461,7 +1461,7 @@ const getUserProfile = asyncHandler(async (req, res, next) => {
 
 // ---------------save visitor and campaign id--------------------------------
 
-const saveVisitorAndCampaign = async (req, res) => {
+const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
   const { visitorId, deviceId, campaignID } = req.body;
   console.log("line 1437", visitorId);
 
@@ -1635,7 +1635,7 @@ const saveVisitorAndCampaign = async (req, res) => {
       error: "An error occurred while processing the request.",
     });
   }
-};
+});
 
 
 const getUserShortUrl=asyncHandler(async (req, res, next) => {
