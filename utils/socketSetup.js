@@ -1,9 +1,10 @@
 const socketIO = require("socket.io");
 
 const allowedOrigins = [
-  "https://xplore-instant.vercel.app",
-  "https://pre.xplore.xircular.io",
-  "http://localhost:5173"
+  // "https://xplore-instant.vercel.app",
+  // "https://pre.xplore.xircular.io",
+  "https://xplr.live",
+  "http://localhost:5173",
 ];
 
 const setupSocket = (server) => {
@@ -16,6 +17,8 @@ const setupSocket = (server) => {
   });
 
   io.on("connection", (socket) => {
+    console.log(`New connection from ${socket.handshake.headers.origin}`);
+    
     console.log("Client connected:", socket.id);
 
     socket.on("join-qr-channel", (channel) => {

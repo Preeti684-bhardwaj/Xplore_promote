@@ -6,14 +6,26 @@ const isSocketConnected = (io, channel) => {
   return !!room && room.size > 0;
 };
 
-const createQRSession = async (channel, token, os) => {
-  await db.qrSessions.create({
-    channel,
-    token,
-    os,
-    createdAt: new Date(),
-  });
-};
+// const createQRSession = async (channel, token, os) => {
+//   try {
+//     await db.qrSessions.create({
+//       channel,
+//       token,
+//       os,
+//       createdAt: new Date(),
+//     });
+//   } catch (error) {
+//     console.error(`Failed to create QR session: ${error.message}`, {
+//       channel,
+//       token,
+//       os,
+//       errorStack: error.stack
+//     });
+    
+//     // Optionally, you might want to rethrow the error or handle it differently
+//     throw error;
+//   }
+// };
 
 const getQRSession = async (channel, userId) => {
   const channelData = await db.qrSessions.findOne({
@@ -92,7 +104,7 @@ const deleteQRSession = async (channel, userId) => {
 
 module.exports = {
   isSocketConnected,
-  createQRSession,
+  // createQRSession,
   getQRSession,
   deleteQRSession,
 };
