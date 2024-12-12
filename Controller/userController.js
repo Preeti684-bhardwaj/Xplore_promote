@@ -718,23 +718,34 @@ const loginUser = asyncHandler(async (req, res, next) => {
     if (!isPasswordMatched) {
       return next(new ErrorHandler("Invalid password", 400));
     }
-
-    if (!user.isEmailVerified) {
-      return next(
-        new ErrorHandler("Please verify your OTP before logging in", 403)
-      );
+    if (user.role !== "CLIENT") {
+      if (!user.isEmailVerified) {
+        return next(
+          new ErrorHandler("Please verify your OTP before logging in", 403)
+        );
+      }
     }
-
     console.log(user);
-
-    const obj = {
-      type: "USER",
-      obj: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      },
-    };
+    let obj;
+    if (user.role !== "CLIENT") {
+      obj = {
+        type: "USER",
+        obj: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      };
+    } else {
+      obj = {
+        type: "CLIENT",
+        obj: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      };
+    }
     const accessToken = generateToken(obj);
 
     // const loggedInUser = await User.findByPk(user.id, {
@@ -1248,39 +1259,39 @@ const updateUser = asyncHandler(async (req, res, next) => {
     }
 
     console.log(updateData);
-     // Handle shortCode and shortUrl generation
-     let shortCode = currentUser.shortCode;
-     let shortUrl = currentUser.shortUrl;
- 
-     // If shortCode or shortUrl doesn't exist, generate new ones
-     if (!shortCode || !shortUrl) {
-       // Generate a new unique shortCode
-       const generateUniqueShortCode = async () => {
-         let newShortCode = shortId.generate().toLowerCase();
-         const existingUser = await User.findOne({
-           where: {
-             [Op.or]: [
-               { shortCode: newShortCode },
-               { shortUrl: `https://xplr.live/profile/${newShortCode}` }
-             ]
-           }
-         });
- 
-         // If shortCode or shortUrl already exists, regenerate
-         if (existingUser) {
-           return generateUniqueShortCode();
-         }
- 
-         return newShortCode;
-       };
- 
-       shortCode = await generateUniqueShortCode();
-       shortUrl = `https://xplr.live/profile/${shortCode}`;
- 
-       updateData.shortCode = shortCode;
-       updateData.shortUrl = shortUrl;
-     }
- 
+    // Handle shortCode and shortUrl generation
+    let shortCode = currentUser.shortCode;
+    let shortUrl = currentUser.shortUrl;
+
+    // If shortCode or shortUrl doesn't exist, generate new ones
+    if (!shortCode || !shortUrl) {
+      // Generate a new unique shortCode
+      const generateUniqueShortCode = async () => {
+        let newShortCode = shortId.generate().toLowerCase();
+        const existingUser = await User.findOne({
+          where: {
+            [Op.or]: [
+              { shortCode: newShortCode },
+              { shortUrl: `https://xplr.live/profile/${newShortCode}` },
+            ],
+          },
+        });
+
+        // If shortCode or shortUrl already exists, regenerate
+        if (existingUser) {
+          return generateUniqueShortCode();
+        }
+
+        return newShortCode;
+      };
+
+      shortCode = await generateUniqueShortCode();
+      shortUrl = `https://xplr.live/profile/${shortCode}`;
+
+      updateData.shortCode = shortCode;
+      updateData.shortUrl = shortUrl;
+    }
+
     // Update user in database
     const [num, [updatedUser]] = await User.update(updateData, {
       where: { id: userId },
@@ -1310,8 +1321,8 @@ const updateUser = asyncHandler(async (req, res, next) => {
         profileLayoutJSon: updatedUser.profileLayoutJSon
           ? JSON.parse(updatedUser.profileLayoutJSon)
           : null,
-        shortCode:shortCode,
-        shortUrl:shortUrl,
+        shortCode: shortCode,
+        shortUrl: shortUrl,
         createdAt: updatedUser.createdAt,
         updatedAt: updatedUser.updatedAt,
       },
@@ -1493,12 +1504,12 @@ const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
   //   // Ensure these error classes are imported or defined
   //   if (error && typeof error === 'object') {
   //     console.error('Error retrieving visitor history:', error);
-      
+
   //     // More generic error handling
   //     if (error.status) {
   //       console.log('Error status:', error.status);
   //     }
-      
+
   //     // Check for rate limiting specifically
   //     if (error.code === 'TOO_MANY_REQUESTS') {
   //       // Implement retry logic
@@ -1637,13 +1648,14 @@ const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
   }
 });
 
-
-const getUserShortUrl=asyncHandler(async (req, res, next) => {
+const getUserShortUrl = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.shortCode) {
       return next(new ErrorHandler("Missing Short Code", 400));
     }
-    const userShortCode = await User.findOne({where: { shortCode: req.params.shortCode }})
+    const userShortCode = await User.findOne({
+      where: { shortCode: req.params.shortCode },
+    });
 
     if (!userShortCode) {
       return next(new ErrorHandler("User Short Code not found", 404));
@@ -1652,14 +1664,13 @@ const getUserShortUrl=asyncHandler(async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: "User Profile Layout",
-      type:"profile",
+      type: "profile",
       ProfileLayout: profileLayout,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
-
-})
+});
 
 module.exports = {
   registerUser,
@@ -1680,5 +1691,5 @@ module.exports = {
   logoutAll,
   getUserProfile,
   saveVisitorAndCampaign,
-  getUserShortUrl
+  getUserShortUrl,
 };

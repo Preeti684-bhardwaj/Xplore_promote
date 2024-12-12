@@ -14,10 +14,10 @@ const sequelize = new Sequelize(env.database, env.username, env.password, {
     idle: env.pool.idle,
   },
   dialectOptions: {
-      ssl:{
-       require: true,
-       rejectUnauthorized: false
-    }
+    //   ssl:{
+    //    require: true,
+    //    rejectUnauthorized: false
+    // }
   // ssl: false,
   }
 });

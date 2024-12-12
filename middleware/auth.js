@@ -1,5 +1,6 @@
 const db = require("../dbConfig/dbConfig");
 const User = db.users;
+const Admin=db.admins;
 // const EndUser = db.endUsers;
 const QrSession = db.qrSessions;
 const jwt = require("jsonwebtoken");
@@ -62,6 +63,64 @@ const verifyJWt = async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 };
+
+// -------------verify admin-----------------------------
+const verifyAdmin = async (req, res, next) => {
+  try {
+    console.log(req.headers);
+
+    // Get the token from Authorization header
+    const bearerHeader = req.headers["authorization"];
+
+    // Check if bearer header exists
+    if (!bearerHeader) {
+      return next(new ErrorHandler("Access Denied.", 401));
+    }
+
+    // Extract the token
+    // Format in Postman: "Bearer eyJhbGciOiJIUzI1NiIs..."
+    const token = bearerHeader.replace("Bearer ", "").trim();
+
+    if (!token) {
+      return next(new ErrorHandler("Access Denied. Token is required.", 401));
+    }
+
+    // Verify token
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    req.decodedToken = decodedToken;
+
+    // Get user ID from token
+    const userId = decodedToken.obj.obj.id;
+
+    // Find admin
+    const admin = await Admin.findOne({
+      where: { id: userId },
+      attributes: { exclude: ["password"] },
+    });
+
+    if (!admin) {
+      return next(new ErrorHandler("Invalid token or admin not found", 401));
+    }
+
+    // Determine platform and OS
+    // const userAgent = req.headers["user-agent"];
+    // const platform = getPlatform(userAgent);
+
+    // Attach info to request
+    // req.platform = platform;
+    req.admin = admin;
+    // req.token = token;
+    console.log(req.admin);
+
+    next();
+  } catch (error) {
+    if(error.message == "jwt expired"){
+      return next(new ErrorHandler("Token expired", 401));
+    }
+    return next(new ErrorHandler(error.message, 500));
+  }
+};
+// ---------------verify enduser---------------------------
 const verifyEndUser = async (req, res, next) => {
   try {
     console.log(req.headers);
@@ -177,4 +236,4 @@ const verifySession = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyJWt,verifyEndUser, authorize, verifyUserAgent, verifySession };
+module.exports = { verifyJWt,verifyAdmin,verifyEndUser, authorize, verifyUserAgent, verifySession };
