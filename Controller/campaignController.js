@@ -118,20 +118,26 @@ const createCampaign = asyncHandler(async (req, res, next) => {
       );
     }
 
+    // Define a new character set without special characters
+    const customChars =
+      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    shortid.characters(customChars);
+
     // Generate short code
-    let shortCode = shortId.generate().toLowerCase();
-     // Ensure unique short code
-     const existingCode = await Campaign.findOne({ 
-      where: { 
-        shortCode:shortCode
-        } 
+    let shortCode = shortid.generate().toLowerCase();
+
+    // Ensure unique short code
+    const existingCode = await Campaign.findOne({
+      where: {
+        shortCode: shortCode,
+      },
     });
-    
+
     if (existingCode) {
-      shortCode = shortId.generate().toLowerCase();
+      shortCode = shortid.generate().toLowerCase();
     }
-     // Create short URL
-     const shortUrl = `https://xplr.live/${shortCode}`;
+    // Create short URL
+    const shortUrl = `https://xplr.live/${shortCode}`;
     // Prepare campaign data
     const campaignData = {
       name: data.name,
@@ -152,8 +158,8 @@ const createCampaign = asyncHandler(async (req, res, next) => {
       createdDate: new Date(),
       lastModifiedDate: new Date(),
       createdBy: req.user.id,
-      shortCode:shortCode,
-      shortUrl:shortUrl,
+      shortCode: shortCode,
+      shortUrl: shortUrl,
       lastModifiedBy: req.user.id,
     };
     // Create campaign with transaction
@@ -314,7 +320,7 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
   try {
     let uploadedUrls = [];
     const campaignId = req.params?.id;
-    const userID=req.user?.id
+    const userID = req.user?.id;
 
     if (!campaignId) {
       return next(new ErrorHandler("Missing campaign Id", 400));
@@ -428,39 +434,43 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
 
     delete updateData.createdBy;
     delete updateData.campaignID;
-      // Handle shortCode and shortUrl generation
-      let shortCode = campaign.shortCode;
-      let shortUrl = campaign.shortUrl;
-  
-      // If shortCode or shortUrl doesn't exist, generate new ones
-      if (!shortCode || !shortUrl) {
-        // Generate a new unique shortCode
-        const generateUniqueShortCode = async () => {
-          let newShortCode = shortId.generate().toLowerCase();
-          const existingUser = await Campaign.findOne({
-            where: {
-              [Op.or]: [
-                { shortCode: newShortCode },
-                { shortUrl: `https://xplr.live/${newShortCode}` }
-              ]
-            }
-          });
-  
-          // If shortCode or shortUrl already exists, regenerate
-          if (existingUser) {
-            return generateUniqueShortCode();
-          }
-  
-          return newShortCode;
-        };
-  
-        shortCode = await generateUniqueShortCode();
-        shortUrl = `https://xplr.live/${shortCode}`;
-  
-        updateData.shortCode = shortCode;
-        updateData.shortUrl = shortUrl;
-      }
-  
+
+    // Define a custom character set without special characters
+    const customChars =
+      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    shortId.characters(customChars);
+    // Handle shortCode and shortUrl generation
+    let shortCode = campaign.shortCode;
+    let shortUrl = campaign.shortUrl;
+
+    // If shortCode or shortUrl doesn't exist, generate new ones
+    if (!shortCode || !shortUrl) {
+      // Generate a new unique shortCode
+      const generateUniqueShortCode = async () => {
+        let newShortCode = shortId.generate().toLowerCase();
+        const existingUser = await Campaign.findOne({
+          where: {
+            [Op.or]: [
+              { shortCode: newShortCode },
+              { shortUrl: `https://xplr.live/${newShortCode}` },
+            ],
+          },
+        });
+
+        // If shortCode or shortUrl already exists, regenerate
+        if (existingUser) {
+          return generateUniqueShortCode();
+        }
+
+        return newShortCode;
+      };
+
+      shortCode = await generateUniqueShortCode();
+      shortUrl = `https://xplr.live/${shortCode}`;
+
+      updateData.shortCode = shortCode;
+      updateData.shortUrl = shortUrl;
+    }
 
     const [updated] = await Campaign.update(updateData, {
       where: { campaignID: req.params.id },
@@ -694,24 +704,27 @@ const deleteCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
-const getShortUrl=asyncHandler(async (req, res, next) => {
+const getShortUrl = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.shortCode) {
       return next(new ErrorHandler("Missing Short Code", 400));
     }
     const campaignShortCode = await Campaign.findOne({
-      where: { shortCode: req.params.shortCode }
+      where: { shortCode: req.params.shortCode },
     });
 
     if (!campaignShortCode) {
       return next(new ErrorHandler("Campaign Short Code not found", 404));
     }
-    return res.status(302).redirect(`https://pre.xplore.xircular.io/campaign/${campaignShortCode.campaignID}`);
+    return res
+      .status(302)
+      .redirect(
+        `https://pre.xplore.xircular.io/campaign/${campaignShortCode.campaignID}`
+      );
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
-
-})
+});
 
 module.exports = {
   createCampaign,
@@ -719,5 +732,5 @@ module.exports = {
   getOneCampaign,
   updateCampaign,
   deleteCampaign,
-  getShortUrl
+  getShortUrl,
 };
