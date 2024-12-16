@@ -99,7 +99,7 @@ const adminSignin = asyncHandler(async (req, res, next) => {
     }
     const isPasswordValid = await bcrypt.compare(password, admin.password);
     if (!isPasswordValid) {
-      returnres
+      return res
         .status(400)
         .send({ status: false, message: "Invalid password." });
     }
