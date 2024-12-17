@@ -14,6 +14,12 @@ const minioClient = new Minio.Client({
 
 const bucketName = process.env.BUCKET_NAME;
 
+// New CDN configuration
+const cdnConfig = {
+  domain: process.env.CDN_DOMAIN || process.env.ENDPOINT, // Fallback to endpoint if no CDN domain
+  enabled: process.env.CDN_ENABLED === 'true' || false
+};
+
 // Verify MinIO connection and bucket
 const verifyMinioConnection = async () => {
   try {
@@ -37,7 +43,14 @@ const generateUniqueFileName = (originalName) => {
   return `${timestamp}-${randomString}${extension}`;
 };
 
-// Upload a single file
+// Enhanced URL generation with CDN support
+const generateFileUrl = (fileName) => {
+  // If CDN is enabled, use CDN domain, otherwise fallback to original endpoint
+  const domain = cdnConfig.enabled ? cdnConfig.domain : process.env.ENDPOINT;
+  return `https://${domain}/${fileName}`;
+};
+
+// Upload a single file (modified to use new URL generation)
 const uploadFile = async (file) => {
   try {
     // Verify connection before upload
@@ -76,16 +89,16 @@ const uploadFile = async (file) => {
       }
     }
 
-    // Generate URL
-    const cdnEndpoint = process.env.ENDPOINT;
-    const fileUrl = `https://${cdnEndpoint}/${bucketName}/${fileName}`;
+    // Generate URL using new method
+    const fileUrl = generateFileUrl(fileName);
     
     return {
       url: fileUrl,
       filename: fileName,
       originalName: file.originalname,
       size: file.buffer.length,
-      mimetype: file.mimetype || 'application/octet-stream'
+      mimetype: file.mimetype || 'application/octet-stream',
+      cdnEnabled: cdnConfig.enabled
     };
   } catch (error) {
     console.error('Error uploading file:', error);
@@ -134,7 +147,6 @@ const deleteFile = async (fileName) => {
   }
 };
 
-// List all files in bucket
 const listFiles = async (prefix = '') => {
   try {
     await verifyMinioConnection();
@@ -148,7 +160,8 @@ const listFiles = async (prefix = '') => {
           name: obj.name,
           size: obj.size,
           lastModified: obj.lastModified,
-          url: `https://${process.env.ENDPOINT}/${bucketName}/${obj.name}`
+          url: generateFileUrl(obj.name),
+          cdnEnabled: cdnConfig.enabled
         });
       });
       

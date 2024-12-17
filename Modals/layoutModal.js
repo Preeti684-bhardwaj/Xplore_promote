@@ -13,6 +13,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSON,
         allowNull: false,
       },
+      cdnDetails:{
+        type: DataTypes.JSON,
+      },
       isInitial: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
