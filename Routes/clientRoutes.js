@@ -6,6 +6,7 @@ const {
 const {
   loginUser
 } = require("../Controller/userController");
+const {exportContactsToExcel}=require("../Controller/contactUsController")
 const {verifyJWt,authorize } = require("../middleware/auth");
 const { getContactDetails } = require("../Controller/adminController");
 
@@ -16,5 +17,6 @@ router.post("/login", loginUser);
 router.get("/getAll", verifyJWt,authorize(["CLIENT"]),getAllAssignedCampaign);
 // -----------------get campaign analytics-------------------------------------
 router.get("/getSubmittedContact/:campaignID", verifyJWt,authorize(["CLIENT"]), getContactDetails);
+router.get('/export-contacts/:campaignID', exportContactsToExcel);
 
 module.exports = router;

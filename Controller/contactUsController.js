@@ -1,4 +1,5 @@
 const db = require("../dbConfig/dbConfig.js");
+const ExcelJS = require('exceljs');
 const Contact = db.contacts;
 const User = db.users;
 const Campaign = db.campaigns;
@@ -418,4 +419,76 @@ const getContactDetails = asyncHandler(async (req, res, next) => {
   }
 });
 
-module.exports = { contactUs, updateInterestedProduct, getContactDetails };
+const exportContactsToExcel = asyncHandler(async (req, res, next) => {
+  try {
+    const campaignID = req.params?.campaignID;
+
+    // Find the campaign to ensure it exists
+    const campaign = await Campaign.findByPk(campaignID);
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    // Fetch all contacts for the campaign
+    const contacts = await Contact.findAll({
+      where: { campaignId: campaignID },
+      order: [["createdAt", "DESC"]],
+    });
+
+    // Create a new workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Campaign Contacts');
+
+    // Add headers
+    worksheet.columns = [
+      { header: 'Name', key: 'name', width: 20 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Phone', key: 'phone', width: 15 },
+      { header: 'Interested Products', key: 'interestedProducts', width: 30 }
+    ];
+
+    // Add rows
+    contacts.forEach(contact => {
+      worksheet.addRow({
+        name: contact.name || 'N/A',
+        email: contact.email || 'N/A',
+        phone: contact.countryCode && contact.phone 
+          ? `+${contact.countryCode} ${contact.phone}` 
+          : 'N/A',
+        interestedProducts: contact.isInterestedProducts 
+          ? contact.isInterestedProducts.filter(p => p !== 'null').join(', ') 
+          : 'N/A'
+      });
+    });
+
+    // Style the header row
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'F0F0F0' }
+      };
+    });
+
+    // Set response headers for Excel download
+    res.setHeader(
+      'Content-Type', 
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition', 
+      `attachment; filename=campaign_contacts_${campaignID}.xlsx`
+    );
+
+    // Write the workbook to the response
+    await workbook.xlsx.write(res);
+    
+    // End the response
+    res.end();
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+module.exports = { contactUs, updateInterestedProduct, getContactDetails,exportContactsToExcel };
