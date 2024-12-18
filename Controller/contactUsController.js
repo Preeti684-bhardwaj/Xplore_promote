@@ -1,6 +1,6 @@
 const db = require("../dbConfig/dbConfig.js");
 const Contact = db.contacts;
-const User=db.users;
+const User = db.users;
 const Campaign = db.campaigns;
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
@@ -233,193 +233,189 @@ const contactUs = asyncHandler(async (req, res, next) => {
 
 // // ----isInterestedProducts--------------------------------
 const updateInterestedProduct = async (req, res, next) => {
-    const transaction = await sequelize.transaction();
-  
-    try {
-      const { visitorId, email, deviceId, productName, campaignID } = req.body;
-  
-      // Validate required inputs
-      if (!visitorId && !deviceId && !email) {
-        return next(
-          new ErrorHandler("Either deviceId, visitorId, or email is required", 400)
-        );
-      }
-  
-      if (!productName) {
-        return next(new ErrorHandler("Product name is required", 400));
-      }
-  
-      if (!campaignID) {
-        return next(new ErrorHandler("Campaign ID is required", 400));
-      }
-  
-      // Check if campaign exists
-      const campaign = await Campaign.findByPk(campaignID, { transaction });
-      if (!campaign) {
-        await transaction.rollback();
-        return next(new ErrorHandler("Campaign not found", 404));
-      }
-  
-      // Build the query conditions
-      const whereConditions = [];
-  
-      // Add conditions based on available identifiers
-      if (visitorId) {
-        whereConditions.push({ visitorIds: { [Op.contains]: [visitorId] } });
-      }
-      if (deviceId) {
-        whereConditions.push({ deviceId: { [Op.contains]: [deviceId] } });
-      }
-      if (email) {
-        whereConditions.push({ email: email.toLowerCase().trim() });
-      }
-  
-      // Find all contacts matching the conditions for this campaign
-      const contacts = await Contact.findAll({
-        where: {
-          [Op.and]: [
-            { 
-              [Op.or]: whereConditions 
-            },
-            { campaignId: campaignID }
-          ]
-        },
-        transaction,
-      });
-  
-      // If no contacts exist, create a new one
-      if (contacts.length === 0) {
-        const newContact = await Contact.create({
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { visitorId, email, deviceId, productName, campaignID } = req.body;
+
+    // Validate required inputs
+    if (!visitorId && !deviceId && !email) {
+      return next(
+        new ErrorHandler(
+          "Either deviceId, visitorId, or email is required",
+          400
+        )
+      );
+    }
+
+    if (!productName) {
+      return next(new ErrorHandler("Product name is required", 400));
+    }
+
+    if (!campaignID) {
+      return next(new ErrorHandler("Campaign ID is required", 400));
+    }
+
+    // Check if campaign exists
+    const campaign = await Campaign.findByPk(campaignID, { transaction });
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    // Build the query conditions
+    const whereConditions = [];
+
+    // Add conditions based on available identifiers
+    if (visitorId) {
+      whereConditions.push({ visitorIds: { [Op.contains]: [visitorId] } });
+    }
+    if (deviceId) {
+      whereConditions.push({ deviceId: { [Op.contains]: [deviceId] } });
+    }
+    if (email) {
+      whereConditions.push({ email: email.toLowerCase().trim() });
+    }
+
+    // Find all contacts matching the conditions for this campaign
+    const contacts = await Contact.findAll({
+      where: {
+        [Op.and]: [
+          {
+            [Op.or]: whereConditions,
+          },
+          { campaignId: campaignID },
+        ],
+      },
+      transaction,
+    });
+
+    // If no contacts exist, create a new one
+    if (contacts.length === 0) {
+      const newContact = await Contact.create(
+        {
           name: null,
           email: email ? email.toLowerCase().trim() : null,
           visitorIds: visitorId ? [visitorId] : [],
           deviceId: deviceId ? [deviceId] : [],
           campaignId: campaignID,
           isInterestedProducts: [productName],
-        }, { transaction });
-  
-        await transaction.commit();
-        return res.status(200).json({
-          success: true,
-          message: "New contact created with product interest",
-          data: {
-            isInterestedProducts: newContact.isInterestedProducts,
-          },
-        });
-      }
-  
-      // Track if any updates were made
-      let updatedContacts = [];
-  
-      // Process each existing contact
-      for (const contact of contacts) {
-        let currentProducts = contact.isInterestedProducts || [];
-  
-        // Check if product name already exists
-        if (currentProducts.includes(productName)) {
-          continue; // Skip this contact if product is already in the list
-        }
-  
-        // Update the array with the new product name
-        const updatedProducts = [...currentProducts, productName];
-  
-        // Prepare update object
-        const updateData = {
-          isInterestedProducts: updatedProducts,
-        };
-  
-        // Add visitorId if not exists
-        if (visitorId && !contact.visitorIds.includes(visitorId)) {
-          updateData.visitorIds = [...new Set([...contact.visitorIds, visitorId])];
-        }
-  
-        // Add deviceId if not exists
-        if (deviceId && !contact.deviceId.includes(deviceId)) {
-          updateData.deviceId = [...new Set([...contact.deviceId, deviceId])];
-        }
-  
-        // Add email if not exists and provided
-        if (email && !contact.email) {
-          updateData.email = email.toLowerCase().trim();
-        }
-  
-        // Update the contact record
-        const updatedContact = await contact.update(updateData, { transaction });
-        updatedContacts.push(updatedContact);
-      }
-  
-      // Commit transaction
+        },
+        { transaction }
+      );
+
       await transaction.commit();
-  
       return res.status(200).json({
         success: true,
-        message: updatedContacts.length > 0 
-          ? "Product interest updated for existing contacts" 
-          : "Product interest already exists for all contacts",
+        message: "New contact created with product interest",
         data: {
-          updatedContactsCount: updatedContacts.length,
-          isInterestedProducts: updatedContacts.length > 0 
-            ? updatedContacts[0].isInterestedProducts 
-            : null,
+          isInterestedProducts: newContact.isInterestedProducts,
         },
       });
-    } catch (error) {
-      // Rollback transaction in case of error
-      await transaction.rollback();
-      console.error("Error updating product interest:", error);
-      return next(new ErrorHandler(error.message, 500));
     }
-  };
 
-  const getContactDetails = asyncHandler(async (req, res, next) => {
-    try {
-      const id = req.user?.id;
-      const campaignID = req.params?.campaignID;
-  
-      // Pagination parameters
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const offset = (page - 1) * limit;
-  
-      // First, verify the user exists
-      const user = await User.findByPk(id);
-      if (!user) {
-        return next(new ErrorHandler("User not found", 404));
+    // Track if any updates were made
+    let updatedContacts = [];
+
+    // Process each existing contact
+    for (const contact of contacts) {
+      let currentProducts = contact.isInterestedProducts || [];
+
+      // Check if product name already exists
+      if (currentProducts.includes(productName)) {
+        continue; // Skip this contact if product is already in the list
       }
-  
-      // Find the campaign to ensure it exists
-      const campaign = await Campaign.findByPk(campaignID);
-      if (!campaign) {
-        return next(new ErrorHandler("Campaign not found", 404));
+
+      // Update the array with the new product name
+      const updatedProducts = [...currentProducts, productName];
+
+      // Prepare update object
+      const updateData = {
+        isInterestedProducts: updatedProducts,
+      };
+
+      // Add visitorId if not exists
+      if (visitorId && !contact.visitorIds.includes(visitorId)) {
+        updateData.visitorIds = [
+          ...new Set([...contact.visitorIds, visitorId]),
+        ];
       }
-      if(campaign.createdBy!==id){
-        return next(new ErrorHandler("Unauthorized to access the resource",401));
+
+      // Add deviceId if not exists
+      if (deviceId && !contact.deviceId.includes(deviceId)) {
+        updateData.deviceId = [...new Set([...contact.deviceId, deviceId])];
       }
-  
-      // Find contacts with pagination
-      const { count, rows: contacts } = await Contact.findAndCountAll({
-        where: { campaignId: campaignID },
-        limit: limit,
-        offset: offset,
-        order: [['createdAt', 'DESC']], // Optional: sort by creation date
-      });
-  
-      // Calculate total pages
-      const totalPages = Math.ceil(count / limit);
-  
-      // Return the contacts with pagination metadata
-      res.status(200).json({
-        success: true,
-        totalContacts: count,
-        totalPages: totalPages,
-        currentPage: page,
-        contactsPerPage: limit,
-        contacts: contacts,
-      });
-    } catch (error) {
-      return next(new ErrorHandler(error.message, 500));
+
+      // Add email if not exists and provided
+      if (email && !contact.email) {
+        updateData.email = email.toLowerCase().trim();
+      }
+
+      // Update the contact record
+      const updatedContact = await contact.update(updateData, { transaction });
+      updatedContacts.push(updatedContact);
     }
-  });
-  
 
-module.exports = { contactUs, updateInterestedProduct,getContactDetails };
+    // Commit transaction
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        updatedContacts.length > 0
+          ? "Product interest updated for existing contacts"
+          : "Product interest already exists for all contacts",
+      data: {
+        updatedContactsCount: updatedContacts.length,
+        isInterestedProducts:
+          updatedContacts.length > 0
+            ? updatedContacts[0].isInterestedProducts
+            : null,
+      },
+    });
+  } catch (error) {
+    // Rollback transaction in case of error
+    await transaction.rollback();
+    console.error("Error updating product interest:", error);
+    return next(new ErrorHandler(error.message, 500));
+  }
+};
+
+const getContactDetails = asyncHandler(async (req, res, next) => {
+  try {
+    const id = req.user?.id;
+    const campaignID = req.params?.campaignID;
+
+    // Verify the user exists
+    const user = await User.findByPk(id);
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    // Find the campaign to ensure it exists
+    const campaign = await Campaign.findByPk(campaignID);
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    if (campaign.createdBy !== id) {
+      return next(new ErrorHandler("Unauthorized to access the resource", 401));
+    }
+
+    // Fetch all contacts for the campaign
+    const contacts = await Contact.findAll({
+      where: { campaignId: campaignID },
+      order: [["createdAt", "DESC"]], // Optional: sort by creation date
+    });
+
+    // Return the contacts
+    res.status(200).json({
+      success: true,
+      contacts: contacts,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+module.exports = { contactUs, updateInterestedProduct, getContactDetails };
