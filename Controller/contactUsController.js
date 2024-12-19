@@ -444,7 +444,7 @@ const exportContactsToExcel = asyncHandler(async (req, res, next) => {
       { header: 'Name', key: 'name', width: 20 },
       { header: 'Email', key: 'email', width: 30 },
       { header: 'Phone', key: 'phone', width: 15 },
-      { header: 'Interested Products', key: 'interestedProducts', width: 30 }
+      // { header: 'Interested Products', key: 'interestedProducts', width: 30 }
     ];
 
     // Add rows
@@ -455,9 +455,9 @@ const exportContactsToExcel = asyncHandler(async (req, res, next) => {
         phone: contact.countryCode && contact.phone 
           ? `+${contact.countryCode} ${contact.phone}` 
           : 'N/A',
-        interestedProducts: contact.isInterestedProducts 
-          ? contact.isInterestedProducts.filter(p => p !== 'null').join(', ') 
-          : 'N/A'
+        // interestedProducts: contact.isInterestedProducts 
+        //   ? contact.isInterestedProducts.filter(p => p !== 'null').join(', ') 
+        //   : 'N/A'
       });
     });
 
