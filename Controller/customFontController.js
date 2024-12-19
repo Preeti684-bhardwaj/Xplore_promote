@@ -174,13 +174,13 @@ const getFontById = async (req, res, next) => {
     if (!req.params?.id) {
         return next(new ErrorHandler("Missing font Id", 400));
       }
-      const layout = await CustomFont.findByPk(req.params.id, {
+      const customFont = await CustomFont.findByPk(req.params.id, {
         include: [
           { model: Campaign, as: "campaign", attributes: ["campaignID"] },
         ],
       });
-      if (layout) {
-        return res.status(200).json({ success: true, data: layout });
+      if (customFont) {
+        return res.status(200).json({ success: true, data: customFont });
       } else {
         return next(new ErrorHandler("font not found", 404));
       }
