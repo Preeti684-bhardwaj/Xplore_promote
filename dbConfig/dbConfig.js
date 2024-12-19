@@ -37,6 +37,7 @@ db.layouts = require("../Modals/layoutModal.js")(sequelize, Sequelize);
 db.assets = require("../Modals/assetStore.js")(sequelize, Sequelize);
 db.qrSessions = require("../Modals/qrSessionModal.js")(sequelize, Sequelize);
 db.contacts=require("../Modals/contactDetailModal.js")(sequelize, Sequelize);
+db.customFonts=require("../Modals/customFontModal.js")(sequelize, Sequelize);
 
 // Define relationships
 db.campaigns.hasMany(db.layouts, {
@@ -66,16 +67,30 @@ db.users.belongsToMany(db.campaigns, {
   as: 'campaigns',
 });
 
- // If you want to track the creator separately
-//  db.campaigns.belongsTo(db.users, {
+//  // relationship between customFonts and User
+//  db.customFonts.belongsTo(db.users, {
 //   foreignKey: 'createdBy',
 //   as: 'creator',
 // });
 
-// db.users.hasMany(db.campaigns, {
+// db.users.hasMany(db.customFonts, {
 //   foreignKey: 'createdBy',
-//   as: 'createdCampaigns',
+//   as: 'createdFonts',
 // });
+
+
+// relationship between customFonts and Campaign
+db.campaigns.hasMany(db.customFonts, {
+  foreignKey: 'campaignID',
+  as: 'customFonts',
+  onDelete: 'CASCADE' // Optional: deletes advertisement when campaign is deleted
+});
+
+db.customFonts.belongsTo(db.campaigns, {
+  foreignKey: 'campaignID',
+  as: 'campaign',
+    onDelete: 'CASCADE' // Optional: deletes advertisement when campaign is deleted
+});
 
 // db.advertisements.hasMany(db.layouts, {
 //   foreignKey: 'advertisementID',
