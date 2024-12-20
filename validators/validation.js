@@ -117,6 +117,17 @@ const getPagination = (page, size) => {
   return { limit, offset };
 };
 
+const validateColor = (colorCode) => {
+  // Validate hex color codes (e.g., #FF0000)
+  const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+  
+  // Validate rgb/rgba color codes
+  const rgbRegex = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/;
+  const rgbaRegex = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([01]|0?\.\d+)\)$/;
+
+  return hexRegex.test(colorCode) || rgbRegex.test(colorCode) || rgbaRegex.test(colorCode);
+};
+
 module.exports = {
   isValidEmail,
   isPhoneValid,
@@ -125,6 +136,7 @@ module.exports = {
   getFileNameFromUrl,
   getPlatform,
   detectOS,
-  getPagination
+  getPagination,
+  validateColor
 };
 
