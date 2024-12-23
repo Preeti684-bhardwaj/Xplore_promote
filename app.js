@@ -77,7 +77,7 @@ app.use("/v1/client",clientRouter);
 app.use("/v1/viewLayout/:shortCode",getLayoutByShortCode);
 app.use("/v1/font",customFontRouter);
 app.use("/v1/analytics",analyticsRouter);
-app.use("/v1/productImage",productImageRouter)
+app.use("/v1/product",productImageRouter)
 
 // Middleware for error
 app.use(errorMiddleware);

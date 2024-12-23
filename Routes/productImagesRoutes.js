@@ -10,7 +10,7 @@ const { verifyJWt, verifySession, authorize } = require("../middleware/auth");
 const upload = require("../middleware/multer");
 
 router.post(
-  "/upload/:campaignID",
+  "/create/:campaignID",
   verifyJWt,
   authorize(["USER"]),
   verifySession,
