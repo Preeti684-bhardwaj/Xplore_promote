@@ -121,10 +121,10 @@ const createCampaign = asyncHandler(async (req, res, next) => {
     // Define a new character set without special characters
     const customChars =
       "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    shortid.characters(customChars);
+      shortId.characters(customChars);
 
     // Generate short code
-    let shortCode = shortid.generate().toLowerCase();
+    let shortCode = shortId.generate().toLowerCase();
 
     // Ensure unique short code
     const existingCode = await Campaign.findOne({
@@ -134,7 +134,7 @@ const createCampaign = asyncHandler(async (req, res, next) => {
     });
 
     if (existingCode) {
-      shortCode = shortid.generate().toLowerCase();
+      shortCode = shortId.generate().toLowerCase();
     }
     // Create short URL
     const shortUrl = `https://xplr.live/${shortCode}`;
