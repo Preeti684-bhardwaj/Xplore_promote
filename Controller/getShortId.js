@@ -43,7 +43,7 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
         const data = await Layout.findAndCountAll({
           where: { campaignID: campaignID },
           include: [
-            { model: Campaign, as: "campaign", attributes: ["campaignID"] },
+            { model: Campaign, as: "campaign", attributes: ["campaignID","name","description","images"] },
           ],
           order: [["createdAt", "ASC"]],
         });
