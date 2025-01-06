@@ -7,7 +7,7 @@ const {
 const { verifyJWt,authorize, verifySession } = require("../middleware/auth");
 
 // Update routes to use upload middleware
-router.post("/create",createAnalytics);
+router.post("/clickCount/create",createAnalytics);
 router.get("/getAll/:campaignID",getCampaignAnalytics);
 
 
