@@ -28,9 +28,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       ipAddress: {
         type: DataTypes.STRING,
-        validate: {
-          isIP: true
-        }
+        allowNull: true
       },
       deviceId: {
         type: DataTypes.STRING,
