@@ -16,7 +16,7 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Campaign ID is required", 400));
     }
 
-    if (!source || !device || !ipAddress) {
+    if (!source || !device) {
       return next(new ErrorHandler("missing required field", 400));
     }
 
