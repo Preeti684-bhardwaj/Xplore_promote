@@ -7,7 +7,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         validate: {
           notEmpty: true,
-          isIn: [['Facebook', 'Instagram', 'Twitter', 'QR', 'Direct', 'Other']] // Add valid sources
+          isIn: [[
+            "facebook",
+            "instagram",
+            "twitter",
+            "qr",
+            "direct",
+            "other",
+          ]] // Add valid sources
         }
       },
       device: {
