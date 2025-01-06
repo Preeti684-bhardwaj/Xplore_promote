@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const env = {
   database: process.env.DATABASE,
-  username: "xploreliveuser",
+  username: "xploreuser",
   password: process.env.PASSWORD,
   host: process.env.HOST,
   dialect: process.env.DIALECT,
