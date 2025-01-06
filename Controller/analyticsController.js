@@ -20,8 +20,8 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("missing required field", 400));
     }
 
-    const validDevices = ['IOS', 'Android', 'Windows', 'Unknown'];
-    if (device && !validDevices.includes(device.toUpperCase())) {
+    const validDevices = ['ios', 'android', 'windows', 'unknown'];
+    if (device && !validDevices.includes(device.toLowerCase())) {
       return next(
         new ErrorHandler(
           `Invalid device type. Allowed values are: ${validDevices.join(', ')}`,
@@ -57,7 +57,7 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
     const analytics = await Analytic.create(
       {
         source,
-        device: device || "Unknown",
+        device: device || "unknown",
         ipAddress,
         deviceId,
         campaignID,
