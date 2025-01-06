@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 'Unknown',
         validate: {
           notEmpty: true,
-          isIn: [['IOS' , 'Android' , 'Windows','Unknown']] // Add valid sources
+          isIn: [['ios' , 'android' , 'windows','unknown']] // Add valid sources
         }
       },
       ipAddress: {
