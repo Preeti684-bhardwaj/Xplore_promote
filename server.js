@@ -1,70 +1,97 @@
-const app = require("./app.js")
-const db = require("./dbConfig/dbConfig.js")
-require("dotenv").config({path:"./.env"})
-const passport = require('passport');
-const passportJWT = require('passport-jwt');
-const setupSocket = require('./utils/socketSetup.js');
+const app = require("./app.js");
+const { testConnection } = require("./dbConfig/dbEnv.js");
+const db = require("./dbConfig/dbConfig.js");
+require("dotenv").config({ path: "./.env" });
+const passport = require("passport");
+const passportJWT = require("passport-jwt");
+const setupSocket = require("./utils/socketSetup.js");
 
-process.on("uncaughtException" , (err)=>{
-    console.log(`Error: ${err.message}`)
-    console.log(`Shutting down the server due to uncaught Exception`)
-    process.exit(1)
-})
-
-// jwt verification 
-let ExtractJwt = passportJWT.ExtractJwt;
-let JwtStrategy = passportJWT.Strategy;
-
-let jwtOptions = {};
-jwtOptions.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
-jwtOptions.secretOrKey = process.env.JWT_SECRET;
-jwtOptions.passReqToCallback = true;
-
-let strategy = new JwtStrategy(jwtOptions, function (req, jwt_payload, done) {
-  var Model = jwt_payload.obj.type === 'USER' ? db.users :  db.admins;
-  
-  Model.findOne({ where: { id: jwt_payload.obj.obj.id } })
-    .then(user => {
-      if (user) {
-        let obj = {
-          type: jwt_payload.obj.type,
-          obj: user
-        };
-        return done(null, obj);
-      } else {
-        return done(null, false);
-      }
-    })
-    .catch(error => {
-      return done(null, false);
-    });
+// Global error handlers
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  process.exit(1);
 });
 
-passport.use('jwt', strategy);
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
+  process.exit(1);
+});
 
+// JWT Configuration
+const ExtractJwt = passportJWT.ExtractJwt;
+const JwtStrategy = passportJWT.Strategy;
 
-// connectDB()
-// database connection
-db.sequelize.sync({ alter: true })
-    .then(() => {
-        const server = app.listen(process.env.PORT || 9190, () => {
-            console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
-        });
+const jwtOptions = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: process.env.JWT_SECRET,
+  passReqToCallback: true
+};
 
-       // Pass db to setupSocket
-       const io = setupSocket(server);
-        app.set('io', io); 
+// JWT Strategy
+const strategy = new JwtStrategy(jwtOptions, async (req, jwt_payload, done) => {
+  try {
+    const Model = jwt_payload.obj.type === "USER" ? db.users : db.admins;
+    const user = await Model.findOne({ where: { id: jwt_payload.obj.obj.id } });
+    
+    if (user) {
+      return done(null, { type: jwt_payload.obj.type, obj: user });
+    }
+    return done(null, false);
+  } catch (error) {
+    console.error("JWT Strategy Error:", error);
+    return done(error, false);
+  }
+});
 
-        process.on("unhandledRejection", (err) => {
-            console.log(`Error: ${err.message}`);
-            console.log(`Shutting down the server due to Unhandled Promise Rejection`);
+passport.use("jwt", strategy);
 
-            server.close(() => {
-                process.exit(1);
-            });
-        });
-    })
-    .catch((err) => {
-        console.log("db connection failed !!! ", err);
-        process.exit(1);
+// Server initialization
+async function startServer() {
+  try {
+    // Test database connection
+    const isConnected = await testConnection(db.sequelize);
+    if (!isConnected) {
+      throw new Error("Database connection test failed");
+    }
+
+    // Sync database
+    await db.sequelize.sync({ alter: true });
+    console.log("Database synchronized successfully");
+
+    // Start HTTP server
+    const server = app.listen(process.env.PORT || 9190, () => {
+      console.log(`⚙️ Server is running at port: ${process.env.PORT || 9190}`);
     });
+
+    // Setup WebSocket
+    const io = setupSocket(server);
+    app.set("io", io);
+
+    // Graceful shutdown
+    const shutdown = async () => {
+      console.log("Shutting down gracefully...");
+      
+      try {
+        await Promise.all([
+          new Promise((resolve) => server.close(resolve)),
+          db.sequelize.close()
+        ]);
+        console.log("Server shutdown completed");
+        process.exit(0);
+      } catch (err) {
+        console.error("Error during shutdown:", err);
+        process.exit(1);
+      }
+    };
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+
+  } catch (error) {
+    console.error("Server startup failed:", error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
