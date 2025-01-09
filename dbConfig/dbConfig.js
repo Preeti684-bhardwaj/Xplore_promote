@@ -42,6 +42,9 @@ db.contacts = require("../Modals/contactDetailModal.js")(sequelize, Sequelize);
 db.customFonts = require("../Modals/customFontModal.js")(sequelize, Sequelize);
 db.productImages = require("../Modals/productImages.js")(sequelize, Sequelize);
 db.analytics=require("../Modals/analyticsModal.js")(sequelize, Sequelize);
+db.deletionRequest=require("../Modals/metaDeletionModal.js")(sequelize, Sequelize);
+
+
 // Define relationships
 db.campaigns.hasMany(db.layouts, {
   foreignKey: "campaignID",

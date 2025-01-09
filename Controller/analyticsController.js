@@ -176,13 +176,11 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
 
   try {
     const { 
-      // Existing fields
       source, 
       device, 
       ipAddress, 
       deviceId, 
       campaignID,
-      // New fields
       timeZone,
       deviceName,
       osVersion,
@@ -194,10 +192,12 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       region,
       deviceModel,
       appVersion,
-      language
+      language,
+      // New fields
+      browser,
+      browserVersion
     } = req.body;
 
-    // Existing validations
     if (!campaignID) {
       return next(new ErrorHandler("Campaign ID is required", 400));
     }
@@ -206,7 +206,7 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("missing required field", 400));
     }
 
-    const validDevices = ['ios', 'android', 'windows', 'unknown'];
+    const validDevices = ['ios', 'android', 'windows', 'linux', 'macos', 'other', 'unknown'];
     if (device && !validDevices.includes(device.toLowerCase())) {
       return next(
         new ErrorHandler(
@@ -216,8 +216,19 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       );
     }
 
+    const validBrowsers = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'other'];
+    if (browser && !validBrowsers.includes(browser.toLowerCase())) {
+      return next(
+        new ErrorHandler(
+          `Invalid browser type. Allowed values are: ${validBrowsers.join(', ')}`,
+          400
+        )
+      );
+    }
+
     const validSources = [
       "facebook",
+      "whatsapp",
       "instagram",
       "twitter",
       "qr",
@@ -233,7 +244,6 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // New validations for region and language if provided
     if (region && region.length !== 2) {
       return next(new ErrorHandler("Region must be a 2-character country code", 400));
     }
@@ -242,22 +252,18 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Language must be between 2-5 characters", 400));
     }
 
-    // Check if campaign exists
     const campaign = await Campaign.findByPk(campaignID);
     if (!campaign) {
       return next(new ErrorHandler("Campaign not found", 404));
     }
 
-    // Create analytics entry with all fields
     const analytics = await Analytic.create(
       {
-        // Existing fields
         source,
         device: device || "unknown",
         ipAddress,
         deviceId,
         campaignID,
-        // New fields
         timeZone,
         deviceName,
         osVersion,
@@ -269,7 +275,9 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
         region,
         deviceModel,
         appVersion,
-        language
+        language,
+        browser,
+        browserVersion
       },
       { transaction: t }
     );

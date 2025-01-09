@@ -7,7 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         validate: {
           notEmpty: true,
-          isIn: [["facebook", "instagram", "twitter", "qr", "direct", "other"]], // Add valid sources
+          isIn: [["facebook", "instagram", "whatsapp", "twitter", "qr", "direct", "other"]], // Add valid sources
         },
       },
       device: {
@@ -16,8 +16,19 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: "Unknown",
         validate: {
           notEmpty: true,
-          isIn: [["ios", "android", "windows", "unknown"]], // Add valid sources
+          isIn: [["ios", "android", "windows", "linux", "macos", "other", "unknown"]], // Add valid sources
         },
+      },
+      browser: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        validate: {
+          isIn: [["chrome", "firefox", "safari", "edge", "opera", "other", null]],
+        },
+      },
+      browserVersion: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
       ipAddress: {
         type: DataTypes.STRING,

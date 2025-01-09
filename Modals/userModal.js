@@ -46,6 +46,18 @@ module.exports = (sequelize, DataTypes) => {
     },
     otp: DataTypes.STRING,
     otpExpire: DataTypes.DATE,
+    metaOtp: DataTypes.STRING,
+    metaOtpExpire: DataTypes.DATE,
+    lastOtpSentAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Timestamp of the last OTP sent to track rate limiting'
+    },
+    otpAttempts: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      comment: 'Number of failed OTP verification attempts'
+    },
     IsActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
