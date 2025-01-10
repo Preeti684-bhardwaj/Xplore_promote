@@ -43,6 +43,7 @@ db.customFonts = require("../Modals/customFontModal.js")(sequelize, Sequelize);
 db.productImages = require("../Modals/productImages.js")(sequelize, Sequelize);
 db.analytics=require("../Modals/analyticsModal.js")(sequelize, Sequelize);
 db.deletionRequest=require("../Modals/metaDeletionModal.js")(sequelize, Sequelize);
+db.modelConfigs = require("../Modals/chatConfigModal.js")(sequelize, Sequelize);
 
 
 // Define relationships

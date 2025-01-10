@@ -58,7 +58,8 @@ const qrRouter = require('./Routes/qrCodeRoutes');
 const clientRouter=require("./Routes/clientRoutes");
 const customFontRouter=require("./Routes/customFontRoutes");
 const analyticsRouter=require("./Routes/analyticsRoutes");
-const productImageRouter=require("./Routes/productImagesRoutes")
+const productImageRouter=require("./Routes/productImagesRoutes");
+const chatBotRouter=require('./Routes/chatRoutes')
 const {getLayoutByShortCode}=require('./Controller/getShortId')
 
 
@@ -70,6 +71,7 @@ app.use("/v1/endUser", endUserRouter);
 app.use("/v1/apple", notificationRouter);
 app.use("/v1/campaign", campaignRouter);
 // app.use("/v1/advertisement", advertisementRouter);
+app.use('/v1/chatBot',chatBotRouter)
 app.use("/v1/layout", layoutRouter);
 app.use("/v1/content", contentRouter);
 app.use("/v1/qr", qrRouter);
