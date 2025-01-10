@@ -37,7 +37,7 @@ You specialize exclusively in the Hyundai IONIQ 5. If asked about other models o
 
 Maintain a conversational and professional tone. Customer's Question:`;
 
-const PROMPT_SUFFIX = " Answer:";
+const PROMPT_SUFFIX = " Sales Expert's JSON Answer:";
 
 const handleChatRequest = asyncHandler(async (req, res, next) => {
   try {
@@ -62,19 +62,20 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
     // Construct the complete prompt
     const fullPrompt = `${BASE_PROMPT}${req.body?.Question}${PROMPT_SUFFIX}`;
 
-    // console.log(fullPrompt);
+    console.log(fullPrompt);
 
     // Prepare API request
     const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
-
+    console.log("adapter_id", config.adapter_id);
+    console.log("adapter_source", config.adapter_source);
     const requestBody = {
       inputs: fullPrompt,
       parameters: {
         adapter_source: config.adapter_source,
         adapter_id: config.adapter_id,
         max_new_tokens: 500,
-        temperature: 0.2, 
-        top_p: 0.1, 
+        temperature: 0.2,
+        top_p: 0.1,
       },
     };
 
