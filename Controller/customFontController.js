@@ -130,6 +130,120 @@ const uploadCustomFont = async (req, res, next) => {
   }
 };
 
+// Upload a custom font
+const uploadUserCustomFont = async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    // Validate request - checking for files array
+    if (!req.files || req.files.length === 0) {
+      return next(new ErrorHandler("Font file is required", 400));
+    }
+
+    if (!req.body.name || !req.body.fontWeight) {
+      return next(new ErrorHandler("Font name and weight are required", 400));
+    }
+
+    const fontFile = req.files[0];
+    const name = req.body.name.trim(); // Sanitize name too
+    const fontWeight = sanitizeFontWeight(req.body.fontWeight);
+    const userId = req.user?.id;
+    // const campaignID = req.params.campaignID;
+
+    // Validate sanitized font weight is not empty
+    if (!fontWeight) {
+      return next(new ErrorHandler("Invalid font weight", 400));
+    }
+
+    // First check if the campaign exists
+    const user = await User.findOne({ where: { id: userId }, transaction });
+    if (!user) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler(`User with ID ${userId} not found`, 404)
+      );
+    }
+    // if (campaign.createdBy !== req.user.id) {
+    //   await transaction.rollback();
+    //   return next(new ErrorHandler("Unauthorized access", 403));
+    // }
+
+    // Validate font weight format
+    // if (!validateFontWeight(fontWeight)) {
+    //   return next(new ErrorHandler('Invalid font weight format', 400));
+    // }
+
+    // Check if font name exists for this campaignId
+    let existingFont = await CustomFont.findOne({
+      where: { name, userId: userId },
+      transaction,
+    });
+
+    // If font exists, check for weight collision
+    if (existingFont) {
+      const currentWeights = existingFont.fontWeight || {};
+      if (currentWeights[fontWeight]) {
+        return res.status(200).json({
+          success: true,
+          message: "Font weight already exists",
+          data: currentWeights[fontWeight],
+        });
+      }
+
+      // Upload new font file to CDN
+      const customFontUpload = await uploadFile({
+        buffer: fontFile.buffer,
+        originalname: fontFile.originalname,
+        mimetype: fontFile.mimetype,
+      });
+      // Add new weight to existing font
+      const updatedWeights = {
+        ...currentWeights,
+        [fontWeight]: customFontUpload.url,
+      };
+
+      await existingFont.update(
+        { fontWeight: updatedWeights },
+        { transaction }
+      );
+
+      await transaction.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: "Font weight added successfully",
+        data: existingFont,
+      });
+    }
+
+    // Create new font entry
+    const customFontUpload = await uploadFile({
+      buffer: fontFile.buffer,
+      originalname: fontFile.originalname,
+      mimetype: fontFile.mimetype,
+    });
+    const newFont = await CustomFont.create(
+      {
+        name,
+        fontWeight: { [fontWeight]: customFontUpload.url },
+        userId: userId,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Font uploaded successfully",
+      data: newFont,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    return next(new ErrorHandler(error.message, 500));
+  }
+};
+
 // Get all fonts for a user
 const getAllFonts = async (req, res, next) => {
   try {
@@ -168,6 +282,44 @@ const getAllFonts = async (req, res, next) => {
   }
 };
 
+// Get all fonts for a user
+const getAllUserFonts = async (req, res, next) => {
+  try {
+    // Get the campaignID from request parameters
+    const userId = req.user?.id;
+    if (!userId) {
+      return next(new ErrorHandler("Access Denied", 403));
+    }
+    const user = await User.findOne({
+      where: { id: userId },
+    });
+    if (!user) {
+      return next(
+        new ErrorHandler("user not found with this Id", 404)
+      );
+    }
+    // Create a condition to filter by campaignID and optionally by name
+    const condition = {
+      userId: user.id, // Include campaignID in the condition
+    };
+    const fonts = await CustomFont.findAll({
+      where:condition,
+      include: [
+        { model: User, as: "user", attributes: ["id"] },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: fonts.length,
+      data: fonts
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+};
+
 // Get font by ID
 const getFontById = async (req, res, next) => {
   try {
@@ -192,6 +344,8 @@ const getFontById = async (req, res, next) => {
 
 module.exports = {
   uploadCustomFont,
+  uploadUserCustomFont,
   getAllFonts,
+  getAllUserFonts,
   getFontById,
 };

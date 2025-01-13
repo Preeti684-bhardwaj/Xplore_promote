@@ -98,6 +98,19 @@ db.customFonts.belongsTo(db.campaigns, {
   onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
 });
 
+// relationship between customFonts and User
+db.users.hasMany(db.customFonts, {
+  foreignKey: "userId",
+  as: "customFonts",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+db.customFonts.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "user",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
 // relationship between productImages and Campaign
 db.campaigns.hasMany(db.productImages, {
   foreignKey: "campaignID",
