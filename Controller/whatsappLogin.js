@@ -1,7 +1,3 @@
-const {
-  sendMessage,
-  getTextMessageInput,
-} = require("../utils/whatsappHandler");
 const db = require("../dbConfig/dbConfig");
 const User = db.users;
 const DeletionRequest = db.deletionRequest;
@@ -11,9 +7,12 @@ const {
 } = require("../validators/userValidation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
+const crypto = require('crypto');
+const { sendWhatsAppLink, getLinkMessageInput, generateAuthLink } = require('../utils/whatsappHandler');
 const { v4: UUIDV4 } = require("uuid");
 const { phoneValidation } = require("../utils/phoneValidation.js");
-const crypto = require('crypto');
+
+
 
 // Enhanced Facebook signed request parsing with security checks
 function parseSignedRequest(signedRequest) {
@@ -353,9 +352,126 @@ const deletionData = asyncHandler(async (req, res, next) => {
   }
 });
 
+const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+  
+  try {
+    const { countryCode, phone } = req.body;
+
+    if (!phone || !countryCode) {
+      return next(new ErrorHandler("Both country code and phone number are required", 400));
+    }
+
+    const phoneValidationResult = phoneValidation.validatePhone(countryCode, phone);
+    if (!phoneValidationResult.isValid) {
+      return next(new ErrorHandler(phoneValidationResult.message, 400));
+    }
+
+    const cleanedPhone = phoneValidationResult.cleanedPhone;
+    const cleanedCountryCode = phoneValidationResult.cleanedCode;
+    const validPhone = cleanedCountryCode + cleanedPhone;
+
+    // Generate state for security
+    const state = UUIDV4();
+    const authLink = generateAuthLink(validPhone, state);
+    
+    const message = "Click the link below to login to your account:";
+    const messageInput = getLinkMessageInput(validPhone, authLink, message);
+
+    const response = await sendWhatsAppLink(JSON.parse(messageInput));
+
+    // Store state in user record or separate table
+    let user = await User.findOne({
+      where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
+      transaction
+    });
+
+    if (!user) {
+      user = await User.create({
+        countryCode: cleanedCountryCode,
+        phone: cleanedPhone,
+        authState: state,
+        stateExpiry: Date.now() + 5 * 60 * 1000, // 5 minutes validity
+      }, { transaction });
+    } else {
+      user.authState = state;
+      user.stateExpiry = Date.now() + 5 * 60 * 1000;
+      await user.save({ transaction });
+    }
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Authentication link sent successfully",
+      data: {
+        messageId: response.data.messages[0].id,
+        state
+      }
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error initiating WhatsApp login:", error);
+    return next(new ErrorHandler(error.response?.data?.message || "Failed to initiate login", error.response?.status || 500));
+  }
+});
+
+const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+  
+  try {
+    const { state, phone } = req.query;
+
+    if (!state || !phone) {
+      return next(new ErrorHandler("Invalid authentication callback", 400));
+    }
+
+    const user = await User.findOne({
+      where: { 
+        phone: phone.slice(-10),
+        authState: state,
+        stateExpiry: { [db.Sequelize.Op.gt]: Date.now() }
+      },
+      transaction
+    });
+
+    if (!user) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid or expired authentication request", 401));
+    }
+
+    // Clear auth state
+    user.authState = null;
+    user.stateExpiry = null;
+    user.isPhoneVerified = true;
+    await user.save({ transaction });
+
+    const tokenPayload = {
+      type: "USER",
+      obj: {
+        id: user.id,
+        countryCode: user.countryCode,
+        phone: user.phone
+      }
+    };
+
+    const accessToken = generateToken(tokenPayload);
+    await transaction.commit();
+
+    // Redirect to frontend with token
+    res.redirect(`${process.env.FRONTEND_URL}/auth/success?token=${accessToken}`);
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error handling WhatsApp callback:", error);
+    res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
+  }
+});
+
 module.exports = {
   sendWhatsAppOTP,
   otpVerification,
   facebookDataDeletion,
   deletionData,
+  initiateWhatsAppLogin,
+  handleWhatsAppCallback
 };

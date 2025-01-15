@@ -26,12 +26,12 @@ const { appleLogin, googleLogin } = require("../Controller/MainUserController");
 // const {googleLogin}=require('../Controller/googleSignin')
 const { verifyJWt, authorize, verifySession } = require("../middleware/auth");
 const { getContactDetails } = require("../Controller/contactUsController");
-const{sendWhatsAppOTP,otpVerification,deletionData,facebookDataDeletion}=require("../Controller/whatsappLogin")
+const{deletionData,facebookDataDeletion,  initiateWhatsAppLogin,handleWhatsAppCallback}=require("../Controller/whatsappLogin")
 
 
 // whatsapp login api
-router.post("/auth/whatsApp",sendWhatsAppOTP);
-router.post("/whatsApp/phoneVerification", otpVerification);
+router.post("/auth/whatsApp",initiateWhatsAppLogin);
+router.post("/whatsApp/callback", handleWhatsAppCallback);
 router.post("/meta/deletion", facebookDataDeletion ); // deleted Api
 router.get("/meta/deletion/page",deletionData ); // deleted status Api
 
