@@ -37,116 +37,118 @@ const PROMPT_SUFFIX = " Sales Expert's JSON Answer:";
 // Format triplets as a JSON-compliant string
 const formatTripletsAsString = (cotList) => {
   if (!Array.isArray(cotList)) return cotList;
-  
+
   const validatedTriplets = cotList
-      .filter(item => Array.isArray(item) && item.length === 3)
-      .map(item => `("${item[0]}", "${item[1]}", "${item[2]}")`)
-      .slice(0, 3);
-      
-  return validatedTriplets.join(', ');
+    .filter((item) => Array.isArray(item) && item.length === 3)
+    .map((item) => `("${item[0]}", "${item[1]}", "${item[2]}")`)
+    .slice(0, 3);
+
+  return validatedTriplets.join(", ");
 };
 
 const handleChatRequest = asyncHandler(async (req, res, next) => {
   try {
-      // Input validation
-      if (!req.body.Question) {
-          return next(new ErrorHandler("Missing required field: Question", 400));
+    // Input validation
+    if (!req.body.Question) {
+      return next(new ErrorHandler("Missing required field: Question", 400));
+    }
+    const validQuestion=req.body.Question.toLowerCase();
+    console.log(validQuestion);
+    
+    // Get active model configuration
+    const config = await ModelConfig.findOne({
+      where: {
+        tenant_id: process.env.PREDIBASE_TENANT_ID,
+        deployment_name: process.env.PREDIBASE_DEPLOYMENT,
+        isActive: true,
+      },
+    });
+
+    if (!config) {
+      return next(new ErrorHandler("Model configuration not found", 404));
+    }
+
+    // Construct the complete prompt
+    const fullPrompt = `${BASE_PROMPT}${validQuestion}${PROMPT_SUFFIX}`;
+
+    // Prepare API request
+    const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
+    const requestBody = {
+      inputs: fullPrompt,
+      parameters: {
+        adapter_source: config.adapter_source,
+        adapter_id: config.adapter_id,
+        max_new_tokens: 500,
+        temperature: 0.2,
+        top_p: 0.1,
+      },
+    };
+
+    // Make request to Predibase API
+    const response = await axios.post(apiUrl, requestBody, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.api_token}`,
+      },
+    });
+
+    // Update usage statistics
+    await config.update({
+      lastUsed: new Date(),
+      requestCount: config.requestCount + 1,
+    });
+
+    // Process and clean the response
+    let generatedText = response.data.generated_text || response.data;
+
+    try {
+      // If the response is a string, try to parse it as JSON
+      if (typeof generatedText === "string") {
+        generatedText = generatedText.replace(/\n/g, "").trim();
+        const parsedResponse = JSON.parse(generatedText);
+
+        // Format COT field if it exists
+        if (parsedResponse.COT) {
+          parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
+        }
+
+        return res.status(200).json(parsedResponse);
       }
 
-      // Get active model configuration
-      const config = await ModelConfig.findOne({
-          where: {
-              tenant_id: process.env.PREDIBASE_TENANT_ID,
-              deployment_name: process.env.PREDIBASE_DEPLOYMENT,
-              isActive: true,
-          },
+      // If response is already an object, just send it
+      return res.status(200).json(generatedText);
+    } catch (parseError) {
+      console.error("Error parsing generated text:", parseError);
+      return res.status(422).json({
+        error: "Malformed response from AI service",
+        details: generatedText,
       });
-
-      if (!config) {
-          return next(new ErrorHandler("Model configuration not found", 404));
-      }
-
-      // Construct the complete prompt
-      const fullPrompt = `${BASE_PROMPT}${req.body.Question}${PROMPT_SUFFIX}`;
-
-      // Prepare API request
-      const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
-      const requestBody = {
-          inputs: fullPrompt,
-          parameters: {
-              adapter_source: config.adapter_source,
-              adapter_id: config.adapter_id,
-              max_new_tokens: 500,
-              temperature: 0.2,
-              top_p: 0.1,
-          },
-      };
-
-      // Make request to Predibase API
-      const response = await axios.post(apiUrl, requestBody, {
-          headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${config.api_token}`,
-          },
-      });
-
-      // Update usage statistics
-      await config.update({
-          lastUsed: new Date(),
-          requestCount: config.requestCount + 1,
-      });
-
-      // Process and clean the response
-      let generatedText = response.data.generated_text || response.data;
-      
-      try {
-          // If the response is a string, try to parse it as JSON
-          if (typeof generatedText === 'string') {
-              generatedText = generatedText.replace(/\n/g, '').trim();
-              const parsedResponse = JSON.parse(generatedText);
-              
-              // Format COT field if it exists
-              if (parsedResponse.COT) {
-                  parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
-              }
-              
-              return res.status(200).json(parsedResponse);
-          }
-          
-          // If response is already an object, just send it
-          return res.status(200).json(generatedText);
-          
-      } catch (parseError) {
-          console.error("Error parsing generated text:", parseError);
-          return res.status(422).json({
-              error: 'Malformed response from AI service',
-              details: generatedText
-          });
-      }
-
+    }
   } catch (error) {
-      console.error("Error processing chat request:", error);
+    console.error("Error processing chat request:", error);
 
-      // Enhanced error handling with rate limit detection
-      if (error.response?.status === 429) {
-          return next(new ErrorHandler("Rate limit exceeded. Please try again later.", 429));
-      }
+    // Enhanced error handling with rate limit detection
+    if (error.response?.status === 429) {
+      return next(
+        new ErrorHandler("Rate limit exceeded. Please try again later.", 429)
+      );
+    }
 
-      const errorMessage = error.response?.data
-          ? typeof error.response.data === "string"
-              ? error.response.data
-              : JSON.stringify(error.response.data)
-          : error.message || "Internal server error";
+    const errorMessage = error.response?.data
+      ? typeof error.response.data === "string"
+        ? error.response.data
+        : JSON.stringify(error.response.data)
+      : error.message || "Internal server error";
 
-      // Log detailed error information
-      console.error({
-          message: errorMessage,
-          stack: error.stack,
-          responseData: error.response?.data,
-          status: error.response?.status
-      });
+    // Log detailed error information
+    console.error({
+      message: errorMessage,
+      stack: error.stack,
+      responseData: error.response?.data,
+      status: error.response?.status,
+    });
 
-      return next(new ErrorHandler(errorMessage, error.response?.status || 500));
+    return next(new ErrorHandler(errorMessage, error.response?.status || 500));
   }
 });
 
