@@ -4,6 +4,8 @@ const ModelConfig = db.modelConfigs;
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
+
+
 const createOrUpdateConfig = asyncHandler(async (req, res, next) => {
   const {
     tenant_id,
@@ -13,55 +15,47 @@ const createOrUpdateConfig = asyncHandler(async (req, res, next) => {
     adapter_id,
     max_new_tokens,
     temperature,
-    top_p,
+    top_p
   } = req.body;
 
-  // Validate required fields
   if (!tenant_id || !deployment_name || !api_token || !adapter_id) {
-    return next(
-      new ErrorHandler('Missing required fields: tenant_id, deployment_name, and api_token are required',400));
+    return next(new ErrorHandler('Missing required fields', 400));
   }
 
   try {
-    // Check if configuration exists
     const existingConfig = await ModelConfig.findOne({
-      where: { tenant_id, adapter_id },
+      where: { tenant_id, adapter_id }
     });
 
-    if (existingConfig) {
-      // Update existing configuration
-      await existingConfig.update({
-        api_token,
-        adapter_source,
-        adapter_id,
-        max_new_tokens,
-        isActive: true,
-        temperature,
-        top_p,
-      });
-
-      return res.status(200).json({
-        message: 'Configuration updated',
-        config: existingConfig,
-      });
-    }
-
-    // Create new configuration
-    const newConfig = await ModelConfig.create({
-      tenant_id,
-      deployment_name,
+    const configData = {
       api_token,
       adapter_source,
       adapter_id,
       max_new_tokens,
       isActive: true,
       temperature,
-      top_p,
+      top_p
+    };
+
+    if (existingConfig) {
+      await existingConfig.update(configData);
+      return res.status(200).json({
+        success:true,
+        message: 'Configuration updated',
+        config: existingConfig
+      });
+    }
+
+    const newConfig = await ModelConfig.create({
+      tenant_id,
+      deployment_name,
+      ...configData
     });
 
     res.status(201).json({
+      success:true,
       message: 'Configuration created',
-      config: newConfig,
+      config: newConfig
     });
   } catch (error) {
     console.error('Error managing configuration:', error);
@@ -69,5 +63,7 @@ const createOrUpdateConfig = asyncHandler(async (req, res, next) => {
   }
 });
 
-
 module.exports={createOrUpdateConfig}
+
+
+
