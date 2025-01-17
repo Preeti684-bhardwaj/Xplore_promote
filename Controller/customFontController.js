@@ -361,31 +361,56 @@ const getAllFonts = async (req, res, next) => {
 // Get all fonts for a user
 const getAllUserFonts = async (req, res, next) => {
   try {
-    // Get the campaignID from request parameters
     const userId = req.user?.id;
     if (!userId) {
       return next(new ErrorHandler("Access Denied", 403));
     }
+
     const user = await User.findOne({
       where: { id: userId },
     });
+
     if (!user) {
-      return next(new ErrorHandler("user not found with this Id", 404));
+      return next(new ErrorHandler("User not found with this Id", 404));
     }
-    // Create a condition to filter by campaignID and optionally by name
-    const condition = {
-      userId: user.id, // Include campaignID in the condition
-    };
+
+    // Modified query to include FontWeight data
     const fonts = await CustomFont.findAll({
-      where: condition,
-      include: [{ model: User, as: "user", attributes: ["id"] }],
+      where: { userId: user.id },
+      include: [
+        { 
+          model: User, 
+          as: "user", 
+          attributes: ["id"] 
+        },
+        {
+          model: db.FontWeight,
+          as: "fontWeights",
+          attributes: ["id", "name", "specificName", "fontWeightFile"]
+        }
+      ],
       order: [["createdAt", "DESC"]],
     });
+
+    // Transform the response to match the desired format
+    const transformedFonts = fonts.map(font => ({
+      id: font.id,
+      name: font.name,
+      userId: font.userId,
+      createdAt: font.createdAt,
+      updatedAt: font.updatedAt,
+      fontWeights: font.fontWeights.map(weight => ({
+        id: weight.id,
+        fontWeightName: weight.name,
+        specificName: weight.specificName,
+        fontWeightFile: weight.fontWeightFile
+      }))
+    }));
 
     return res.status(200).json({
       success: true,
       count: fonts.length,
-      data: fonts,
+      data: transformedFonts
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
