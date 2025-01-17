@@ -44,7 +44,7 @@ db.productImages = require("../Modals/productImages.js")(sequelize, Sequelize);
 db.analytics=require("../Modals/analyticsModal.js")(sequelize, Sequelize);
 db.deletionRequest=require("../Modals/metaDeletionModal.js")(sequelize, Sequelize);
 db.modelConfigs = require("../Modals/chatConfigModal.js")(sequelize, Sequelize);
-
+db.FontWeight = require("../Modals/fontWeightModal.js")(sequelize, Sequelize);
 
 // Define relationships
 db.campaigns.hasMany(db.layouts, {
@@ -74,16 +74,17 @@ db.users.belongsToMany(db.campaigns, {
   as: "campaigns",
 });
 
-//  // relationship between customFonts and User
-//  db.customFonts.belongsTo(db.users, {
-//   foreignKey: 'createdBy',
-//   as: 'creator',
-// });
+//  // relationship between customFonts and fontWeight
+db.customFonts.hasMany(db.FontWeight, {
+  foreignKey: 'customFontId', // Foreign key in FontWeight table
+  as: 'fontWeights', // Alias for the related data
+});
 
-// db.users.hasMany(db.customFonts, {
-//   foreignKey: 'createdBy',
-//   as: 'createdFonts',
-// });
+// FontWeight belongs to one customFont
+db.FontWeight.belongsTo(db.customFonts, {
+  foreignKey: 'customFontId', // Foreign key in FontWeight table
+  as: 'customFont', // Alias for the related data
+});
 
 // relationship between customFonts and Campaign
 db.campaigns.hasMany(db.customFonts, {

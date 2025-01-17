@@ -1,15 +1,16 @@
 module.exports = (sequelize, DataTypes) => {
-    const CustomFont = sequelize.define("CustomFont", {
+    const FontWeight = sequelize.define("FontWeight", {
       id: {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: DataTypes.UUIDV4,
       },
       name: DataTypes.STRING,
-      // fontWeight: {
-      //   type: DataTypes.JSON,
-      // }
+      specificName:DataTypes.STRING,
+      fontWeightFile: {
+        type: DataTypes.JSON
+      }
     });
-    return CustomFont;
+    return FontWeight;
   };
   

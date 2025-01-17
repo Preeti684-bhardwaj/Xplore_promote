@@ -58,14 +58,6 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0,
       comment: 'Number of failed OTP verification attempts'
     },
-    // authState: {
-    //   type: DataTypes.STRING,
-    //   allowNull: true
-    // },
-    // stateExpiry: {
-    //   type: DataTypes.DATE,
-    //   allowNull: true
-    // },
     IsActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
