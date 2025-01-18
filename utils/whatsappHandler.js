@@ -1,6 +1,6 @@
+// whatsappHandler.js
 const axios = require('axios');
 const crypto = require('crypto');
-const { generateToken } = require("../validators/userValidation.js");
 
 function generateAppSecretProof(accessToken, appSecret) {
   return crypto
@@ -13,11 +13,16 @@ function generateAuthLink(phoneNumber, state) {
   return `${process.env.APP_URL}/auth/callback?state=${state}&phone=${phoneNumber}`;
 }
 
-const sendWhatsAppLink = (data) => {
-  const appSecretProof = generateAppSecretProof(process.env.ACCESS_TOKEN, process.env.FACEBOOK_APP_SECRET);
+const sendWhatsAppLink = async (data) => {
+  // Generate appsecret_proof
+  const appSecretProof = generateAppSecretProof(
+    process.env.ACCESS_TOKEN,
+    process.env.FACEBOOK_APP_SECRET
+  );
+
   const config = {
     method: 'post',
-    url: `https://graph.facebook.com/${process.env.VERSION}/${process.env.PHONE_NUMBER_ID}/messages`,
+    url: `https://graph.facebook.com/v17.0/${process.env.PHONE_NUMBER_ID}/messages`,
     headers: {
       'Authorization': `Bearer ${process.env.ACCESS_TOKEN}`,
       'Content-Type': 'application/json'
@@ -28,20 +33,38 @@ const sendWhatsAppLink = (data) => {
     data: data
   };
 
-  return axios(config);
+  try {
+    const response = await axios(config);
+    return response;
+  } catch (error) {
+    console.error('WhatsApp API Error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers
+    });
+    throw error;
+  }
 }
 
 const getLinkMessageInput = (recipient, link, text) => {
-  return JSON.stringify({
-    "messaging_product": "whatsapp",
-    "recipient_type": "individual",
-    "to": recipient,
-    "type": "text",
-    "text": {
-      "preview_url": true,
-      "body": `${text}\n${link}`
+  // Validate phone number format
+  if (!recipient.startsWith('+')) {
+    recipient = '+' + recipient;
+  }
+
+  // Ensure the link is properly encoded
+  const encodedLink = encodeURI(link);
+
+  return {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: recipient,
+    type: "text",
+    text: {
+      preview_url: true,
+      body: `${text}\n${encodedLink}`
     }
-  });
+  };
 }
 
 module.exports = {

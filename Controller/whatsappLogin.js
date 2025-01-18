@@ -3,83 +3,89 @@ const User = db.users;
 const DeletionRequest = db.deletionRequest;
 const {
   generateToken,
-  generateOtp
+  generateOtp,
 } = require("../validators/userValidation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
-const crypto = require('crypto');
-const { sendWhatsAppLink, getLinkMessageInput, generateAuthLink } = require('../utils/whatsappHandler');
+const crypto = require("crypto");
+const {
+  sendWhatsAppLink,
+  getLinkMessageInput,
+  generateAuthLink,
+} = require("../utils/whatsappHandler");
 const { v4: UUIDV4 } = require("uuid");
 const { phoneValidation } = require("../utils/phoneValidation.js");
-
-
 
 // Enhanced Facebook signed request parsing with security checks
 function parseSignedRequest(signedRequest) {
   try {
-    if (!signedRequest || typeof signedRequest !== 'string') {
-      throw new Error('Invalid signed request format');
+    if (!signedRequest || typeof signedRequest !== "string") {
+      throw new Error("Invalid signed request format");
     }
 
-    const parts = signedRequest.split('.');
+    const parts = signedRequest.split(".");
     if (parts.length !== 2) {
-      throw new Error('Invalid signed request structure');
+      throw new Error("Invalid signed request structure");
     }
 
     const [encodedSig, payload] = parts;
-    
+
     // Verify signature (add your app secret here)
     const sig = base64UrlDecode(encodedSig);
     const expectedSig = crypto
-      .createHmac('sha256', process.env.FACEBOOK_APP_SECRET)
+      .createHmac("sha256", process.env.FACEBOOK_APP_SECRET)
       .update(payload)
-      .digest('base64');
-    
+      .digest("base64");
+
     if (sig !== expectedSig) {
-      throw new Error('Invalid signature');
+      throw new Error("Invalid signature");
     }
 
     const data = JSON.parse(base64UrlDecode(payload));
-    
+
     // Validate required fields
-    if (!data.user_id || !data.algorithm || data.algorithm !== 'HMAC-SHA256') {
-      throw new Error('Missing or invalid required fields');
+    if (!data.user_id || !data.algorithm || data.algorithm !== "HMAC-SHA256") {
+      throw new Error("Missing or invalid required fields");
     }
 
     return data;
   } catch (error) {
-    console.error('Error parsing signed request:', error);
+    console.error("Error parsing signed request:", error);
     return null;
   }
 }
 
 function base64UrlDecode(input) {
   try {
-    input = input.replace(/-/g, '+').replace(/_/g, '/');
+    input = input.replace(/-/g, "+").replace(/_/g, "/");
     const padding = 4 - (input.length % 4);
     if (padding !== 4) {
-      input += '='.repeat(padding);
+      input += "=".repeat(padding);
     }
-    return Buffer.from(input, 'base64').toString('utf-8');
+    return Buffer.from(input, "base64").toString("utf-8");
   } catch (error) {
-    console.error('Error decoding base64:', error);
+    console.error("Error decoding base64:", error);
     return null;
   }
 }
 
-
 // Controller function to send OTP via WhatsApp
 const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-  
+
   try {
     const { countryCode, phone } = req.body;
 
     if (!phone || !countryCode) {
-      return next(new ErrorHandler("Both country code and phone number are required", 400));
+      return next(
+        new ErrorHandler("Both country code and phone number are required", 400)
+      );
     }
 
-    const phoneValidationResult = phoneValidation.validatePhone(countryCode, phone);
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
     if (!phoneValidationResult.isValid) {
       return next(new ErrorHandler(phoneValidationResult.message, 400));
     }
@@ -90,14 +96,17 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     // Rate limiting check (add to user model)
     const user = await User.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
-      transaction
+      transaction,
     });
 
     if (user && user.lastOtpSentAt) {
       const timeDiff = Date.now() - user.lastOtpSentAt;
-      if (timeDiff < 60000) { // 1 minute cooldown
+      if (timeDiff < 60000) {
+        // 1 minute cooldown
         await transaction.rollback();
-        return next(new ErrorHandler("Please wait before requesting another OTP", 429));
+        return next(
+          new ErrorHandler("Please wait before requesting another OTP", 429)
+        );
       }
     }
 
@@ -111,14 +120,17 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const response = await sendMessage(JSON.parse(messageInput));
 
     if (!user) {
-      await User.create({
-        countryCode: cleanedCountryCode,
-        phone: cleanedPhone,
-        metaOtp: otp,
-        metaOtpExpire: expireTime,
-        lastOtpSentAt: Date.now(),
-        otpAttempts: 0
-      }, { transaction });
+      await User.create(
+        {
+          countryCode: cleanedCountryCode,
+          phone: cleanedPhone,
+          metaOtp: otp,
+          metaOtpExpire: expireTime,
+          lastOtpSentAt: Date.now(),
+          otpAttempts: 0,
+        },
+        { transaction }
+      );
     } else {
       user.metaOtp = otp;
       user.metaOtpExpire = expireTime;
@@ -134,19 +146,24 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
       message: "OTP sent successfully",
       data: {
         messageId: response.data.messages[0].id,
-        ...(process.env.NODE_ENV === 'development' && { otp })
+        ...(process.env.NODE_ENV === "development" && { otp }),
       },
     });
   } catch (error) {
     await transaction.rollback();
     console.error("Error sending OTP:", error);
-    return next(new ErrorHandler(error.response?.data?.message || "Failed to send OTP", error.response?.status || 500));
+    return next(
+      new ErrorHandler(
+        error.response?.data?.message || "Failed to send OTP",
+        error.response?.status || 500
+      )
+    );
   }
 });
 
 const otpVerification = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-  
+
   try {
     const { countryCode, phone, otp } = req.body;
 
@@ -155,10 +172,15 @@ const otpVerification = asyncHandler(async (req, res, next) => {
     }
 
     if (!phone || !countryCode) {
-      return next(new ErrorHandler("Both country code and phone number are required", 400));
+      return next(
+        new ErrorHandler("Both country code and phone number are required", 400)
+      );
     }
 
-    const phoneValidationResult = phoneValidation.validatePhone(countryCode, phone);
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
     if (!phoneValidationResult.isValid) {
       return next(new ErrorHandler(phoneValidationResult.message, 400));
     }
@@ -168,7 +190,7 @@ const otpVerification = asyncHandler(async (req, res, next) => {
 
     const user = await User.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
-      transaction
+      transaction,
     });
 
     if (!user) {
@@ -179,7 +201,12 @@ const otpVerification = asyncHandler(async (req, res, next) => {
     // Check OTP attempts
     if (user.otpAttempts >= 3) {
       await transaction.rollback();
-      return next(new ErrorHandler("Too many failed attempts. Please request a new OTP", 429));
+      return next(
+        new ErrorHandler(
+          "Too many failed attempts. Please request a new OTP",
+          429
+        )
+      );
     }
 
     // Validate OTP
@@ -207,8 +234,8 @@ const otpVerification = asyncHandler(async (req, res, next) => {
       obj: {
         id: user.id,
         countryCode: user.countryCode,
-        phone: user.phone
-      }
+        phone: user.phone,
+      },
     };
 
     const accessToken = generateToken(tokenPayload);
@@ -220,13 +247,15 @@ const otpVerification = asyncHandler(async (req, res, next) => {
       data: {
         id: user.id,
         countryCode: user.countryCode,
-        phone: user.phone
+        phone: user.phone,
       },
-      token: accessToken
+      token: accessToken,
     });
   } catch (error) {
     await transaction.rollback();
-    return next(new ErrorHandler(error.message || "Internal server error", 500));
+    return next(
+      new ErrorHandler(error.message || "Internal server error", 500)
+    );
   }
 });
 const facebookDataDeletion = asyncHandler(async (req, res, next) => {
@@ -354,15 +383,20 @@ const deletionData = asyncHandler(async (req, res, next) => {
 
 const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-  
+
   try {
     const { countryCode, phone } = req.body;
 
     if (!phone || !countryCode) {
-      return next(new ErrorHandler("Both country code and phone number are required", 400));
+      return next(
+        new ErrorHandler("Both country code and phone number are required", 400)
+      );
     }
 
-    const phoneValidationResult = phoneValidation.validatePhone(countryCode, phone);
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
     if (!phoneValidationResult.isValid) {
       return next(new ErrorHandler(phoneValidationResult.message, 400));
     }
@@ -374,25 +408,31 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
     // Generate state for security
     const state = UUIDV4();
     const authLink = generateAuthLink(validPhone, state);
-    
+
     const message = "Click the link below to login to your account:";
     const messageInput = getLinkMessageInput(validPhone, authLink, message);
 
-    const response = await sendWhatsAppLink(JSON.parse(messageInput));
+    // Log the exact payload being sent
+    console.log('WhatsApp API Request Payload:', JSON.stringify(messageInput, null, 2));
 
-    // Store state in user record or separate table
+    const response = await sendWhatsAppLink(messageInput);
+
+    // Store state in user record
     let user = await User.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
-      transaction
+      transaction,
     });
 
     if (!user) {
-      user = await User.create({
-        countryCode: cleanedCountryCode,
-        phone: cleanedPhone,
-        authState: state,
-        stateExpiry: Date.now() + 5 * 60 * 1000, // 5 minutes validity
-      }, { transaction });
+      user = await User.create(
+        {
+          countryCode: cleanedCountryCode,
+          phone: cleanedPhone,
+          authState: state,
+          stateExpiry: Date.now() + 5 * 60 * 1000,
+        },
+        { transaction }
+      );
     } else {
       user.authState = state;
       user.stateExpiry = Date.now() + 5 * 60 * 1000;
@@ -406,19 +446,24 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
       message: "Authentication link sent successfully",
       data: {
         messageId: response.data.messages[0].id,
-        state
-      }
+        state,
+      },
     });
   } catch (error) {
     await transaction.rollback();
     console.error("Error initiating WhatsApp login:", error);
-    return next(new ErrorHandler(error.response?.data?.message || "Failed to initiate login", error.response?.status || 500));
+    return next(
+      new ErrorHandler(
+        error.response?.data?.error?.message || "Failed to initiate login",
+        error.response?.status || 500
+      )
+    );
   }
 });
 
 const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-  
+
   try {
     const { state, phone } = req.query;
 
@@ -427,17 +472,19 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
     }
 
     const user = await User.findOne({
-      where: { 
+      where: {
         phone: phone.slice(-10),
         authState: state,
-        stateExpiry: { [db.Sequelize.Op.gt]: Date.now() }
+        stateExpiry: { [db.Sequelize.Op.gt]: Date.now() },
       },
-      transaction
+      transaction,
     });
 
     if (!user) {
       await transaction.rollback();
-      return next(new ErrorHandler("Invalid or expired authentication request", 401));
+      return next(
+        new ErrorHandler("Invalid or expired authentication request", 401)
+      );
     }
 
     // Clear auth state
@@ -451,15 +498,17 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
       obj: {
         id: user.id,
         countryCode: user.countryCode,
-        phone: user.phone
-      }
+        phone: user.phone,
+      },
     };
 
     const accessToken = generateToken(tokenPayload);
     await transaction.commit();
 
     // Redirect to frontend with token
-    res.redirect(`${process.env.FRONTEND_URL}/auth/success?token=${accessToken}`);
+    res.redirect(
+      `${process.env.FRONTEND_URL}/auth/success?token=${accessToken}`
+    );
   } catch (error) {
     await transaction.rollback();
     console.error("Error handling WhatsApp callback:", error);
@@ -473,5 +522,5 @@ module.exports = {
   facebookDataDeletion,
   deletionData,
   initiateWhatsAppLogin,
-  handleWhatsAppCallback
+  handleWhatsAppCallback,
 };

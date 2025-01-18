@@ -48,19 +48,17 @@ const PROMPT_SUFFIX = " Sales Expert's JSON Answer:";
 // Format triplets as a JSON-compliant string
 const formatTripletsAsString = (cotList) => {
   if (!Array.isArray(cotList)) return cotList;
-
   const validatedTriplets = cotList
     .filter((item) => Array.isArray(item) && item.length === 3)
     .map((item) => `("${item[0]}", "${item[1]}", "${item[2]}")`)
     .slice(0, 3);
-
   return validatedTriplets.join(", ");
 };
 
-// Function to get response from Predibase
-const getPredibaseResponse = async (config, fullPrompt) => {
+// Modified Predibase response function to support streaming
+const getPredibaseResponse = async (config, fullPrompt, res = null) => {
   const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
-
+  
   const requestBody = {
     inputs: fullPrompt,
     parameters: {
@@ -69,55 +67,66 @@ const getPredibaseResponse = async (config, fullPrompt) => {
       max_new_tokens: config.max_new_tokens || 500,
       temperature: config.temperature || 0.2,
       top_p: config.top_p || 0.1,
+      stream: res ? true : false, // Enable streaming if res is provided
     },
   };
 
-  const response = await axios.post(apiUrl, requestBody, {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.api_token}`,
-    },
-  });
+  if (res) {
+    // Streaming response
+    const response = await axios.post(apiUrl, requestBody, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.api_token}`,
+      },
+      responseType: 'stream'
+    });
 
-  let generatedText = response.data.generated_text || response.data;
+    response.data.on('data', chunk => {
+      const data = chunk.toString();
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.generated_text) {
+          res.write(`data: ${JSON.stringify({ content: parsed.generated_text })}\n\n`);
+        }
+      } catch (e) {
+        console.error('Error parsing streaming chunk:', e);
+      }
+    });
 
-  // Process the response
-  if (typeof generatedText === "string") {
-    generatedText = generatedText.replace(/\n/g, "").trim();
-    const parsedResponse = JSON.parse(generatedText);
+    return new Promise((resolve, reject) => {
+      response.data.on('end', () => resolve());
+      response.data.on('error', reject);
+    });
+  } else {
+    // Regular response
+    const response = await axios.post(apiUrl, requestBody, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.api_token}`,
+      },
+    });
 
-    if (parsedResponse.COT) {
-      parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
+    let generatedText = response.data.generated_text || response.data;
+    if (typeof generatedText === "string") {
+      generatedText = generatedText.replace(/\n/g, "").trim();
+      const parsedResponse = JSON.parse(generatedText);
+      if (parsedResponse.COT) {
+        parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
+      }
+      return parsedResponse;
     }
-
-    return parsedResponse;
+    return generatedText;
   }
-
-  return generatedText;
 };
 
-// Function to process streaming via OpenAI
-const processOpenAIStream = async (content) => {
-  const openai = new OpenAI();
-  const stream = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: JSON.stringify(content) }],
-    stream: true,
-  });
-
-  return stream;
-};
-
-// Main chat handler
+// Main chat handler with SSE support
 const handleChatRequest = asyncHandler(async (req, res, next) => {
   try {
-    // Input validation
     if (!req.body.Question) {
       return next(new ErrorHandler("Missing required field: Question", 400));
     }
-    const validQuestion = req.body.Question.toLowerCase();
 
-    // Get active model configuration
+    const validQuestion = req.body.Question.toLowerCase();
     const config = await ModelConfig.findOne({
       where: {
         tenant_id: process.env.PREDIBASE_TENANT_ID,
@@ -130,58 +139,44 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Model configuration not found", 404));
     }
 
-    // Construct the complete prompt
     const fullPrompt = `${BASE_PROMPT}${validQuestion}${PROMPT_SUFFIX}`;
 
-    try {
-      // Get initial response from Predibase
-      const predibaseResponse = await getPredibaseResponse(config, fullPrompt);
+    // If streaming is requested
+    if (req.query.stream === "true") {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no"); // Important for nginx
+      
+      // Send initial connection established message
+      res.write(`data: ${JSON.stringify({ status: "connected" })}\n\n`);
 
-      // If streaming is requested
-      if (req.query.stream === "true") {
-        res.setHeader("Content-Type", "text/event-stream");
-        res.setHeader("Cache-Control", "no-cache");
-        res.setHeader("Connection", "keep-alive");
-
-        const stream = await processOpenAIStream(predibaseResponse);
-
-        for await (const chunk of stream) {
-          const content = chunk.choices[0]?.delta?.content || "";
-          if (content) {
-            res.write(`data: ${JSON.stringify({ content })}\n\n`);
-          }
-        }
-        // console.log("i am in streaming");
-
-        // Send the final complete response
-        return res.status(200).json({
-          streaming: true,
-          finalResponse: predibaseResponse,
-        });
-      } else {
-        // Regular response without streaming
-        // Update usage statistics
-        await config.update({
-          lastUsed: new Date(),
-          requestCount: config.requestCount + 1,
-        });
-        return res.status(200).json(predibaseResponse);
+      try {
+        await getPredibaseResponse(config, fullPrompt, res);
+        res.write(`data: ${JSON.stringify({ status: "complete" })}\n\n`);
+        res.end();
+      } catch (streamError) {
+        console.error("Streaming error:", streamError);
+        res.write(`data: ${JSON.stringify({ error: "Streaming error occurred" })}\n\n`);
+        res.end();
       }
-    } catch (parseError) {
-      console.error("Error processing response:", parseError);
-      return res.status(422).json({
-        error: "Malformed response from AI service",
-        details: parseError.message,
+    } else {
+      // Regular non-streaming response
+      const response = await getPredibaseResponse(config, fullPrompt);
+      
+      // Update usage statistics
+      await config.update({
+        lastUsed: new Date(),
+        requestCount: config.requestCount + 1,
       });
+
+      return res.status(200).json(response);
     }
   } catch (error) {
     console.error("Error processing chat request:", error);
-
-    // Enhanced error handling with rate limit detection
+    
     if (error.response?.status === 429) {
-      return next(
-        new ErrorHandler("Rate limit exceeded. Please try again later.", 429)
-      );
+      return next(new ErrorHandler("Rate limit exceeded. Please try again later.", 429));
     }
 
     const errorMessage = error.response?.data
@@ -190,7 +185,6 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
         : JSON.stringify(error.response.data)
       : error.message || "Internal server error";
 
-    // Log detailed error information
     console.error({
       message: errorMessage,
       stack: error.stack,
@@ -201,111 +195,5 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(errorMessage, error.response?.status || 500));
   }
 });
-
-// const handleChatRequest = asyncHandler(async (req, res, next) => {
-//   try {
-//     // Input validation
-//     if (!req.body.Question) {
-//       return next(new ErrorHandler("Missing required field: Question", 400));
-//     }
-//     const validQuestion=req.body.Question.toLowerCase();
-//     console.log(validQuestion);
-
-//     // Get active model configuration
-//     const config = await ModelConfig.findOne({
-//       where: {
-//         tenant_id: process.env.PREDIBASE_TENANT_ID,
-//         deployment_name: process.env.PREDIBASE_DEPLOYMENT,
-//         isActive: true,
-//       },
-//     });
-
-//     if (!config) {
-//       return next(new ErrorHandler("Model configuration not found", 404));
-//     }
-
-//     // Construct the complete prompt
-//     const fullPrompt = `${BASE_PROMPT}${validQuestion}${PROMPT_SUFFIX}`;
-
-//     // Prepare API request
-//     const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
-//     const requestBody = {
-//       inputs: fullPrompt,
-//       parameters: {
-//         adapter_source: config.adapter_source,
-//         adapter_id: config.adapter_id,
-//         max_new_tokens: 500,
-//         temperature: 0.2,
-//         top_p: 0.1,
-//       },
-//     };
-
-//     // Make request to Predibase API
-//     const response = await axios.post(apiUrl, requestBody, {
-//       headers: {
-//         "Content-Type": "application/json",
-//         Authorization: `Bearer ${config.api_token}`,
-//       },
-//     });
-
-//     // Update usage statistics
-//     await config.update({
-//       lastUsed: new Date(),
-//       requestCount: config.requestCount + 1,
-//     });
-
-//     // Process and clean the response
-//     let generatedText = response.data.generated_text || response.data;
-
-//     try {
-//       // If the response is a string, try to parse it as JSON
-//       if (typeof generatedText === "string") {
-//         generatedText = generatedText.replace(/\n/g, "").trim();
-//         const parsedResponse = JSON.parse(generatedText);
-
-//         // Format COT field if it exists
-//         if (parsedResponse.COT) {
-//           parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
-//         }
-
-//         return res.status(200).json(parsedResponse);
-//       }
-
-//       // If response is already an object, just send it
-//       return res.status(200).json(generatedText);
-//     } catch (parseError) {
-//       console.error("Error parsing generated text:", parseError);
-//       return res.status(422).json({
-//         error: "Malformed response from AI service",
-//         details: generatedText,
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error processing chat request:", error);
-
-//     // Enhanced error handling with rate limit detection
-//     if (error.response?.status === 429) {
-//       return next(
-//         new ErrorHandler("Rate limit exceeded. Please try again later.", 429)
-//       );
-//     }
-
-//     const errorMessage = error.response?.data
-//       ? typeof error.response.data === "string"
-//         ? error.response.data
-//         : JSON.stringify(error.response.data)
-//       : error.message || "Internal server error";
-
-//     // Log detailed error information
-//     console.error({
-//       message: errorMessage,
-//       stack: error.stack,
-//       responseData: error.response?.data,
-//       status: error.response?.status,
-//     });
-
-//     return next(new ErrorHandler(errorMessage, error.response?.status || 500));
-//   }
-// });
 
 module.exports = { handleChatRequest };
