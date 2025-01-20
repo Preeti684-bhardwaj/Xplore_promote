@@ -3,7 +3,7 @@ const bodyParser = require("body-parser");
 require("dotenv").config({ path: "./.env" });
 const app = express();
 const cors = require("cors");
-const path = require("path");
+// const path = require("path");
 const errorMiddleware = require("./middleware/Error")
 
 // Define the allowed origins
@@ -13,6 +13,7 @@ const allowedOrigins = [
     "http://localhost:5173",
     "https://xplr.live"
 ];
+
 
 // Configure CORS middleware
 app.use(cors({
@@ -45,7 +46,9 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.urlencoded({ extended: true }));
 
+
 // Routes Imports
+const authRouter = require('./Routes/authRoutes');
 const userRouter = require("./Routes/userRoutes");
 const adminRouter = require("./Routes/adminRoutes");
 const endUserRouter = require("./Routes/endUserRoutes");
@@ -63,8 +66,8 @@ const chatBotRouter=require('./Routes/chatRoutes')
 const {getLayoutByShortCode}=require('./Controller/getShortId')
 
 
-
 // Routes declaration
+app.use('/v1/auth', authRouter);
 app.use("/v1/user", userRouter);
 app.use("/v1/admin", adminRouter);
 app.use("/v1/endUser", endUserRouter);

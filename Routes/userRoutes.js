@@ -25,6 +25,7 @@ const {
 const { appleLogin, googleLogin } = require("../Controller/MainUserController");
 // const {googleLogin}=require('../Controller/googleSignin')
 const { verifyJWt, authorize, verifySession } = require("../middleware/auth");
+const { verifyEncryption} = require('../middleware/encryption');
 const { getContactDetails } = require("../Controller/contactUsController");
 const{deletionData,facebookDataDeletion,  initiateWhatsAppLogin,handleWhatsAppCallback}=require("../Controller/whatsappLogin")
 
@@ -54,7 +55,7 @@ router.get(
   getUserByToken
 );
 // get user profile layout
-router.get("/getUserProfile/:id", getUserProfile);
+router.get("/getUserProfile/:id",verifyEncryption, getUserProfile);
 router.put(
   "/updateUser",
   verifyJWt,
