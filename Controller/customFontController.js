@@ -417,7 +417,7 @@ const getAllUserFonts = async (req, res, next) => {
   }
 };
 
-const downloadFontBySpecificName = async (req, res, next) => {
+const downloadFontBySpecificName =asyncHandler(async (req, res, next) => {
   try {
     const { specificName } = req.query;
 
@@ -468,7 +468,39 @@ const downloadFontBySpecificName = async (req, res, next) => {
     console.error('General error:', error.message); // Add detailed error logging
     return next(new ErrorHandler(error.message, 500));
   }
-};
+});
+
+
+const fontUrlBySpecificName=asyncHandler(async (req, res, next) => {
+  try {
+    const { specificName } = req.query;
+
+    if (!specificName) {
+      return next(new ErrorHandler("Specific name is required", 400));
+    }
+
+    const fontWeight = await db.FontWeight.findOne({
+      where: { specificName },
+      include: [{
+        model: db.customFonts,
+        as: "customFont",
+        attributes: ["name"],
+      }],
+    });
+
+    if (!fontWeight) {
+      return next(new ErrorHandler("Font not found", 404));
+    }
+
+    const fontFileUrl = fontWeight.fontWeightFile;
+    console.log(fontFileUrl);
+      // Send the file
+      return res.status(200).send({success:true,data:fontFileUrl});
+  } catch (error) {
+    console.error('General error:', error.message); // Add detailed error logging
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
 
 // Get font by ID
 const getFontById = async (req, res, next) => {
@@ -573,6 +605,7 @@ module.exports = {
   uploadCustomFont,
   uploadUserCustomFont,
   downloadFontBySpecificName,
+  fontUrlBySpecificName,
   getAllFonts,
   getAllUserFonts,
   getFontById,

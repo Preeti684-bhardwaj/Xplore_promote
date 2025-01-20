@@ -9,20 +9,20 @@ const verifyEncryption = (req, res, next) => {
         // Log request attempt (remove in production or log securely)
         console.log(`Auth attempt from ${req.ip} at ${new Date().toISOString()}`);
 
-        if (!encryptedHeader || !timestamp) {
+        if (!encryptedHeader) {
             console.warn(`Missing headers from ${req.ip}`);
             return res.status(401).json({ error: 'Missing required headers' });
         }
 
-        // Verify timestamp is within acceptable range (e.g., 5 minutes)
-        const requestTime = new Date(parseInt(timestamp));
-        const now = new Date();
-        const timeDiff = Math.abs(now - requestTime);
+        // // Verify timestamp is within acceptable range (e.g., 5 minutes)
+        // const requestTime = new Date(parseInt(timestamp));
+        // const now = new Date();
+        // const timeDiff = Math.abs(now - requestTime);
         
-        if (timeDiff > 5 * 60 * 1000) { // 5 minutes
-            console.warn(`Expired timestamp from ${req.ip}`);
-            return res.status(401).json({ error: 'Request expired' });
-        }
+        // if (timeDiff > 5 * 60 * 1000) { // 5 minutes
+        //     console.warn(`Expired timestamp from ${req.ip}`);
+        //     return res.status(401).json({ error: 'Request expired' });
+        // }
 
         // Get the text to verify from request body
         const textToVerify = JSON.stringify(req.body);
