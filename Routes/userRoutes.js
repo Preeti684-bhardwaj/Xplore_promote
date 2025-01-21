@@ -55,7 +55,7 @@ router.get(
   getUserByToken
 );
 // get user profile layout
-router.get("/getUserProfile/:id",verifyEncryption, getUserProfile);
+router.get("/getUserProfile/:id",getUserProfile);
 router.put(
   "/updateUser",
   verifyJWt,

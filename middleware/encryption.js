@@ -36,6 +36,7 @@ const verifyEncryption = (req, res, next) => {
       .createHash("sha256")
       .update(`${keyManager.getCurrentKey()}${timestamp}`)
       .digest("hex");
+      
 
     if (serverHash !== encryptedHeader) {
       console.warn(`Invalid hash from ${req.ip}`);
