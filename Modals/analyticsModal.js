@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: "Unknown",
         validate: {
           notEmpty: true,
-          isIn: [["ios", "android", "windows", "linux", "macos", "other", "unknown"]], // Add valid sources
+          isIn: [["ios", "android","PostmanRuntime", "windows", "linux", "macos", "other", "unknown"]], // Add valid sources
         },
       },
       browser: {

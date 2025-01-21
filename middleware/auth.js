@@ -63,6 +63,37 @@ const verifyJWt = async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 };
+const verifyIp = async (req, res, next) => {
+  try {
+      // Get IP from X-Forwarded-For header or fallback to REMOTE_ADDR
+      const forwardedIp = req.headers['x-forwarded-for'];
+      const remoteAddr = req.socket.remoteAddress;
+      console.log(req);
+      
+      // If X-Forwarded-For exists, take the first IP in the list
+      // Otherwise use REMOTE_ADDR
+      if (forwardedIp) {
+          // X-Forwarded-For can contain multiple IPs, get the first one
+          const ips = forwardedIp.split(',');
+          req.ipAddress = ips[0].trim();
+      } else {
+          req.ipAddress = remoteAddr;
+      }
+
+      // Handle case where both might be undefined
+      if (!req.ipAddress) {
+          req.ipAddress = 'Unknown';
+      }
+
+      // Remove IPv6 prefix if present
+      req.ipAddress = req.ipAddress.replace(/^::ffff:/, '');
+      
+      next();
+  } catch (err) {
+      console.error('Error in IP verification middleware:', err);
+      next(err);
+  }
+};
 
 // -------------verify admin-----------------------------
 const verifyAdmin = async (req, res, next) => {
@@ -236,4 +267,4 @@ const verifySession = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyJWt,verifyAdmin,verifyEndUser, authorize, verifyUserAgent, verifySession };
+module.exports = { verifyJWt,verifyAdmin,verifyEndUser, authorize, verifyUserAgent, verifySession,verifyIp };

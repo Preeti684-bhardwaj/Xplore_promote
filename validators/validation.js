@@ -105,7 +105,7 @@ const detectOS = (userAgent) => {
   } else if (userAgent.includes('Android')) {
     return 'Android';
   } else if (userAgent.includes('iPhone') || userAgent.includes('iPad') || userAgent.includes('iPod')) {
-    return 'iOS';
+    return 'IOS';
   }
   return 'Unknown';
 };

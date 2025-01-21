@@ -108,8 +108,8 @@ const asyncHandler = require("../utils/asyncHandler.js");
 //       attributes: [
 //         "source",
 //         [sequelize.fn("COUNT", sequelize.col("source")), "count"],
-//         [sequelize.fn("ROUND", 
-//           sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"), 
+//         [sequelize.fn("ROUND",
+//           sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"),
 //           2
 //         ), "percentage"]
 //       ],
@@ -124,8 +124,8 @@ const asyncHandler = require("../utils/asyncHandler.js");
 //       attributes: [
 //         "device",
 //         [sequelize.fn("COUNT", sequelize.col("device")), "count"],
-//         [sequelize.fn("ROUND", 
-//           sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"), 
+//         [sequelize.fn("ROUND",
+//           sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"),
 //           2
 //         ), "percentage"]
 //       ],
@@ -170,22 +170,18 @@ const asyncHandler = require("../utils/asyncHandler.js");
 //   }
 // });
 
-
 const createAnalytics = asyncHandler(async (req, res, next) => {
   const t = await sequelize.transaction();
 
   try {
-    const { 
-      source, 
-      device, 
-      ipAddress, 
-      deviceId, 
+    const {
+      source,
+      deviceId,
       campaignID,
       timeZone,
       deviceName,
       osVersion,
       buildNumber,
-      osName,
       screenWidth,
       screenHeight,
       appName,
@@ -193,34 +189,52 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
       deviceModel,
       appVersion,
       language,
-      // New fields
       browser,
-      browserVersion
+      browserVersion,
     } = req.body;
 
     if (!campaignID) {
       return next(new ErrorHandler("Campaign ID is required", 400));
     }
 
-    if (!source || !device) {
+    if (!source) {
       return next(new ErrorHandler("missing required field", 400));
     }
-
-    const validDevices = ['ios', 'android', 'windows', 'linux', 'macos', 'other', 'unknown'];
+    const device = req.userOS.toLowerCase();
+    const ipAddress = req.ipAddress;
+    const validDevices = [
+      "ios",
+      "android",
+      "windows",
+      "linux",
+      "macos",
+      "other",
+      "PostmanRuntime",
+      "unknown",
+    ];
     if (device && !validDevices.includes(device.toLowerCase())) {
       return next(
         new ErrorHandler(
-          `Invalid device type. Allowed values are: ${validDevices.join(', ')}`,
+          `Invalid device type. Allowed values are: ${validDevices.join(", ")}`,
           400
         )
       );
     }
 
-    const validBrowsers = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'other'];
+    const validBrowsers = [
+      "chrome",
+      "firefox",
+      "safari",
+      "edge",
+      "opera",
+      "other",
+    ];
     if (browser && !validBrowsers.includes(browser.toLowerCase())) {
       return next(
         new ErrorHandler(
-          `Invalid browser type. Allowed values are: ${validBrowsers.join(', ')}`,
+          `Invalid browser type. Allowed values are: ${validBrowsers.join(
+            ", "
+          )}`,
           400
         )
       );
@@ -245,11 +259,15 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
     }
 
     if (region && region.length !== 2) {
-      return next(new ErrorHandler("Region must be a 2-character country code", 400));
+      return next(
+        new ErrorHandler("Region must be a 2-character country code", 400)
+      );
     }
 
     if (language && (language.length < 2 || language.length > 5)) {
-      return next(new ErrorHandler("Language must be between 2-5 characters", 400));
+      return next(
+        new ErrorHandler("Language must be between 2-5 characters", 400)
+      );
     }
 
     const campaign = await Campaign.findByPk(campaignID);
@@ -268,7 +286,7 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
         deviceName,
         osVersion,
         buildNumber,
-        osName,
+        osName:device,
         screenWidth,
         screenHeight,
         appName,
@@ -277,7 +295,7 @@ const createAnalytics = asyncHandler(async (req, res, next) => {
         appVersion,
         language,
         browser,
-        browserVersion
+        browserVersion,
       },
       { transaction: t }
     );
@@ -321,14 +339,20 @@ const getCampaignAnalytics = asyncHandler(async (req, res, next) => {
       attributes: [
         "source",
         [sequelize.fn("COUNT", sequelize.col("source")), "count"],
-        [sequelize.fn("ROUND", 
-          sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"), 
-          2
-        ), "percentage"]
+        [
+          sequelize.fn(
+            "ROUND",
+            sequelize.literal(
+              'COUNT(*)::decimal / (SELECT COUNT(*) FROM "Analytics" WHERE "campaignID" = :campaignID) * 100'
+            ),
+            2
+          ),
+          "percentage",
+        ],
       ],
       group: ["source"],
       order: [[sequelize.fn("COUNT", sequelize.col("source")), "DESC"]],
-      replacements: { campaignID }
+      replacements: { campaignID },
     });
 
     const deviceDistribution = await Analytic.findAll({
@@ -336,14 +360,20 @@ const getCampaignAnalytics = asyncHandler(async (req, res, next) => {
       attributes: [
         "device",
         [sequelize.fn("COUNT", sequelize.col("device")), "count"],
-        [sequelize.fn("ROUND", 
-          sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"), 
-          2
-        ), "percentage"]
+        [
+          sequelize.fn(
+            "ROUND",
+            sequelize.literal(
+              'COUNT(*)::decimal / (SELECT COUNT(*) FROM "Analytics" WHERE "campaignID" = :campaignID) * 100'
+            ),
+            2
+          ),
+          "percentage",
+        ],
       ],
       group: ["device"],
       order: [[sequelize.fn("COUNT", sequelize.col("device")), "DESC"]],
-      replacements: { campaignID }
+      replacements: { campaignID },
     });
 
     // New distributions
@@ -352,14 +382,20 @@ const getCampaignAnalytics = asyncHandler(async (req, res, next) => {
       attributes: [
         "osName",
         [sequelize.fn("COUNT", sequelize.col("osName")), "count"],
-        [sequelize.fn("ROUND", 
-          sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"), 
-          2
-        ), "percentage"]
+        [
+          sequelize.fn(
+            "ROUND",
+            sequelize.literal(
+              'COUNT(*)::decimal / (SELECT COUNT(*) FROM "Analytics" WHERE "campaignID" = :campaignID) * 100'
+            ),
+            2
+          ),
+          "percentage",
+        ],
       ],
       group: ["osName"],
       order: [[sequelize.fn("COUNT", sequelize.col("osName")), "DESC"]],
-      replacements: { campaignID }
+      replacements: { campaignID },
     });
 
     const regionDistribution = await Analytic.findAll({
@@ -367,50 +403,55 @@ const getCampaignAnalytics = asyncHandler(async (req, res, next) => {
       attributes: [
         "region",
         [sequelize.fn("COUNT", sequelize.col("region")), "count"],
-        [sequelize.fn("ROUND", 
-          sequelize.literal("COUNT(*)::decimal / (SELECT COUNT(*) FROM \"Analytics\" WHERE \"campaignID\" = :campaignID) * 100"), 
-          2
-        ), "percentage"]
+        [
+          sequelize.fn(
+            "ROUND",
+            sequelize.literal(
+              'COUNT(*)::decimal / (SELECT COUNT(*) FROM "Analytics" WHERE "campaignID" = :campaignID) * 100'
+            ),
+            2
+          ),
+          "percentage",
+        ],
       ],
       group: ["region"],
       order: [[sequelize.fn("COUNT", sequelize.col("region")), "DESC"]],
-      replacements: { campaignID }
+      replacements: { campaignID },
     });
 
     return res.status(200).json({
       success: true,
       data: {
         totalClicks,
-        sourceDistribution: sourceDistribution.map(dist => ({
+        sourceDistribution: sourceDistribution.map((dist) => ({
           source: dist.source,
-          count: parseInt(dist.get('count')),
-          percentage: parseFloat(dist.get('percentage'))
+          count: parseInt(dist.get("count")),
+          percentage: parseFloat(dist.get("percentage")),
         })),
-        deviceDistribution: deviceDistribution.map(dist => ({
+        deviceDistribution: deviceDistribution.map((dist) => ({
           device: dist.device,
-          count: parseInt(dist.get('count')),
-          percentage: parseFloat(dist.get('percentage'))
+          count: parseInt(dist.get("count")),
+          percentage: parseFloat(dist.get("percentage")),
         })),
-        osDistribution: osDistribution.map(dist => ({
+        osDistribution: osDistribution.map((dist) => ({
           osName: dist.osName,
-          count: parseInt(dist.get('count')),
-          percentage: parseFloat(dist.get('percentage'))
+          count: parseInt(dist.get("count")),
+          percentage: parseFloat(dist.get("percentage")),
         })),
-        regionDistribution: regionDistribution.map(dist => ({
+        regionDistribution: regionDistribution.map((dist) => ({
           region: dist.region,
-          count: parseInt(dist.get('count')),
-          percentage: parseFloat(dist.get('percentage'))
+          count: parseInt(dist.get("count")),
+          percentage: parseFloat(dist.get("percentage")),
         })),
         overview: {
-          topSource: sourceDistribution[0]?.source || 'N/A',
-          topDevice: deviceDistribution[0]?.device || 'N/A',
-          topOS: osDistribution[0]?.osName || 'N/A',
-          topRegion: regionDistribution[0]?.region || 'N/A',
-          totalDevices: deviceDistribution.length
-        }
+          topSource: sourceDistribution[0]?.source || "N/A",
+          topDevice: deviceDistribution[0]?.device || "N/A",
+          topOS: osDistribution[0]?.osName || "N/A",
+          topRegion: regionDistribution[0]?.region || "N/A",
+          totalDevices: deviceDistribution.length,
+        },
       },
     });
-
   } catch (error) {
     return next(new ErrorHandler(error.message, 400));
   }
