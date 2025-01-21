@@ -32,15 +32,16 @@ const verifyEncryption = (req, res, next) => {
     // console.log(textToVerify);
 
     // Recreate the hash on server side
-    const dataToHash = `${keyManager.getCurrentKey()}${timestamp}`;
-    const serverHash = crypto
-      .createHash("sha256")
-      .update(Buffer.from(dataToHash, "utf-8")) // Ensure consistent encoding
-      .digest("hex");
+    const serverHash = generateHash(keyManager.getCurrentKey(), timestamp);
+    
+    // Use constant-time comparison to prevent timing attacks
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(serverHash, 'hex'),
+      Buffer.from(encryptedHeader, 'hex')
+    );
 
-    if (serverHash !== encryptedHeader) {
-      console.warn(`Invalid hash from ${req.ip}`);
-      return res.status(401).json({ error: "Invalid authentication" });
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid authentication' });
     }
 
     next();
