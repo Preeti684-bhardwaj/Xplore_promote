@@ -50,9 +50,9 @@ const formatTripletsAsString = (cotList) => {
 
 const handleChatRequest = asyncHandler(async (req, res, next) => {
   // Set headers for streaming
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
 
   try {
     // Input validation
@@ -77,10 +77,10 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
     const fullPrompt = `${BASE_PROMPT}${validQuestion}${PROMPT_SUFFIX}`;
 
     // Prepare streaming API request
-    const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate_stream`;
-    
+    const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
+
     const response = await axios({
-      method: 'post',
+      method: "post",
       url: apiUrl,
       data: {
         inputs: fullPrompt,
@@ -90,76 +90,122 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
           max_new_tokens: 500,
           temperature: 0.2,
           top_p: 0.1,
-        }
+        },
       },
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.api_token}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.api_token}`,
       },
-      responseType: 'stream'
     });
 
-    let accumulatedData = '';
+    //     let accumulatedData = '';
 
-    response.data.on('data', chunk => {
-      try {
-        const lines = chunk.toString().split('\n');
-        lines.forEach(line => {
-          if (line.trim() === '') return;
-          
-          // Remove "data: " prefix if present
-          const jsonStr = line.replace(/^data: /, '');
-          
-          try {
-            const data = JSON.parse(jsonStr);
-            accumulatedData += data.generated_text || '';
-            
-            // Send the chunk to the client
-            res.write(`data: ${JSON.stringify({ chunk: data.generated_text })}\n\n`);
-          } catch (parseError) {
-            console.error('Error parsing chunk:', parseError);
-          }
-        });
-      } catch (streamError) {
-        console.error('Error processing stream chunk:', streamError);
+    //     response.data.on('data', chunk => {
+    //       try {
+    //         const lines = chunk.toString().split('\n');
+    //         lines.forEach(line => {
+    //           if (line.trim() === '') return;
+
+    //           // Remove "data: " prefix if present
+    //           const jsonStr = line.replace(/^data: /, '');
+
+    //           try {
+    //             const data = JSON.parse(jsonStr);
+    //             accumulatedData += data.generated_text || '';
+
+    //             // Send the chunk to the client
+    //             res.write(`data: ${JSON.stringify({ chunk: data.generated_text })}\n\n`);
+    //           } catch (parseError) {
+    //             console.error('Error parsing chunk:', parseError);
+    //           }
+    //         });
+    //       } catch (streamError) {
+    //         console.error('Error processing stream chunk:', streamError);
+    //       }
+    //     });
+
+    //     response.data.on('end', async () => {
+    //       try {
+    //         // Update usage statistics
+    //         await config.update({
+    //           lastUsed: new Date(),
+    //           requestCount: config.requestCount + 1,
+    //         });
+
+    //         // Try to parse the accumulated data as JSON
+    //         const cleanedData = accumulatedData.trim();
+    //         const parsedResponse = JSON.parse(cleanedData);
+
+    //         if (parsedResponse.COT) {
+    //           parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
+    //         }
+
+    //         // Send the final processed response
+    //         res.write(`data: ${JSON.stringify({ final: parsedResponse })}\n\n`);
+    //         res.end();
+    //       } catch (finalizeError) {
+    //         console.error('Error finalizing response:', finalizeError);
+    //         res.write(`data: ${JSON.stringify({ error: 'Error processing final response' })}\n\n`);
+    //         res.end();
+    //       }
+    //     });
+
+    //     response.data.on('error', (error) => {
+    //       console.error('Stream error:', error);
+    //       res.write(`data: ${JSON.stringify({ error: 'Stream error occurred' })}\n\n`);
+    //       res.end();
+    //     });
+
+    //   } catch (error) {
+    //     console.error("Error processing chat request:", error);
+
+    //     // Enhanced error handling
+    //     const statusCode = error.response?.status || 500;
+    //     const errorMessage = error.response?.data
+    //       ? typeof error.response.data === "string"
+    //         ? error.response.data
+    //         : JSON.stringify(error.response.data)
+    //       : error.message || "Internal server error";
+
+    //     // Log detailed error information
+    //     console.error({
+    //       message: errorMessage,
+    //       stack: error.stack,
+    //       responseData: error.response?.data,
+    //       status: statusCode
+    //     });
+
+    //     // Send error as SSE
+    //     res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+    //     res.end();
+    //   }
+    // });
+    // Process the response
+    const generatedText = response.data.generated_text || "";
+
+    try {
+      // Parse and format the response
+      const parsedResponse = JSON.parse(generatedText.trim());
+
+      if (parsedResponse.COT) {
+        parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
       }
-    });
 
-    response.data.on('end', async () => {
-      try {
-        // Update usage statistics
-        await config.update({
-          lastUsed: new Date(),
-          requestCount: config.requestCount + 1,
-        });
+      // Update usage statistics
+      await config.update({
+        lastUsed: new Date(),
+        requestCount: config.requestCount + 1,
+      });
 
-        // Try to parse the accumulated data as JSON
-        const cleanedData = accumulatedData.trim();
-        const parsedResponse = JSON.parse(cleanedData);
-        
-        if (parsedResponse.COT) {
-          parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
-        }
-
-        // Send the final processed response
-        res.write(`data: ${JSON.stringify({ final: parsedResponse })}\n\n`);
-        res.end();
-      } catch (finalizeError) {
-        console.error('Error finalizing response:', finalizeError);
-        res.write(`data: ${JSON.stringify({ error: 'Error processing final response' })}\n\n`);
-        res.end();
-      }
-    });
-
-    response.data.on('error', (error) => {
-      console.error('Stream error:', error);
-      res.write(`data: ${JSON.stringify({ error: 'Stream error occurred' })}\n\n`);
-      res.end();
-    });
-
+      // Send the final response
+      return res.status(200).json(parsedResponse);
+    } catch (parseError) {
+      console.error("Error parsing response:", parseError);
+      throw new ErrorHandler("Error processing model response", 500);
+    }
   } catch (error) {
     console.error("Error processing chat request:", error);
-    
+
     // Enhanced error handling
     const statusCode = error.response?.status || 500;
     const errorMessage = error.response?.data
@@ -173,13 +219,11 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
       message: errorMessage,
       stack: error.stack,
       responseData: error.response?.data,
-      status: statusCode
+      status: statusCode,
     });
 
-    // Send error as SSE
-    res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
-    res.end();
+    // Send error response
+    return res.status(statusCode).json({ error: errorMessage });
   }
 });
-
 module.exports = { handleChatRequest };
