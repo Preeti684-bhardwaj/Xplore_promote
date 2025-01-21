@@ -8,7 +8,7 @@ const generateHash = (authKey, timestamp) => {
   
   const hashBytes = crypto
     .createHash("sha256")
-    .update(dataToEncrypt)
+    .update(dataToEncrypt, 'utf8')
     .digest();
     
   // Mirror Android's formatting exactly: hashBytes.joinToString("") { "%02x".format(it) }
@@ -40,7 +40,7 @@ const verifyEncryption = (req, res, next) => {
     console.log('Server generated hash:', serverHash); // For debugging
 
     // Compare the hashes
-    if (serverHash.toLowerCase() !== encryptedHeader.toLowerCase()) {
+    if (serverHash !== encryptedHeader) {
       console.warn(`Invalid hash from ${req.ip}`);
       console.warn('Expected:', serverHash);
       console.warn('Received:', encryptedHeader);
