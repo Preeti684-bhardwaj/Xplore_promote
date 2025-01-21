@@ -1,5 +1,6 @@
 const { uploadFiles, deleteFile } = require("../utils/cdnImplementation.js");
-
+const db = require("../dbConfig/dbConfig.js");
+const Campaign = db.campaigns;
 // Constants
 const CAMPAIGN_CONSTANTS = {
   MAX_FILES: 1,
@@ -12,7 +13,7 @@ const CAMPAIGN_CONSTANTS = {
 const validateFiles = (files) => {
   // Check if files exist
   if (!files || Object.keys(files).length === 0) {
-    return "At least one file upload is required"
+    return "At least one file upload is required";
   }
 
   // Convert to array if it's not already (handles both array and object inputs)
@@ -20,13 +21,13 @@ const validateFiles = (files) => {
 
   // Check maximum number of files
   if (fileArray.length > CAMPAIGN_CONSTANTS.MAX_FILES) {
-    return `Maximum ${CAMPAIGN_CONSTANTS.MAX_FILES} files allowed`
+    return `Maximum ${CAMPAIGN_CONSTANTS.MAX_FILES} files allowed`;
   }
 
   // Check each file's size
   for (const file of fileArray) {
     if (file.size > CAMPAIGN_CONSTANTS.MAX_FILE_SIZE) {
-      return `File ${file.name} exceeds size limit of ${CAMPAIGN_CONSTANTS.MAX_FILE_SIZE} bytes`
+      return `File ${file.name} exceeds size limit of ${CAMPAIGN_CONSTANTS.MAX_FILE_SIZE} bytes`;
     }
   }
   // If all validations pass, return true
@@ -92,9 +93,34 @@ const cleanupFiles = async (files) => {
 
 // Pagination helper function
 const getPagination = (page, size) => {
-  const limit = +size || 10;  // Default limit is 10
-  const offset = (+page || 0) * limit;  // Default page is 0
+  const limit = +size || 10; // Default limit is 10
+  const offset = (+page || 0) * limit; // Default page is 0
   return { limit, offset };
+};
+
+// for meta injection
+const getCampaignMetaData = async (campaignId) => {
+  try {
+    // Assuming you have a campaigns model in your Sequelize setup
+    const campaign = await Campaign.findOne({
+      where: { campaignID: campaignId },
+      attributes: ["campaignID", "name", "description", "images","shortCode"],
+    });
+
+    if (!campaign) {
+      return null;
+    }
+
+    return {
+      title: campaign.name,
+      description: campaign.description,
+      image: campaign.images[0].url,
+      url: `${process.env.PRODUCTION_BASE_URL}/campaigns/${campaign.shortCode}`,
+    };
+  } catch (error) {
+    console.error("Error fetching campaign metadata:", error);
+    return null;
+  }
 };
 
 module.exports = {
@@ -103,4 +129,5 @@ module.exports = {
   handleFileUpload,
   cleanupFiles,
   getPagination,
+  getCampaignMetaData
 };

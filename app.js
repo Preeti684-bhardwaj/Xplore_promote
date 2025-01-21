@@ -4,7 +4,8 @@ require("dotenv").config({ path: "./.env" });
 const app = express();
 const cors = require("cors");
 // const path = require("path");
-const errorMiddleware = require("./middleware/Error")
+const errorMiddleware = require("./middleware/Error");
+const metaTagMiddleware = require("./middleware/metaInjection.js");
 
 // Define the allowed origins
 const allowedOrigins = [
@@ -45,7 +46,7 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.urlencoded({ extended: true }));
-
+app.use(metaTagMiddleware());
 
 // Routes Imports
 const authRouter = require('./Routes/authRoutes');
