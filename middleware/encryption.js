@@ -2,20 +2,20 @@ const crypto = require("crypto");
 const { keyManager } = require("../config/keys");
 
 // This function exactly mirrors the Android implementation
-// const generateHash = (authKey, timestamp) => {
-//   const dataToEncrypt = `${authKey}${timestamp}`;
-//   console.log('Data to encrypt:', dataToEncrypt); // For debugging
+const generateHash = (authKey, timestamp) => {
+  const dataToEncrypt = `${authKey}${timestamp}`;
+  console.log('Data to encrypt:', dataToEncrypt); // For debugging
   
-//   const hashBytes = crypto
-//     .createHash("sha256")
-//     .update(dataToEncrypt, 'utf8')
-//     .digest();
+  const hashBytes = crypto
+    .createHash("sha256")
+    .update(dataToEncrypt, 'utf8')
+    .digest();
     
-//   // Mirror Android's formatting exactly: hashBytes.joinToString("") { "%02x".format(it) }
-//   return Array.from(hashBytes)
-//     .map(b => b.toString(16).padStart(2, '0'))
-//     .join('');
-// };
+  // Mirror Android's formatting exactly: hashBytes.joinToString("") { "%02x".format(it) }
+  return Array.from(hashBytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+};
 
 const verifyEncryption = (req, res, next) => {
   try {
