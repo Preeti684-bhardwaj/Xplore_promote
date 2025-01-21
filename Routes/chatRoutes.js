@@ -3,9 +3,10 @@ const router = express.Router();
 const {handleChatRequest} = require('../Controller/chatController');
 const {createOrUpdateConfig}=require('../Controller/configController');
 const {verifyAdmin, authorize } = require("../middleware/auth");
+const { verifyEncryption} = require('../middleware/encryption');
 
 router.post('/config',verifyAdmin,
     authorize(["ADMIN"]), createOrUpdateConfig);
-router.post('/chat', handleChatRequest);
+router.post('/chat',verifyEncryption, handleChatRequest);
 
 module.exports = router;
