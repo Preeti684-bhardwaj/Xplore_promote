@@ -1,4 +1,3 @@
-// whatsappHandler.js
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -19,10 +18,9 @@ const sendWhatsAppLink = async (data) => {
     process.env.ACCESS_TOKEN,
     process.env.FACEBOOK_APP_SECRET
   );
-
   const config = {
     method: 'post',
-    url: `https://graph.facebook.com/v17.0/${process.env.PHONE_NUMBER_ID}/messages`,
+    url: `https://graph.facebook.com/${process.env.VERSION}/${process.env.PHONE_NUMBER_ID}/messages`,
     headers: {
       'Authorization': `Bearer ${process.env.ACCESS_TOKEN}`,
       'Content-Type': 'application/json'
@@ -45,7 +43,6 @@ const sendWhatsAppLink = async (data) => {
     throw error;
   }
 }
-
 const getLinkMessageInput = (recipient, link, text) => {
   // Validate phone number format
   if (!recipient.startsWith('+')) {
