@@ -1,6 +1,21 @@
 const crypto = require("crypto");
 const { keyManager } = require("../config/keys");
-const { log } = require("console");
+
+// This function exactly mirrors the Android implementation
+// const generateHash = (authKey, timestamp) => {
+//   const dataToEncrypt = `${authKey}${timestamp}`;
+//   console.log('Data to encrypt:', dataToEncrypt); // For debugging
+  
+//   const hashBytes = crypto
+//     .createHash("sha256")
+//     .update(dataToEncrypt, 'utf8')
+//     .digest();
+    
+//   // Mirror Android's formatting exactly: hashBytes.joinToString("") { "%02x".format(it) }
+//   return Array.from(hashBytes)
+//     .map(b => b.toString(16).padStart(2, '0'))
+//     .join('');
+// };
 
 const verifyEncryption = (req, res, next) => {
   try {
@@ -9,39 +24,27 @@ const verifyEncryption = (req, res, next) => {
 
     // Log request attempt (remove in production or log securely)
     console.log(`Auth attempt from ${req.ip} at ${new Date().toISOString()}`);
+    console.log('Received encrypted header:', encryptedHeader);
+    console.log('Received timestamp:', timestamp);
 
-    if (!encryptedHeader) {
+    if (!encryptedHeader || !timestamp) {
       console.warn(`Missing headers from ${req.ip}`);
       return res.status(401).json({ error: "Missing required headers" });
     }
 
-    console.log(encryptedHeader);
-
-    // // Verify timestamp is within acceptable range (e.g., 5 minutes)
-    // const requestTime = new Date(parseInt(timestamp));
-    // const now = new Date();
-    // const timeDiff = Math.abs(now - requestTime);
-
-    // if (timeDiff > 5 * 60 * 1000) { // 5 minutes
-    //     console.warn(`Expired timestamp from ${req.ip}`);
-    //     return res.status(401).json({ error: 'Request expired' });
-    // }
-
-    // Get the text to verify from request body
-    // const textToVerify = JSON.stringify(req.body);
-    // console.log(textToVerify);
-
-    // Recreate the hash on server side
-    const serverHash = generateHash(keyManager.getCurrentKey(), timestamp);
+    // Get current key and generate hash
+    const currentKey = keyManager.getCurrentKey();
+    console.log('Using key:', currentKey); // For debugging
     
-    // Use constant-time comparison to prevent timing attacks
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(serverHash, 'hex'),
-      Buffer.from(encryptedHeader, 'hex')
-    );
+    const serverHash = generateHash(currentKey, timestamp);
+    console.log('Server generated hash:', serverHash); // For debugging
 
-    if (!isValid) {
-      return res.status(401).json({ error: 'Invalid authentication' });
+    // Compare the hashes
+    if (serverHash.toLowerCase() !== encryptedHeader.toLowerCase()) {
+      console.warn(`Invalid hash from ${req.ip}`);
+      console.warn('Expected:', serverHash);
+      console.warn('Received:', encryptedHeader);
+      return res.status(401).json({ error: "Invalid authentication" });
     }
 
     next();
@@ -51,4 +54,4 @@ const verifyEncryption = (req, res, next) => {
   }
 };
 
-module.exports = { verifyEncryption };
+module.exports = { verifyEncryption};
