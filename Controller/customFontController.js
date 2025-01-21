@@ -5,7 +5,7 @@ const CustomFont = db.customFonts;
 const User = db.users;
 const FontWeight = db.FontWeight;
 const axios = require("axios");
-const { uploadFile,deleteFile} = require("../utils/cdnImplementation.js");
+const { uploadFile, deleteFile } = require("../utils/cdnImplementation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
@@ -186,8 +186,19 @@ const uploadUserCustomFont = async (req, res, next) => {
     });
 
     if (existingSpecificName) {
-      await transaction.rollback();
-      return next(new ErrorHandler("Specific name must be unique", 400));
+      // Instead of error, return the existing font data
+      const responseData = {
+          id: existingSpecificName.id,
+          fontWeightName: existingSpecificName.name,
+          specificName: existingSpecificName.specificName,
+          fontWeightFile: existingSpecificName.fontWeightFile,
+      };
+
+      return res.status(200).json({
+        success: true,
+        message: "Font with this specific name already exists",
+        data: responseData,
+      });
     }
 
     if (existingFont) {
@@ -378,46 +389,46 @@ const getAllUserFonts = async (req, res, next) => {
     const fonts = await CustomFont.findAll({
       where: { userId: user.id },
       include: [
-        { 
-          model: User, 
-          as: "user", 
-          attributes: ["id"] 
+        {
+          model: User,
+          as: "user",
+          attributes: ["id"],
         },
         {
           model: db.FontWeight,
           as: "fontWeights",
-          attributes: ["id", "name", "specificName", "fontWeightFile"]
-        }
+          attributes: ["id", "name", "specificName", "fontWeightFile"],
+        },
       ],
       order: [["createdAt", "DESC"]],
     });
 
     // Transform the response to match the desired format
-    const transformedFonts = fonts.map(font => ({
+    const transformedFonts = fonts.map((font) => ({
       id: font.id,
       name: font.name,
       userId: font.userId,
       createdAt: font.createdAt,
       updatedAt: font.updatedAt,
-      fontWeights: font.fontWeights.map(weight => ({
+      fontWeights: font.fontWeights.map((weight) => ({
         id: weight.id,
         fontWeightName: weight.name,
         specificName: weight.specificName,
-        fontWeightFile: weight.fontWeightFile
-      }))
+        fontWeightFile: weight.fontWeightFile,
+      })),
     }));
 
     return res.status(200).json({
       success: true,
       count: fonts.length,
-      data: transformedFonts
+      data: transformedFonts,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
 };
 
-const downloadFontBySpecificName =asyncHandler(async (req, res, next) => {
+const downloadFontBySpecificName = asyncHandler(async (req, res, next) => {
   try {
     const { specificName } = req.query;
 
@@ -427,11 +438,13 @@ const downloadFontBySpecificName =asyncHandler(async (req, res, next) => {
 
     const fontWeight = await db.FontWeight.findOne({
       where: { specificName },
-      include: [{
-        model: db.customFonts,
-        as: "customFont",
-        attributes: ["name"],
-      }],
+      include: [
+        {
+          model: db.customFonts,
+          as: "customFont",
+          attributes: ["name"],
+        },
+      ],
     });
 
     if (!fontWeight) {
@@ -444,34 +457,32 @@ const downloadFontBySpecificName =asyncHandler(async (req, res, next) => {
     try {
       // Use axios instead of fetch
       const response = await axios({
-        method: 'get',
+        method: "get",
         url: fontFileUrl,
-        responseType: 'arraybuffer'
+        responseType: "arraybuffer",
       });
 
       // Set appropriate headers
-      res.setHeader('Content-Type', 'font/ttf');
+      res.setHeader("Content-Type", "font/ttf");
       res.setHeader(
-        'Content-Disposition', 
+        "Content-Disposition",
         `attachment; filename="${fontWeight.customFont.name}_${fontWeight.name}.ttf"`
       );
-      res.setHeader('Content-Length', response.data.length);
+      res.setHeader("Content-Length", response.data.length);
 
       // Send the file
       return res.send(response.data);
-
     } catch (error) {
-      console.error('Download error:', error.message); // Add detailed error logging
+      console.error("Download error:", error.message); // Add detailed error logging
       return next(new ErrorHandler("Error downloading font file", 500));
     }
   } catch (error) {
-    console.error('General error:', error.message); // Add detailed error logging
+    console.error("General error:", error.message); // Add detailed error logging
     return next(new ErrorHandler(error.message, 500));
   }
 });
 
-
-const fontUrlBySpecificName=asyncHandler(async (req, res, next) => {
+const fontUrlBySpecificName = asyncHandler(async (req, res, next) => {
   try {
     const { specificName } = req.query;
 
@@ -481,11 +492,13 @@ const fontUrlBySpecificName=asyncHandler(async (req, res, next) => {
 
     const fontWeight = await db.FontWeight.findOne({
       where: { specificName },
-      include: [{
-        model: db.customFonts,
-        as: "customFont",
-        attributes: ["name"],
-      }],
+      include: [
+        {
+          model: db.customFonts,
+          as: "customFont",
+          attributes: ["name"],
+        },
+      ],
     });
 
     if (!fontWeight) {
@@ -494,10 +507,10 @@ const fontUrlBySpecificName=asyncHandler(async (req, res, next) => {
 
     const fontFileUrl = fontWeight.fontWeightFile;
     console.log(fontFileUrl);
-      // Send the file
-      return res.status(200).send({success:true,data:fontFileUrl});
+    // Send the file
+    return res.status(200).send({ success: true, data: fontFileUrl });
   } catch (error) {
-    console.error('General error:', error.message); // Add detailed error logging
+    console.error("General error:", error.message); // Add detailed error logging
     return next(new ErrorHandler(error.message, 500));
   }
 });
@@ -523,7 +536,7 @@ const getFontById = async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 };
-// delete fontweight file from cdn and db 
+// delete fontweight file from cdn and db
 const deleteFontWeight = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -537,31 +550,37 @@ const deleteFontWeight = async (req, res, next) => {
     // Find the font weight and include the associated custom font for ownership verification
     const fontWeight = await db.FontWeight.findOne({
       where: { id },
-      include: [{
-        model: db.customFonts,
-        as: "customFont",
-        where: { userId }, // Ensure the font belongs to the requesting user
-        required: true
-      }],
-      transaction
+      include: [
+        {
+          model: db.customFonts,
+          as: "customFont",
+          where: { userId }, // Ensure the font belongs to the requesting user
+          required: true,
+        },
+      ],
+      transaction,
     });
 
     if (!fontWeight) {
       await transaction.rollback();
-      return next(new ErrorHandler("Font weight not found or unauthorized", 404));
+      return next(
+        new ErrorHandler("Font weight not found or unauthorized", 404)
+      );
     }
 
     // Extract the filename from the CDN URL
     const fontWeightFile = fontWeight.fontWeightFile;
-    const fileName = fontWeightFile.split('/').pop(); // Get the last part of the URL
+    const fileName = fontWeightFile.split("/").pop(); // Get the last part of the URL
 
     try {
       // Delete file from MinIO/CDN
       await deleteFile(fileName);
     } catch (error) {
-      console.error('Error deleting file from storage:', error);
+      console.error("Error deleting file from storage:", error);
       await transaction.rollback();
-      return next(new ErrorHandler("Error deleting font file from storage", 500));
+      return next(
+        new ErrorHandler("Error deleting font file from storage", 500)
+      );
     }
 
     // Delete the font weight from database
@@ -570,14 +589,14 @@ const deleteFontWeight = async (req, res, next) => {
     // Check if this was the last weight for the font
     const remainingWeights = await db.FontWeight.count({
       where: { customFontId: fontWeight.customFontId },
-      transaction
+      transaction,
     });
 
     // If no weights remain, delete the parent font
     if (remainingWeights === 0) {
       await db.customFonts.destroy({
         where: { id: fontWeight.customFontId },
-        transaction
+        transaction,
       });
     }
 
@@ -591,12 +610,11 @@ const deleteFontWeight = async (req, res, next) => {
         fontWeightName: fontWeight.name,
         specificName: fontWeight.specificName,
         // wasLastWeight: remainingWeights === 0
-      }
+      },
     });
-
   } catch (error) {
     await transaction.rollback();
-    console.error('Delete font weight error:', error);
+    console.error("Delete font weight error:", error);
     return next(new ErrorHandler(error.message, 500));
   }
 };
@@ -609,5 +627,5 @@ module.exports = {
   getAllFonts,
   getAllUserFonts,
   getFontById,
-  deleteFontWeight
+  deleteFontWeight,
 };
