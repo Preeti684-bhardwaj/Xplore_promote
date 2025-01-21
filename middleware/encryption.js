@@ -8,13 +8,13 @@ const generateHash = (authKey, timestamp) => {
   
   const hashBytes = crypto
     .createHash("sha256")
-    .update(dataToEncrypt, 'utf8')
+    .update(dataToEncrypt)
     .digest();
     
   // Mirror Android's formatting exactly: hashBytes.joinToString("") { "%02x".format(it) }
-  return Array.from(hashBytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+//   return Array.from(hashBytes)
+//     .map(b => b.toString(16).padStart(2, '0'))
+//     .join('');
 };
 
 const verifyEncryption = (req, res, next) => {
