@@ -89,7 +89,7 @@ const getPlatform = (userAgent) => {
   if (!userAgent) return 'unknown';
   
   // Check if it's a mobile device
-  const isMobile = /Mobile|Android|iPhone|iPad|iPod|PostmanRuntime|okhttp|CFNetwork|Darwin/i.test(userAgent);
+  const isMobile = /Mobile|Android|iPhone|iPad|iPod|iPad Simulator|iPhone Simulator|iPod Simulator|PostmanRuntime|okhttp|CFNetwork|Darwin/i.test(userAgent);
   return isMobile ? 'mobile' : 'web';
 };
 
@@ -104,7 +104,7 @@ const detectOS = (userAgent) => {
     return 'Linux';
   } else if (userAgent.includes('Android') ||userAgent.includes('okhttp')) {
     return 'Android';
-  } else if (userAgent.includes('iPhone') || userAgent.includes('iPad') || userAgent.includes('iPod') || userAgent.includes('CFNetwork') || userAgent.includes('Darwin')) {
+  } else if (userAgent.includes('iPhone') || userAgent.includes('iPad') || userAgent.includes('iPod') || userAgent.includes('iPad Simulator') || userAgent.includes('iPhone Simulator') || userAgent.includes('iPod Simulator') || userAgent.includes('CFNetwork') || userAgent.includes('Darwin')) {
     return 'IOS';
   }
   return 'Unknown';

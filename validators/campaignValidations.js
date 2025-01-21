@@ -99,11 +99,11 @@ const getPagination = (page, size) => {
 };
 
 // for meta injection
-const getCampaignMetaData = async (campaignId) => {
+const getCampaignMetaData = async (campaignShortCode) => {
   try {
     // Assuming you have a campaigns model in your Sequelize setup
     const campaign = await Campaign.findOne({
-      where: { campaignID: campaignId },
+      where: { shortCode: campaignShortCode },
       attributes: ["campaignID", "name", "description", "images","shortCode"],
     });
 

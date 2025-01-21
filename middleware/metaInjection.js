@@ -7,10 +7,10 @@ const metaTagMiddleware = () => {
       console.log(campaignIdMatch,"hi i am in metatag middleare");
       
       if (campaignIdMatch) {
-        const campaignId = campaignIdMatch[1];
+        const campaignShortCode = campaignIdMatch[1];
         
         try {
-          const metaData = await getCampaignMetaData(campaignId);
+          const metaData = await getCampaignMetaData(campaignShortCode);
           console.log(metaData,"i am here getting metadata value");
           
           if (metaData) {
