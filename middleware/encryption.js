@@ -11,6 +11,7 @@ const generateHash = (authKey, timestamp) => {
     .update(dataToEncrypt, 'utf8')
     .digest();
     
+    return hashBytes;
   // Mirror Android's formatting exactly: hashBytes.joinToString("") { "%02x".format(it) }
 //   return Array.from(hashBytes)
 //     .map(b => b.toString(16).padStart(2, '0'))
