@@ -3,7 +3,7 @@ const {getCampaignMetaData}=require('../validators/campaignValidations')
 const metaTagMiddleware = () => {
     return async (req, res, next) => {
       // Only process routes that match campaign patterns
-      const campaignIdMatch = req.path.match(/\/v1\/campaign\/getOne\/([^\/]+)/);
+      const campaignIdMatch = req.path.match(/\/api\/v1\/viewLayout\/([^\/]+)/);
       console.log(campaignIdMatch,"hi i am in metatag middleare");
       
       if (campaignIdMatch) {
