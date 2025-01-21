@@ -102,9 +102,9 @@ const detectOS = (userAgent) => {
     return 'MacOS';
   } else if (userAgent.includes('Linux')) {
     return 'Linux';
-  } else if (userAgent.includes('Android')) {
+  } else if (userAgent.includes('Android') ||userAgent.includes('okhttp')) {
     return 'Android';
-  } else if (userAgent.includes('iPhone') || userAgent.includes('iPad') || userAgent.includes('iPod')) {
+  } else if (userAgent.includes('iPhone') || userAgent.includes('iPad') || userAgent.includes('iPod') || userAgent.includes('CFNetwork') || userAgent.includes('Darwin')) {
     return 'IOS';
   }
   return 'Unknown';
