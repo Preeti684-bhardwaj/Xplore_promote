@@ -7,6 +7,6 @@ const { verifyEncryption} = require('../middleware/encryption');
 
 router.post('/config',verifyAdmin,
     authorize(["ADMIN"]), createOrUpdateConfig);
-router.post('/chat',verifyEncryption, handleChatRequest);
+router.post('/chat', handleChatRequest);
 
 module.exports = router;
