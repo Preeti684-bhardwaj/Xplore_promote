@@ -32,11 +32,11 @@ const verifyEncryption = (req, res, next) => {
     // console.log(textToVerify);
 
     // Recreate the hash on server side
+    const dataToHash = `${keyManager.getCurrentKey()}${timestamp}`;
     const serverHash = crypto
       .createHash("sha256")
-      .update(`${keyManager.getCurrentKey()}${timestamp}`)
+      .update(Buffer.from(dataToHash, "utf-8")) // Ensure consistent encoding
       .digest("hex");
-      
 
     if (serverHash !== encryptedHeader) {
       console.warn(`Invalid hash from ${req.ip}`);
