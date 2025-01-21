@@ -1,4 +1,5 @@
 const cheerio = require('cheerio');
+const {getCampaignMetaData}=require('../validators/campaignValidations')
 
 const metaTagMiddleware = () => {
   return async (req, res, next) => {
