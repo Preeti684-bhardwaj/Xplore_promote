@@ -84,6 +84,8 @@ const uploadFile = async (file) => {
         break;
       } catch (error) {
         attempts++;
+        console.log("error of stack",error.stack);
+        console.log("error message",error.message);
         if (attempts === maxAttempts) throw error;
         await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
       }
