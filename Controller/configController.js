@@ -24,7 +24,7 @@ const createOrUpdateConfig = asyncHandler(async (req, res, next) => {
 
   try {
     const existingConfig = await ModelConfig.findOne({
-      where: { tenant_id, adapter_id }
+      where: { tenant_id, adapter_id,deployment_name }
     });
 
     const configData = {

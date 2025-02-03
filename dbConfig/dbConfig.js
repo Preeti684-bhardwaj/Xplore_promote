@@ -1,7 +1,7 @@
 const {env}=require('../dbConfig/dbEnv.js')
 const pg = require("pg");
 const Sequelize = require("sequelize");
-console.log(env.password);
+// console.log(env.password);
 
 // Create Sequelize instance with error handling
 let sequelize;
