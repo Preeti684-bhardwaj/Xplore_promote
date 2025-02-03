@@ -74,7 +74,7 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
   });
   const getPreviewByShortCode = asyncHandler(async (req, res, next) => {
     try {
-        const { shortCode } = req.params;
+      const shortCode = req.params[0];
         
         // Reuse your existing logic to fetch data
         const user = await User.findOne({ where: { shortCode } });

@@ -85,7 +85,7 @@ app.use("/v1/viewLayout/:shortCode",getLayoutByShortCode);
 app.use("/v1/font",customFontRouter);
 app.use("/v1/analytics",analyticsRouter);
 app.use("/v1/product",productImageRouter);
-app.get("/v1/preview/:shortCode", getPreviewByShortCode);
+app.get("/v1/preview/*", getPreviewByShortCode);
 
 // Middleware for error
 app.use(errorMiddleware);
