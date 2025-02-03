@@ -64,7 +64,8 @@ const customFontRouter=require("./Routes/customFontRoutes");
 const analyticsRouter=require("./Routes/analyticsRoutes");
 const productImageRouter=require("./Routes/productImagesRoutes");
 const chatBotRouter=require('./Routes/chatRoutes')
-const {getLayoutByShortCode}=require('./Controller/getShortId')
+const {getLayoutByShortCode,getPreviewByShortCode}=require('./Controller/getShortId');
+
 
 
 // Routes declaration
@@ -83,7 +84,8 @@ app.use("/v1/client",clientRouter);
 app.use("/v1/viewLayout/:shortCode",getLayoutByShortCode);
 app.use("/v1/font",customFontRouter);
 app.use("/v1/analytics",analyticsRouter);
-app.use("/v1/product",productImageRouter)
+app.use("/v1/product",productImageRouter);
+app.get("/v1/preview/:shortCode", getPreviewByShortCode);
 
 // Middleware for error
 app.use(errorMiddleware);

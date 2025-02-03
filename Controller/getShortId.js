@@ -72,5 +72,47 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(error.message, 500));
     }
   });
+  const getPreviewByShortCode = asyncHandler(async (req, res, next) => {
+    try {
+        const { shortCode } = req.params;
+        
+        // Reuse your existing logic to fetch data
+        const user = await User.findOne({ where: { shortCode } });
+        if (user) {
+            return res.send(`
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <title>${user.name}</title>
+                        <meta property="og:title" content="${user.name}" />
+                        <meta property="og:description" content="${user.bio}" />
+                        <meta property="og:image" content="${user.avatar}" />
+                    </head>
+                    <body>Redirecting...</body>
+                </html>
+            `);
+        }
+
+        const campaign = await Campaign.findOne({ where: { shortCode } });
+        if (campaign) {
+            return res.send(`
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <title>${campaign.name}</title>
+                        <meta property="og:title" content="${campaign.name}" />
+                        <meta property="og:description" content="${campaign.description}" />
+                        <meta property="og:image" content="${campaign.thumbnail}" />
+                    </head>
+                    <body>Redirecting...</body>
+                </html>
+            `);
+        }
+
+        return next(new ErrorHandler("Resource not found", 404));
+    } catch (error) {
+        next(error);
+    }
+});
   
-  module.exports = {getLayoutByShortCode}
+  module.exports = {getLayoutByShortCode,getPreviewByShortCode}
