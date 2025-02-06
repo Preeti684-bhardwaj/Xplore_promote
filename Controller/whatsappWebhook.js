@@ -1,118 +1,154 @@
-const crypto = require('crypto');
+const crypto = require("crypto");
+const asyncHandler = require("../utils/asyncHandler");
 require("dotenv").config();
+const axios = require("axios");
 
 // Validate webhook signature
-function validateSignature(payload, signature, webhookSecret) {
-  if (!signature) return false;
+// function validateSignature(payload, signature, webhookSecret) {
+//   if (!signature) return false;
 
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(JSON.stringify(payload))
-    .digest('hex');
+//   const expectedSignature = crypto
+//     .createHmac("sha256", webhookSecret)
+//     .update(JSON.stringify(payload))
+//     .digest("hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(signature.slice(7)), // Remove 'sha256=' prefix
-    Buffer.from(expectedSignature)
-  );
-}
+//   return crypto.timingSafeEqual(
+//     Buffer.from(signature.slice(7)), // Remove 'sha256=' prefix
+//     Buffer.from(expectedSignature)
+//   );
+// }
 
-// Handle verification request
-function handleVerification(mode, token, challenge, verifyToken) {
-  if (mode === 'subscribe' && token === verifyToken) {
-    console.log('Webhook verified');
-    console.log("data form webhook", challenge);
-    return { status: 200, data: challenge };
-  }
-  return { status: 403, data: { error: 'Verification failed' } };
-}
+// // Handle verification request
+// function handleVerification(mode, token, challenge, verifyToken) {
+//   if (mode === "subscribe" && token === verifyToken) {
+//     console.log("Webhook verified");
+//     console.log("data form webhook", challenge);
+//     return { status: 200, data: challenge };
+//   }
+//   return { status: 403, data: { error: "Verification failed" } };
+// }
 
-// Handle message events
-async function handleMessageEvent(event) {
-  try {
-    console.log('Processing message event:', event.message_id);
-    // Add your message handling logic here
-    // For example: saving to database, sending notifications, etc.
-  } catch (error) {
-    console.error('Error processing message event:', error);
-    throw error;
-  }
-}
+// // Handle message events
+// async function handleMessageEvent(event) {
+//   try {
+//     console.log("Processing message event:", event.message_id);
+//     // Add your message handling logic here
+//     // For example: saving to database, sending notifications, etc.
+//   } catch (error) {
+//     console.error("Error processing message event:", error);
+//     throw error;
+//   }
+// }
 
-// Handle profile update events
-async function handleProfileUpdate(event) {
-  try {
-    console.log('Processing profile update:', event.user_id);
-    // Add your profile update handling logic here
-    // For example: updating user records, triggering notifications, etc.
-  } catch (error) {
-    console.error('Error processing profile update:', error);
-    throw error;
-  }
-}
+// // Handle profile update events
+// async function handleProfileUpdate(event) {
+//   try {
+//     console.log("Processing profile update:", event.user_id);
+//     // Add your profile update handling logic here
+//     // For example: updating user records, triggering notifications, etc.
+//   } catch (error) {
+//     console.error("Error processing profile update:", error);
+//     throw error;
+//   }
+// }
 
-// Process webhook events
-async function processWebhookEvent(body) {
-  const eventType = body.type;
+// // Process webhook events
+// async function processWebhookEvent(body) {
+//   const eventType = body.type;
 
-  switch (eventType) {
-    case 'message':
-      await handleMessageEvent(body);
-      break;
-    case 'profile_update':
-      await handleProfileUpdate(body);
-      break;
-    default:
-      console.warn(`Unhandled webhook event type: ${eventType}`);
-  }
+//   switch (eventType) {
+//     case "message":
+//       await handleMessageEvent(body);
+//       break;
+//     case "profile_update":
+//       await handleProfileUpdate(body);
+//       break;
+//     default:
+//       console.warn(`Unhandled webhook event type: ${eventType}`);
+//   }
 
-  return { status: 200, data: { status: 'received' } };
-}
+//   return { status: 200, data: { status: "received" } };
+// }
+const webhookEvent =asyncHandler(async (req, res) => {
+    // log incoming messages
+    console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
+  
+    // check if the webhook request contains a message
+    // details on WhatsApp text message payload: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples#text-messages
+    const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
+  
+    // check if the incoming message contains text
+    if (message?.type === "text") {
+      // extract the business number to send the reply from it
+      const business_phone_number_id =
+        req.body.entry?.[0].changes?.[0].value?.metadata?.phone_number_id;
+  
+      // send a reply message as per the docs here https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
+        },
+        data: {
+          messaging_product: "whatsapp",
+          to: message.from,
+          text: { body: "Echo: " + message.text.body },
+          context: {
+            message_id: message.id, // shows the message as a reply to the original user message
+          },
+        },
+      });
+  
+      // mark incoming message as read
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
+        },
+        data: {
+          messaging_product: "whatsapp",
+          status: "read",
+          message_id: message.id,
+        },
+      });
+    }
+  
+    res.sendStatus(200);
+  });
+  
 
 // Main webhook handler
-async function handleWebhook(req) {
+const handleWebhook= asyncHandler(async(req,res)=> {
   try {
-    // Check if it's a verification request
-    if (req.query['hub.mode']) {
-      return handleVerification(
-        req.query['hub.mode'],
-        req.query['hub.verify_token'],
-        req.query['hub.challenge'],
-        process.env.VERIFY_TOKEN
-      );
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    // check the mode and token sent are correct
+    if (mode === "subscribe" && token === process.env.VERIFY_TOKEN) {
+      // respond with 200 OK and challenge token from the request
+      res.status(200).send(challenge);
+      console.log("Webhook verified successfully!");
+    } else {
+      // respond with '403 Forbidden' if verify tokens do not match
+      res.sendStatus(403);
     }
-
-    // // Validate webhook signature
-    // const isValid = validateSignature(
-    //   req.body,
-    //   req.headers['x-hub-signature-256'],
-    //   process.env.WEBHOOK_SECRET
-    // );
-
-    // if (!isValid) {
-    //   return { status: 401, data: { error: 'Invalid signature' } };
-    // }
-
-    // Process the webhook event
-    // return await processWebhookEvent(req.body);
   } catch (error) {
-    console.error('Webhook Error:', error);
-    return { status: 500, data: { error: 'Internal server error' } };
+    console.error("Webhook Error:", error);
+    return { status: 500, data: { error: "Internal server error" } };
   }
-}
+});
 
 module.exports = {
-  handleWebhook
+  handleWebhook,
+  webhookEvent
 };
-
-
-
-
-
 
 // const crypto = require('crypto');
 
 // crypto.randomBytes(10).toString("hex");
-
 
 // class WebhookController {
 //   constructor() {

@@ -1,4 +1,3 @@
-const axios = require("axios");
 const OpenAI = require("openai");
 const db = require("../dbConfig/dbConfig.js");
 const ModelConfig = db.modelConfigs;
