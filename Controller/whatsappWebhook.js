@@ -20,7 +20,8 @@ function validateSignature(payload, signature, webhookSecret) {
 function handleVerification(mode, token, challenge, verifyToken) {
   if (mode === 'subscribe' && token === verifyToken) {
     console.log('Webhook verified');
-    return res.status(200).send({data: challenge });
+    console.log("data form webhook", challenge);
+    return { status: 200, data: challenge };
   }
   return { status: 403, data: { error: 'Verification failed' } };
 }
