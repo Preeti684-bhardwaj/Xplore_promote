@@ -1261,7 +1261,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
     console.log(updateData);
     // Define a custom character set without special characters
     const customChars =
-      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$#";
     shortId.characters(customChars);
     // Handle shortCode and shortUrl generation
     let shortCode = currentUser.shortCode;

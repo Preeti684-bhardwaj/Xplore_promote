@@ -65,6 +65,7 @@ const analyticsRouter=require("./Routes/analyticsRoutes");
 const productImageRouter=require("./Routes/productImagesRoutes");
 const chatBotRouter=require('./Routes/chatRoutes')
 const {getLayoutByShortCode,getPreviewByShortCode}=require('./Controller/getShortId');
+const {handleWebhook}=require('./Controller/whatsappWebhook.js')
 
 
 
@@ -86,6 +87,7 @@ app.use("/v1/font",customFontRouter);
 app.use("/v1/analytics",analyticsRouter);
 app.use("/v1/product",productImageRouter);
 app.get("/v1/preview/*", getPreviewByShortCode);
+app.post("/v1/webhook",handleWebhook);
 
 // Middleware for error
 app.use(errorMiddleware);
