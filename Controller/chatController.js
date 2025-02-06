@@ -1,10 +1,9 @@
+const axios = require("axios");
 const OpenAI = require("openai");
 const db = require("../dbConfig/dbConfig.js");
 const ModelConfig = db.modelConfigs;
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
-const { parser: jsonParser } = require("stream-json");
-const { streamValues } = require("stream-json/streamers/StreamValues");
 
 // Define the base prompt template
 const BASE_PROMPT = `You are a Hyundai IONIQ 5 sales expert, trained to engage with customers in a persuasive, friendly, and professional manner. Your knowledge is based strictly on the information associated with the UUID: d950614d-2b47-4c4f-b71b-0c61b5082471.
@@ -24,8 +23,8 @@ const BASE_PROMPT = `You are a Hyundai IONIQ 5 sales expert, trained to engage w
 
 {
     "summary": "<Formatted summary here if not first question>",
-    "finalAnswer": "<Concise and informative answer>",
-    "projectedQuestions":["Follow-up question 1", "Follow-up question 2"]
+    "answer": "<Concise and informative answer>",
+    "questions":["Follow-up question 1", "Follow-up question 2"]
 } Customer's Question:`;
 
 const PROMPT_SUFFIX = " Sales Expert's JSON Answer:";
@@ -58,9 +57,9 @@ const generateSummary = () => {
 };
 
 const updateSummary = (response) => {
-  const finalAnswer = response?.finalAnswer?.trim();
-  if (finalAnswer && !isGreeting(finalAnswer)) {
-    finalAnswerHistory.push(finalAnswer);
+  const answer = response?.answer?.trim();
+  if (answer && !isGreeting(answer)) {
+    finalAnswerHistory.push(answer);
     if (finalAnswerHistory.length > 9) finalAnswerHistory.shift();
   }
 };
@@ -78,32 +77,30 @@ const handleChatRequest = asyncHandler(async (req, res) => {
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
 
+    // Handle greeting
     if (isGreeting(question)) {
-      const greetingResponse = {
-        finalAnswer:
+      const response = {
+        answer:
           "Hello! Welcome to Hyundai. How can I assist you with the IONIQ 5 today?",
-        projectedQuestions: [
+        questions: [
           "What are the available trim levels for the IONIQ 5?",
           "What is the starting price of the IONIQ 5?",
         ],
       };
-      res.write(`event: start\n`);
-      res.write(`data: ${JSON.stringify({ customerQuestion: question })}\n\n`);
+
+      res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
       res.write(
         `data: ${JSON.stringify({
-          finalAnswer: greetingResponse.finalAnswer,
+          type: "stream",
+          content: response.answer,
         })}\n\n`
       );
-      res.write(
-        `data: ${JSON.stringify({
-          projectedQuestions: greetingResponse.projectedQuestions,
-        })}\n\n`
-      );
-      res.write(`event: end\n\n`);
+      res.write(`data: ${JSON.stringify(response)}\n\n`);
+      res.write('data: {"type": "end"}\n\n');
       return res.end();
     }
 
-    const config = await ModelConfig.findOne({
+  const config = await ModelConfig.findOne({
       where: {
         tenant_id: process.env.PREDIBASE_TENANT_ID,
         deployment_name: process.env.PREDIBASE_DEPLOYMENT,
@@ -112,7 +109,6 @@ const handleChatRequest = asyncHandler(async (req, res) => {
     });
 
     if (!config) throw new ErrorHandler("Model configuration not found", 404);
-
     const openai = new OpenAI({
       apiKey: config.api_token,
       baseURL: `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/v1`,
@@ -121,44 +117,17 @@ const handleChatRequest = asyncHandler(async (req, res) => {
     const previousSummary = generateSummary();
     const fullPrompt = `${BASE_PROMPT}${question}${SUMMARY}${previousSummary}${PROMPT_SUFFIX}`;
 
-    res.write(`event: start\n`);
-    res.write(`data: ${JSON.stringify({ customerQuestion: question })}\n\n`);
+    // Tracking variables for the complete response
+    let responseData = {
+      summary: previousSummary || undefined, // Only include if there's a previous summary
+      answer: "",
+      questions: [],
+    };
+    let collectingQuestions = false;
+    let questionBuffer = "";
+    let lastToken = "";
 
-    // Initialize JSON streaming parser
-    const parser = jsonParser();
-    const valueStream = streamValues();
-    let parsedValue = null;
-
-    parser.pipe(valueStream);
-
-    valueStream.on("data", (data) => {
-      parsedValue = data.value;
-    });
-
-    valueStream.on("end", () => {
-      if (parsedValue) {
-        updateSummary(parsedValue);
-        res.write(
-          `data: ${JSON.stringify({
-            finalAnswer: parsedValue.finalAnswer,
-          })}\n\n`
-        );
-        res.write(
-          `data: ${JSON.stringify({
-            projectedQuestions: parsedValue.projectedQuestions,
-          })}\n\n`
-        );
-      }
-    });
-
-    valueStream.on("error", (error) => {
-      console.error("JSON Parsing Error:", error);
-      res.write(`event: error\n`);
-      res.write(
-        `data: ${JSON.stringify({ error: "Failed to parse AI response" })}\n\n`
-      );
-      res.end();
-    });
+    res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
 
     const stream = await openai.completions.create({
       model: config.adapter || "test/3",
@@ -171,18 +140,81 @@ const handleChatRequest = asyncHandler(async (req, res) => {
 
     for await (const chunk of stream) {
       const token = chunk.choices[0]?.text || "";
-      if (token) {
-        res.write(
-          `data: ${JSON.stringify({ token: token.replace(/"/g, "") })}\n\n`
-        );
-        parser.write(token); // Feed token to the parser
+
+      // Handle section markers
+      if (token.includes("questions")) {
+        collectingQuestions = true;
+        continue;
+      }
+
+      // Process the token based on section
+      if (collectingQuestions) {
+        if (token.includes("[") || token.includes("]")) continue;
+
+        questionBuffer += token;
+        if (token.includes("?")) {
+          const cleanedQuestion = questionBuffer
+            .replace(/[",]/g, "")
+            .trim()
+            .replace(/\s+/g, " ");
+          responseData.questions.push(cleanedQuestion);
+          questionBuffer = "";
+        }
+      } else {
+        // Handle answer section
+        let cleanToken = token
+          .replace(/[{}"]/g, "")
+          .replace(/^answer\s*:\s*/, "") // Remove "answer:" prefix
+          .trim();
+
+        if (cleanToken) {
+          // Fix spacing for specific tokens
+          if (cleanToken === "IONIQ") {
+            cleanToken = "IONIQ";
+          } else if (cleanToken.startsWith("IONIQ")) {
+            cleanToken = " IONIQ" + cleanToken.slice(5);
+          }
+
+          // Add space between tokens if needed
+          const needsSpace =
+            lastToken &&
+            !lastToken.endsWith(" ") &&
+            !cleanToken.startsWith(" ") &&
+            !lastToken.endsWith("-") &&
+            !lastToken.endsWith(".") &&
+            !lastToken.endsWith(",");
+
+          if (needsSpace) {
+            responseData.answer += " ";
+          }
+
+          responseData.answer += cleanToken;
+
+          // Stream the token with proper spacing
+          res.write(
+            `data: ${JSON.stringify({
+              type: "stream",
+              content: needsSpace ? " " + cleanToken : cleanToken,
+            })}\n\n`
+          );
+
+          lastToken = cleanToken;
+        }
       }
     }
 
-    parser.end(); // Signal end of input
+    // Clean up final response
+    responseData.answer = responseData.answer
+      .replace(/\s+/g, " ")
+      .replace(/\s+([.,])/g, "$1")
+      .trim();
 
-    // Wait for parsing to complete
-    await new Promise((resolve) => valueStream.on("end", resolve));
+    // Send only the questions in the final response
+    const finalResponse = {
+      questions: responseData.questions,
+    };
+
+    res.write(`data: ${JSON.stringify(finalResponse)}\n\n`);
 
     // Update model usage stats
     await config.update({
@@ -190,13 +222,14 @@ const handleChatRequest = asyncHandler(async (req, res) => {
       requestCount: config.requestCount + 1,
     });
 
-    res.write(`event: end\n\n`);
+    updateSummary(responseData);
+    res.write('data: {"type": "end"}\n\n');
     res.end();
   } catch (error) {
     console.error("Error:", error);
-    res.write(`event: error\n`);
     res.write(
       `data: ${JSON.stringify({
+        type: "error",
         error: error.message || "Internal server error",
       })}\n\n`
     );
@@ -205,4 +238,3 @@ const handleChatRequest = asyncHandler(async (req, res) => {
 });
 
 module.exports = { handleChatRequest };
-1

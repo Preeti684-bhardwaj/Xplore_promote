@@ -90,22 +90,6 @@ app.get("/v1/preview/*", getPreviewByShortCode);
 app.get("/v1/webhook",handleWebhook);
 app.post("/v1/webhook",webhookEvent);
 
-// (req, res) => {
-//     const mode = req.query["hub.mode"];
-//     const token = req.query["hub.verify_token"];
-//     const challenge = req.query["hub.challenge"];
-  
-//     // check the mode and token sent are correct
-//     if (mode === "subscribe" && token === process.env.VERIFY_TOKEN) {
-//       // respond with 200 OK and challenge token from the request
-//       res.status(200).send(challenge);
-//       console.log("Webhook verified successfully!");
-//     } else {
-//       // respond with '403 Forbidden' if verify tokens do not match
-//       res.sendStatus(403);
-//     }
-//   });;
-
 // Middleware for error
 app.use(errorMiddleware);
 
