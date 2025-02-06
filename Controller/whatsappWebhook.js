@@ -20,7 +20,7 @@ function validateSignature(payload, signature, webhookSecret) {
 function handleVerification(mode, token, challenge, verifyToken) {
   if (mode === 'subscribe' && token === verifyToken) {
     console.log('Webhook verified');
-    return { status: 200, data: challenge };
+    return res.status(200).send({data: challenge });
   }
   return { status: 403, data: { error: 'Verification failed' } };
 }
@@ -92,7 +92,7 @@ async function handleWebhook(req) {
     // }
 
     // Process the webhook event
-    return await processWebhookEvent(req.body);
+    // return await processWebhookEvent(req.body);
   } catch (error) {
     console.error('Webhook Error:', error);
     return { status: 500, data: { error: 'Internal server error' } };
