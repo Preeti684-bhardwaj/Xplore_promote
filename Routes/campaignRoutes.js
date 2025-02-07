@@ -6,7 +6,8 @@ const {
     getAllCampaign,
     getOneCampaign,
     updateCampaign,
-    deleteCampaign
+    deleteCampaign,
+    getAllCampaignMetadata
 } = require("../Controller/campaignController");
 const { verifyJWt,authorize, verifySession } = require("../middleware/auth");
 
@@ -16,6 +17,7 @@ router.get("/getAll", verifyJWt,authorize(["USER"]),verifySession ,getAllCampaig
 router.get("/getOne/:id", verifyJWt,authorize(["USER"]),verifySession,getOneCampaign);
 router.put("/update/:id", verifyJWt,authorize(["USER"]),verifySession, upload.array('files'), updateCampaign);
 router.delete("/delete/:id", verifyJWt, authorize(["USER"]), verifySession,deleteCampaign);
+router.get('/getAllCampaignMetadata',getAllCampaignMetadata)
 
 
 module.exports = router;

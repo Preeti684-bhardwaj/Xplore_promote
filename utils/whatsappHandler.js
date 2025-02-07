@@ -43,10 +43,6 @@ const sendWhatsAppLink = async (data) => {
   }
 }
 const getLinkMessageInput = (recipient, link, text) => {
-  // Validate phone number format
-  if (!recipient.startsWith('+')) {
-    recipient = '+' + recipient;
-  }
 
   // Ensure the link is properly encoded
   const encodedLink = encodeURI(link);

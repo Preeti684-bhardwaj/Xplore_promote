@@ -76,7 +76,6 @@ const handleChatRequest = asyncHandler(async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
-
     // Handle greeting
     if (isGreeting(question)) {
       const response = {
