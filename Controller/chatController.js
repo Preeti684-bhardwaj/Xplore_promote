@@ -6,26 +6,37 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
 // Define the base prompt template
-const BASE_PROMPT = `You are a Hyundai IONIQ 5 sales expert, trained to engage with customers in a persuasive, friendly, and professional manner. Your knowledge is based strictly on the information associated with the UUID: d950614d-2b47-4c4f-b71b-0c61b5082471.
+const BASE_PROMPT = `You are a professional sales expert representing the Hyundai IONIQ 5. Engage with customers in a friendly, informative, and helpful manner, just as a dealership salesperson would during a consultation. Your knowledge is based strictly on the information associated with the UUID: d950614d-2b47-4c4f-b71b-0c61b5082471.
+
+When answering questions:
+1. Always provide information on Hyundai IONIQ 5 pricing, features, specifications, and additional costs.
+2. NEVER say "No information available" for pricing, trim levels, or feature-related questions.
+3. Always provide MINIMUM 2 OR 3 TRIPLETS in your response.
+4. Each triplet must strictly follow the format: "<Subject>, <Predicate>, <Object>".
+5. Combine all triplets into a single string separated by commas. Ensure the "COT" field is JSON-compliant.
+6. Greet customers with gratitude when they say "hi", "hello", or similar words, but DO NOT include greetings in the conversation summary.
 
 // Sales Strategy
-- Understand the customer's requirements before making recommendations.
-- Offer concise, clear answers in *2-3 sentences* maximum.
-- Upsell & suggest alternatives when necessary.
-- Convince the customer to take action (schedule a test drive, apply for financing, or make a purchase).
-- Never say "No information available" about features, pricing, or trim levels.
+- *Understand the customer's requirements* before making recommendations.
+- *Offer the best Hyundai IONIQ 5 trim* based on their budget, performance, and feature needs.
+- *Upsell & suggest alternatives* when necessary.
+- *Convince the customer to take action* (schedule a test drive, apply for financing, or make a purchase).
+- *Never say "No information available"* about features, pricing, or trim levels.
 
-// Expected Response Format (JSON)
-- *If this is the first customer question, DO NOT include the summary.* Only return the finalAnswer and projectedQuestions.
-- *For all subsequent questions, include the summary using the following structure:*
-    - *Previously, we discussed:* <First Summary>
-    - *Additionally, we covered:* <Second Summary>
+Additionally, after answering the customer's question:
+1. Generate two projected follow-up questions the customer might ask next.
+2. Format the response as JSON with four sections:
+   {
+       "answer": "<Your concise answer>",
+       "questions": "[<Projected Question 1>, <Projected Question 2>]",
+       "summary": "<Summarize previous 2 questions & responses, excluding the latest>"
+   }
 
-{
-    "summary": "<Formatted summary here if not first question>",
-    "answer": "<Concise and informative answer>",
-    "questions":["Follow-up question 1", "Follow-up question 2"]
-} Customer's Question:`;
+DO NOT return "No information available" for pricing, colors, trim levels, or Hyundai IONIQ 5 features.
+
+Maintain a conversational and professional tone.
+
+Customer's Question:`;
 
 const PROMPT_SUFFIX = " Sales Expert's JSON Answer:";
 const SUMMARY = " Previous Conversation Summary:";
@@ -76,6 +87,7 @@ const handleChatRequest = asyncHandler(async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
+
     // Handle greeting
     if (isGreeting(question)) {
       const response = {
@@ -85,6 +97,7 @@ const handleChatRequest = asyncHandler(async (req, res) => {
           "What are the available trim levels for the IONIQ 5?",
           "What is the starting price of the IONIQ 5?",
         ],
+        summary: generateSummary()
       };
 
       res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
@@ -95,11 +108,12 @@ const handleChatRequest = asyncHandler(async (req, res) => {
         })}\n\n`
       );
       res.write(`data: ${JSON.stringify(response)}\n\n`);
+      updateSummary(response);
       res.write('data: {"type": "end"}\n\n');
       return res.end();
     }
 
-  const config = await ModelConfig.findOne({
+    const config = await ModelConfig.findOne({
       where: {
         tenant_id: process.env.PREDIBASE_TENANT_ID,
         deployment_name: process.env.PREDIBASE_DEPLOYMENT,
@@ -108,6 +122,7 @@ const handleChatRequest = asyncHandler(async (req, res) => {
     });
 
     if (!config) throw new ErrorHandler("Model configuration not found", 404);
+    
     const openai = new OpenAI({
       apiKey: config.api_token,
       baseURL: `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/v1`,
@@ -116,18 +131,9 @@ const handleChatRequest = asyncHandler(async (req, res) => {
     const previousSummary = generateSummary();
     const fullPrompt = `${BASE_PROMPT}${question}${SUMMARY}${previousSummary}${PROMPT_SUFFIX}`;
 
-    // Tracking variables for the complete response
-    let responseData = {
-      summary: previousSummary || undefined, // Only include if there's a previous summary
-      answer: "",
-      questions: [],
-    };
-    let collectingQuestions = false;
-    let questionBuffer = "";
-    let lastToken = "";
-
     res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
 
+    let accumulatedResponse = '';
     const stream = await openai.completions.create({
       model: config.adapter || "test/3",
       prompt: fullPrompt,
@@ -139,81 +145,22 @@ const handleChatRequest = asyncHandler(async (req, res) => {
 
     for await (const chunk of stream) {
       const token = chunk.choices[0]?.text || "";
-
-      // Handle section markers
-      if (token.includes("questions")) {
-        collectingQuestions = true;
-        continue;
-      }
-
-      // Process the token based on section
-      if (collectingQuestions) {
-        if (token.includes("[") || token.includes("]")) continue;
-
-        questionBuffer += token;
-        if (token.includes("?")) {
-          const cleanedQuestion = questionBuffer
-            .replace(/[",]/g, "")
-            .trim()
-            .replace(/\s+/g, " ");
-          responseData.questions.push(cleanedQuestion);
-          questionBuffer = "";
-        }
-      } else {
-        // Handle answer section
-        let cleanToken = token
-          .replace(/[{}"]/g, "")
-          .replace(/^answer\s*:\s*/, "") // Remove "answer:" prefix
-          .trim();
-
-        if (cleanToken) {
-          // Fix spacing for specific tokens
-          if (cleanToken === "IONIQ") {
-            cleanToken = "IONIQ";
-          } else if (cleanToken.startsWith("IONIQ")) {
-            cleanToken = " IONIQ" + cleanToken.slice(5);
-          }
-
-          // Add space between tokens if needed
-          const needsSpace =
-            lastToken &&
-            !lastToken.endsWith(" ") &&
-            !cleanToken.startsWith(" ") &&
-            !lastToken.endsWith("-") &&
-            !lastToken.endsWith(".") &&
-            !lastToken.endsWith(",");
-
-          if (needsSpace) {
-            responseData.answer += " ";
-          }
-
-          responseData.answer += cleanToken;
-
-          // Stream the token with proper spacing
-          res.write(
-            `data: ${JSON.stringify({
-              type: "stream",
-              content: needsSpace ? " " + cleanToken : cleanToken,
-            })}\n\n`
-          );
-
-          lastToken = cleanToken;
-        }
-      }
+      accumulatedResponse += token;
+      res.write(
+        `data: ${JSON.stringify({
+          type: "stream",
+          content: token,
+        })}\n\n`
+      );
     }
 
-    // Clean up final response
-    responseData.answer = responseData.answer
-      .replace(/\s+/g, " ")
-      .replace(/\s+([.,])/g, "$1")
-      .trim();
-
-    // Send only the questions in the final response
-    const finalResponse = {
-      questions: responseData.questions,
-    };
-
-    res.write(`data: ${JSON.stringify(finalResponse)}\n\n`);
+    // Parse the accumulated response and update summary
+    try {
+      const parsedResponse = JSON.parse(accumulatedResponse);
+      updateSummary(parsedResponse);
+    } catch (parseError) {
+      console.error("Error parsing response:", parseError);
+    }
 
     // Update model usage stats
     await config.update({
@@ -221,7 +168,6 @@ const handleChatRequest = asyncHandler(async (req, res) => {
       requestCount: config.requestCount + 1,
     });
 
-    updateSummary(responseData);
     res.write('data: {"type": "end"}\n\n');
     res.end();
   } catch (error) {
