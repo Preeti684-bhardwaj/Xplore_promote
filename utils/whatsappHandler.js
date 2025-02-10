@@ -25,12 +25,11 @@ const sendWhatsAppLink = async (data) => {
       'Authorization': `Bearer ${process.env.ACCESS_TOKEN}`,
       'Content-Type': 'application/json'
     },
-    params: {
-      appsecret_proof: appSecretProof
-    },
+    // params: {
+    //   appsecret_proof: appSecretProof
+    // },
     data: data
   };
-
   try {
     const response = await axios(config);
     return response;
@@ -44,10 +43,6 @@ const sendWhatsAppLink = async (data) => {
   }
 }
 const getLinkMessageInput = (recipient, link, text) => {
-  // Validate phone number format
-  if (!recipient.startsWith('+')) {
-    recipient = '+' + recipient;
-  }
 
   // Ensure the link is properly encoded
   const encodedLink = encodeURI(link);

@@ -1,5 +1,5 @@
 const axios = require("axios");
-// const OpenAI = require("openai");
+const OpenAI = require("openai");
 const db = require("../dbConfig/dbConfig.js");
 const ModelConfig = db.modelConfigs;
 const ErrorHandler = require("../utils/ErrorHandler.js");
@@ -9,56 +9,110 @@ const asyncHandler = require("../utils/asyncHandler.js");
 const BASE_PROMPT = `You are a professional sales expert representing the Hyundai IONIQ 5. Engage with customers in a friendly, informative, and helpful manner, just as a dealership salesperson would during a consultation. Your knowledge is based strictly on the information associated with the UUID: d950614d-2b47-4c4f-b71b-0c61b5082471.
 
 When answering questions:
-1. **Always provide information on Hyundai IONIQ 5 pricing, features, specifications, and additional costs.**
-2. **NEVER say "No information available" for pricing, trim levels, or feature-related questions.**
-3. Always provide *MINIMUM 2 OR 3 TRIPLETS* in your response.
+1. Always provide information on Hyundai IONIQ 5 pricing, features, specifications, and additional costs.
+2. NEVER say "No information available" for pricing, trim levels, or feature-related questions.
+3. Always provide MINIMUM 2 OR 3 TRIPLETS in your response.
 4. Each triplet must strictly follow the format: "<Subject>, <Predicate>, <Object>".
 5. Combine all triplets into a single string separated by commas. Ensure the "COT" field is JSON-compliant.
-6. Greet customers with gratitude when they say "hi", "hello", or similar words.
+6. Greet customers with gratitude when they say "hi", "hello", or similar words, but DO NOT include greetings in the conversation summary.
 
-Example:
-{
-    "COT": "ADAS, are standard on, Hyundai IONIQ 5, ADAS, enhance, safety through adaptive cruise control and lane keeping assist, ADAS, Aim to reduce, driver workload and mitigate accident consequences",
-    "final_answer": "The Hyundai IONIQ 5 comes equipped with Advanced Driver Assistance Systems (ADAS) that significantly enhance safety features, including adaptive cruise control, lane keeping assist, and automatic emergency braking."
-}
+// Sales Strategy
+- *Understand the customer's requirements* before making recommendations.
+- *Offer the best Hyundai IONIQ 5 trim* based on their budget, performance, and feature needs.
+- *Upsell & suggest alternatives* when necessary.
+- *Convince the customer to take action* (schedule a test drive, apply for financing, or make a purchase).
+- *Never say "No information available"* about features, pricing, or trim levels.
 
 Additionally, after answering the customer's question:
 1. Generate two projected follow-up questions the customer might ask next.
 2. Format the response as JSON with four sections:
    {
-       "summary": "<Summarize previous 2 questions & responses, excluding the latest>",
-       "COT": "<Triplet1, Triplet2, Triplet3>",
-       "final_answer": "<Your concise answer>",
-       "projected_questions":[<Projected Question 1>, <Projected Question 2>]
+       "answer": "<Your concise answer>",
+       "questions": "[<Projected Question 1>, <Projected Question 2>]",
+       "summary": "<Summarize previous 2 questions & responses, excluding the latest>"
    }
 
-**DO NOT return "No information available" for pricing, colors, trim levels, or Hyundai IONIQ 5 features.**
+DO NOT return "No information available" for pricing, colors, trim levels, or Hyundai IONIQ 5 features.
 
-Maintain a conversational and professional tone. Customer's Question:`;
+Maintain a conversational and professional tone.
+
+Customer's Question:`;
 
 const PROMPT_SUFFIX = " Sales Expert's JSON Answer:";
+const SUMMARY = " Previous Conversation Summary:";
 
-// Format triplets as a JSON-compliant string
-const formatTripletsAsString = (cotList) => {
-  if (!Array.isArray(cotList)) return cotList;
-  const validatedTriplets = cotList
-    .filter((item) => Array.isArray(item) && item.length === 3)
-    .map((item) => `("${item[0]}", "${item[1]}", "${item[2]}")`)
-    .slice(0, 3);
-  return validatedTriplets.join(", ");
+const greetingWords = new Set([
+  "hi",
+  "hello",
+  "hey",
+  "good morning",
+  "good afternoon",
+  "namaste",
+  "good evening",
+  "greetings",
+]);
+
+// Store conversation history
+let finalAnswerHistory = [];
+
+// Helper functions
+const isGreeting = (question) =>
+  greetingWords.has(question.toLowerCase().trim());
+
+const generateSummary = () => {
+  if (finalAnswerHistory.length === 0) return "";
+  if (finalAnswerHistory.length === 1)
+    return `Previously, we discussed: ${finalAnswerHistory[0]}`;
+  const lastTwo = finalAnswerHistory.slice(-2);
+  return `Previously, we discussed: ${lastTwo[0]}. Additionally, we covered: ${lastTwo[1]}`;
 };
 
+const updateSummary = (response) => {
+  const answer = response?.answer?.trim();
+  if (answer && !isGreeting(answer)) {
+    finalAnswerHistory.push(answer);
+    if (finalAnswerHistory.length > 9) finalAnswerHistory.shift();
+  }
+};
 
-
-const handleChatRequest = asyncHandler(async (req, res, next) => {
+const handleChatRequest = asyncHandler(async (req, res) => {
   try {
-    // Input validation
     if (!req.body.Question) {
       throw new ErrorHandler("Missing required field: Question", 400);
     }
-    const validQuestion = req.body.Question.toLowerCase();
 
-    // Get active model configuration
+    const question = req.body.Question.trim();
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    // Handle greeting
+    if (isGreeting(question)) {
+      const response = {
+        answer:
+          "Hello! Welcome to Hyundai. How can I assist you with the IONIQ 5 today?",
+        questions: [
+          "What are the available trim levels for the IONIQ 5?",
+          "What is the starting price of the IONIQ 5?",
+        ],
+        summary: generateSummary()
+      };
+
+      res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          type: "stream",
+          content: response.answer,
+        })}\n\n`
+      );
+      res.write(`data: ${JSON.stringify(response)}\n\n`);
+      updateSummary(response);
+      res.write('data: {"type": "end"}\n\n');
+      return res.end();
+    }
+
     const config = await ModelConfig.findOne({
       where: {
         tenant_id: process.env.PREDIBASE_TENANT_ID,
@@ -66,215 +120,66 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
         isActive: true,
       },
     });
-    if (!config) {
-      throw new ErrorHandler("Model configuration not found", 404);
-    }
 
-    // Construct the complete prompt
-    const fullPrompt = `${BASE_PROMPT}${validQuestion}${PROMPT_SUFFIX}`;
-
-    // Make API request
-    const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
+    if (!config) throw new ErrorHandler("Model configuration not found", 404);
     
-    const response = await axios({
-      method: 'post',
-      url: apiUrl,
-      data: {
-        inputs: fullPrompt,
-        parameters: {
-          adapter_source: config.adapter_source,
-          adapter_id: config.adapter_id,
-          max_new_tokens: 500,
-          temperature: 0.2,
-          top_p: 0.1,
-        }
-      },
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.api_token}`,
-      }
+    const openai = new OpenAI({
+      apiKey: config.api_token,
+      baseURL: `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/v1`,
     });
 
-    // Process the response
-    const generatedText = response.data.generated_text || '';
-    
+    const previousSummary = generateSummary();
+    const fullPrompt = `${BASE_PROMPT}${question}${SUMMARY}${previousSummary}${PROMPT_SUFFIX}`;
+
+    res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
+
+    let accumulatedResponse = '';
+    const stream = await openai.completions.create({
+      model: config.adapter || "test/3",
+      prompt: fullPrompt,
+      max_tokens: 300,
+      temperature: 0.2,
+      top_p: 0.1,
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const token = chunk.choices[0]?.text || "";
+      accumulatedResponse += token;
+      res.write(
+        `data: ${JSON.stringify({
+          type: "stream",
+          content: token,
+        })}\n\n`
+      );
+    }
+
+    // Parse the accumulated response and update summary
     try {
-      // Parse and format the response
-      const parsedResponse = JSON.parse(generatedText.trim());
-      
-      if (parsedResponse.COT) {
-        parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
-      }
-
-      // Update usage statistics
-      await config.update({
-        lastUsed: new Date(),
-        requestCount: config.requestCount + 1,
-      });
-
-      // Send the final response
-      return res.status(200).json(parsedResponse);
-      
+      const parsedResponse = JSON.parse(accumulatedResponse);
+      updateSummary(parsedResponse);
     } catch (parseError) {
-      console.error('Error parsing response:', parseError);
-      throw new ErrorHandler('Error processing model response', 500);
+      console.error("Error parsing response:", parseError);
     }
 
-  } catch (error) {
-    console.error("Error processing chat request:", error);
-    
-    // Enhanced error handling
-    const statusCode = error.response?.status || 500;
-    const errorMessage = error.response?.data
-      ? typeof error.response.data === "string"
-        ? error.response.data
-        : JSON.stringify(error.response.data)
-      : error.message || "Internal server error";
-
-    // Log detailed error information
-    console.error({
-      message: errorMessage,
-      stack: error.stack,
-      responseData: error.response?.data,
-      status: statusCode
+    // Update model usage stats
+    await config.update({
+      lastUsed: new Date(),
+      requestCount: config.requestCount + 1,
     });
 
-    // Send error response
-    return res.status(statusCode).json({ error: errorMessage });
+    res.write('data: {"type": "end"}\n\n');
+    res.end();
+  } catch (error) {
+    console.error("Error:", error);
+    res.write(
+      `data: ${JSON.stringify({
+        type: "error",
+        error: error.message || "Internal server error",
+      })}\n\n`
+    );
+    res.end();
   }
 });
-
-// const handleChatRequest = asyncHandler(async (req, res, next) => {
-//   // Set headers for streaming
-//   res.setHeader('Content-Type', 'text/event-stream');
-//   res.setHeader('Cache-Control', 'no-cache');
-//   res.setHeader('Connection', 'keep-alive');
-
-//   try {
-//     // Input validation
-//     if (!req.body.Question) {
-//       throw new ErrorHandler("Missing required field: Question", 400);
-//     }
-//     const validQuestion = req.body.Question.toLowerCase();
-
-//     // Get active model configuration
-//     const config = await ModelConfig.findOne({
-//       where: {
-//         tenant_id: process.env.PREDIBASE_TENANT_ID,
-//         deployment_name: process.env.PREDIBASE_DEPLOYMENT,
-//         isActive: true,
-//       },
-//     });
-//     if (!config) {
-//       throw new ErrorHandler("Model configuration not found", 404);
-//     }
-
-//     // Construct the complete prompt
-//     const fullPrompt = `${BASE_PROMPT}${validQuestion}${PROMPT_SUFFIX}`;
-
-//     // Prepare streaming API request
-//     const apiUrl = `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/generate`;
-    
-//     const response = await axios({
-//       method: 'post',
-//       url: apiUrl,
-//       data: {
-//         inputs: fullPrompt,
-//         parameters: {
-//           adapter_source: config.adapter_source,
-//           adapter_id: config.adapter_id,
-//           max_new_tokens: 500,
-//           temperature: 0.2,
-//           top_p: 0.1,
-//         }
-//       },
-//       headers: {
-//         'Content-Type': 'application/json',
-//         'Authorization': `Bearer ${config.api_token}`,
-//       }
-//     });
-
-//     let accumulatedData = '';
-
-//     response.data.on('data', chunk => {
-//       try {
-//         const lines = chunk.toString().split('\n');
-//         lines.forEach(line => {
-//           if (line.trim() === '') return;
-          
-//           // Remove "data: " prefix if present
-//           const jsonStr = line.replace(/^data: /, '');
-          
-//           try {
-//             const data = JSON.parse(jsonStr);
-//             accumulatedData += data.generated_text || '';
-            
-//             // Send the chunk to the client
-//             res.write(`data: ${JSON.stringify({ chunk: data.generated_text })}\n\n`);
-//           } catch (parseError) {
-//             console.error('Error parsing chunk:', parseError);
-//           }
-//         });
-//       } catch (streamError) {
-//         console.error('Error processing stream chunk:', streamError);
-//       }
-//     });
-
-//     response.data.on('end', async () => {
-//       try {
-//         // Update usage statistics
-//         await config.update({
-//           lastUsed: new Date(),
-//           requestCount: config.requestCount + 1,
-//         });
-
-//         // Try to parse the accumulated data as JSON
-//         const cleanedData = accumulatedData.trim();
-//         const parsedResponse = JSON.parse(cleanedData);
-        
-//         if (parsedResponse.COT) {
-//           parsedResponse.COT = formatTripletsAsString(parsedResponse.COT);
-//         }
-
-//         // Send the final processed response
-//         res.write(`data: ${JSON.stringify({ final: parsedResponse })}\n\n`);
-//         res.end();
-//       } catch (finalizeError) {
-//         console.error('Error finalizing response:', finalizeError);
-//         res.write(`data: ${JSON.stringify({ error: 'Error processing final response' })}\n\n`);
-//         res.end();
-//       }
-//     });
-
-//     response.data.on('error', (error) => {
-//       console.error('Stream error:', error);
-//       res.write(`data: ${JSON.stringify({ error: 'Stream error occurred' })}\n\n`);
-//       res.end();
-//     });
-
-//   } catch (error) {
-//     console.error("Error processing chat request:", error);
-    
-//     // Enhanced error handling
-//     const statusCode = error.response?.status || 500;
-//     const errorMessage = error.response?.data
-//       ? typeof error.response.data === "string"
-//         ? error.response.data
-//         : JSON.stringify(error.response.data)
-//       : error.message || "Internal server error";
-
-//     // Log detailed error information
-//     console.error({
-//       message: errorMessage,
-//       stack: error.stack,
-//       responseData: error.response?.data,
-//       status: statusCode
-//     });
-
-//     // Send error as SSE
-//     res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
-//     res.end();
-//   }
-// });
 
 module.exports = { handleChatRequest };

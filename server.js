@@ -59,8 +59,8 @@ async function startServer() {
     console.log("Database synchronized successfully");
 
     // Start HTTP server
-    const server = app.listen(process.env.PORT || 9190, () => {
-      console.log(`⚙️ Server is running at port: ${process.env.PORT || 9190}`);
+    const server = app.listen(process.env.PORT || 9191, () => {
+      console.log(`⚙️ Server is running at port: ${process.env.PORT || 9191}`);
     });
 
     // Setup WebSocket

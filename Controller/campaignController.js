@@ -726,6 +726,45 @@ const getShortUrl = asyncHandler(async (req, res, next) => {
   }
 });
 
+// get all metadata of campaign
+const getAllCampaignMetadata = asyncHandler(async (req, res, next) => {
+  try {
+    // const { page, size, name, startDate, endDate, status } = req.query;
+    const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
+    const { limit, offset } = getPagination(page, size);
+    // const userID = req.user.id;
+    // Build filter conditions
+    // const condition = {
+    //   createdBy: req.user.id,
+    //   // ...(name && { name: { [Op.iLike]: `%${name}%` } }),
+    //   // ...(status && { status }),
+    //   // ...(startDate && endDate && {
+    //   //   createdDate: {
+    //   //     [Op.between]: [new Date(startDate), new Date(endDate)]
+    //   //   }
+    //   // })
+    // };
+
+    const campaigns = await Campaign.findAndCountAll({
+      // where: condition,
+      limit,
+      offset,
+      attributes: ['campaignID', 'name', 'description','images'],
+      order: [["createdDate", "DESC"]],
+    });
+    return res.status(200).json({
+      success: true,
+      totalItems: campaigns.count,
+      campaigns: campaigns,
+      currentPage: page ? +page : 0,
+      totalPages: Math.ceil(campaigns.count / limit),
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+
 module.exports = {
   createCampaign,
   getAllCampaign,
@@ -733,4 +772,5 @@ module.exports = {
   updateCampaign,
   deleteCampaign,
   getShortUrl,
+  getAllCampaignMetadata
 };
