@@ -12,11 +12,12 @@ const {
   sendWhatsAppLink,
   getLinkMessageInput,
   generateAuthLink,
+  getOtpMessage,
 } = require("../utils/whatsappHandler");
 const { v4: UUIDV4 } = require("uuid");
 const { phoneValidation } = require("../utils/phoneValidation.js");
 
-// Enhanced Facebook signed request parsing with security checks
+//---------Enhanced Facebook signed request parsing with security checks------------------------------
 function parseSignedRequest(signedRequest) {
   try {
     if (!signedRequest || typeof signedRequest !== "string") {
@@ -55,6 +56,7 @@ function parseSignedRequest(signedRequest) {
   }
 }
 
+//-----------base64 url decode------------------------------------
 function base64UrlDecode(input) {
   try {
     input = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -69,7 +71,7 @@ function base64UrlDecode(input) {
   }
 }
 
-// Controller function to send OTP via WhatsApp
+//----------------send OTP via WhatsApp----------------------------------
 const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
@@ -113,11 +115,11 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const otp = generateOtp();
     const expireTime = Date.now() + 5 * 60 * 1000; // 5 minutes
 
-    const message = `Your verification code is: ${otp}. This code will expire in 5 minutes. Please do not share this code with anyone.`;
-    const validPhone = cleanedCountryCode + cleanedPhone;
-    const messageInput = getTextMessageInput(validPhone, message);
-
-    const response = await sendMessage(JSON.parse(messageInput));
+    const message = otp;
+    const validPhone =cleanedCountryCode + cleanedPhone; //`+${cleanedCountryCode}${cleanedPhone}`
+    const messageInput = getOtpMessage(validPhone, message);
+    console.log(messageInput);
+    const response = await sendWhatsAppLink(messageInput);
 
     if (!user) {
       await User.create(
@@ -146,7 +148,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
       message: "OTP sent successfully",
       data: {
         messageId: response.data.messages[0].id,
-        ...(process.env.NODE_ENV === "development" && { otp }),
+        otp,
       },
     });
   } catch (error) {
@@ -161,6 +163,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   }
 });
 
+//---------------whatsapp otp verification-----------------------------------
 const otpVerification = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
@@ -258,6 +261,8 @@ const otpVerification = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
+//--------------- facebook user data deletion-------------------------------------
 const facebookDataDeletion = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
 
@@ -351,6 +356,7 @@ const facebookDataDeletion = asyncHandler(async (req, res, next) => {
   }
 });
 
+//------------------deletion of data-------------------------------------------------
 const deletionData = asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.query;
@@ -381,11 +387,11 @@ const deletionData = asyncHandler(async (req, res, next) => {
   }
 });
 
+//----------------whatsapp link initiated---------------------------------------- 
 const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-
   try {
-    const { countryCode, phone } = req.body;
+    const { countryCode, phone ,shortId} = req.body;
 
     if (!phone || !countryCode) {
       return next(
@@ -413,7 +419,10 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
     const messageInput = getLinkMessageInput(validPhone, authLink, message);
 
     // Log the exact payload being sent
-    console.log('WhatsApp API Request Payload:', JSON.stringify(messageInput, null, 2));
+    console.log(
+      "WhatsApp API Request Payload:",
+      JSON.stringify(messageInput, null, 2)
+    );
 
     const response = await sendWhatsAppLink(messageInput);
 
@@ -422,7 +431,7 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
     });
-
+    7;
     if (!user) {
       user = await User.create(
         {
@@ -461,6 +470,7 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
   }
 });
 
+//------------------handle whtsapp callback----------------------------------------
 const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 

@@ -10,7 +10,7 @@ const sequelize = db.sequelize;
 const { phoneValidation } = require("../utils/phoneValidation.js");
 const { isValidEmail, isValidLength } = require("../validators/validation.js");
 
-// //----------contact us----------------------------
+// //----------contact us---------------------------------------
 const contactUs = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
 
@@ -232,7 +232,7 @@ const contactUs = asyncHandler(async (req, res, next) => {
   }
 });
 
-// // ----isInterestedProducts--------------------------------
+//----isInterestedProducts-----------------------------------------
 const updateInterestedProduct = async (req, res, next) => {
   const transaction = await sequelize.transaction();
 
@@ -382,6 +382,7 @@ const updateInterestedProduct = async (req, res, next) => {
   }
 };
 
+// --------------get contact details---------------------------------------
 const getContactDetails = asyncHandler(async (req, res, next) => {
   try {
     const id = req.user?.id;
@@ -419,6 +420,7 @@ const getContactDetails = asyncHandler(async (req, res, next) => {
   }
 });
 
+// ----------------export contatct details in excel--------------------------
 const exportContactsToExcel = asyncHandler(async (req, res, next) => {
   try {
     const campaignID = req.params?.campaignID;

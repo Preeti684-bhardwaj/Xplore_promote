@@ -1,13 +1,7 @@
 const db = require("../dbConfig/dbConfig.js");
 const AssetStore = db.assets;
-const {
-  uploadFile,
-  deleteFile,
-  listFiles,
-} = require("../utils/cdnImplementation.js");
-const {
-  validateFiles
-} = require("../validators/campaignValidations.js");
+const {uploadFile,deleteFile,listFiles} = require("../utils/cdnImplementation.js");
+const {validateFiles} = require("../validators/campaignValidations.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
@@ -119,6 +113,7 @@ const uploadContent = asyncHandler(async (req, res, next) => {
   }
 });
 
+//-----------------upload to files CDN------------------------------------------
 const uploadImage = asyncHandler(async (req, res, next) => {
   try {
     // Validate file request
@@ -172,90 +167,7 @@ const uploadImage = asyncHandler(async (req, res, next) => {
   }
 });
 
-
-// const uploadContent = asyncHandler(async (req, res, next) => {
-//   try {
-//     // Validate file request
-//     const fileError = validateFiles(req.files);
-//     if (fileError) {
-//       return next(new ErrorHandler(fileError, 400));
-//     }
-//     const uploadResults = [];
-//     const userId = req.user?.id;
-
-//     // Check if the user already has an entry in AssetStore
-//     let assetStore = await AssetStore.findOne({ where: { userId: userId } });
-//     if(!assetStore){
-//       return next(new ErrorHandler("AssetStore not found",404));
-//     }
-
-//     // Initialize assetData array, ensuring we parse existing JSON data
-//     let assetData = [];
-//     if (assetStore && assetStore.assetData) {
-//       // Parse the existing assetData if it's a string, otherwise use it directly
-//       assetData =
-//         typeof assetStore.assetData === "string"
-//           ? JSON.parse(assetStore.assetData)
-//           : assetStore.assetData;
-//     }
-
-//     console.log("Existing assetData:", assetData); // Debug log
-
-//     // Process each file
-//     for (const file of req.files) {
-//       // Upload to CDN
-//       const cdnResult = await uploadFile(file);
-
-//       // Prepare new asset data
-//       const newAssetData = {
-//         fileName: cdnResult.filename,
-//         originalName: cdnResult.originalName,
-//         fileType: cdnResult.type,
-//         fileSize: cdnResult.size,
-//         cdnUrl: cdnResult.url,
-//         uploadedAt: new Date().toISOString(),
-//       };
-
-//       // Add new asset to assetData array
-//       assetData.push(newAssetData);
-//       uploadResults.push(newAssetData);
-//     }
-
-//     console.log("Updated assetData:", assetData); // Debug log
-
-//     // Update or create AssetStore record
-//     if (assetStore) {
-//       // Update existing record
-//       await AssetStore.update(
-//         { assetData: assetData },
-//         { where: { userId: userId } }
-//       );
-//     } else {
-//       // Create new record for new user
-//       assetStore = await AssetStore.create({
-//         userId: userId,
-//         assetData: assetData,
-//       });
-//     }
-
-//     // Verify the update
-//     const updatedStore = await AssetStore.findOne({
-//       where: { userId: userId },
-//     });
-//     console.log("Verified assetData after update:", updatedStore.assetData); // Debug log
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Files uploaded successfully",
-//       data: uploadResults,
-//       currentAssets: assetData, // Include all assets in response for verification
-//     });
-//   } catch (error) {
-//     console.error("Upload Content Error:", error);
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
-//-------------------Get assetstore data-----------------------
+//-------------------Get assetstore data-----------------------------------
 const getUploadedAssets = asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -361,7 +273,8 @@ const deleteContent = asyncHandler(async (req, res,next) => {
     return next(new ErrorHandler(`Deletion failed: ${error.message}`,500));
   }
 });
-//------------Delete content from CDN --------------------------
+
+//------------Delete content from CDN -----------------------------------
 const deleteContentCdn = asyncHandler(async (req, res,next) => {
   try {
     const { fileName } = req.query;
@@ -389,6 +302,7 @@ const deleteContentCdn = asyncHandler(async (req, res,next) => {
   }
 });
 
+//------------get listing of files from CDN--------------------------------
 const getFiles = asyncHandler(async (req, res,next) => {
   try {
     const cdnFiles = await listFiles();

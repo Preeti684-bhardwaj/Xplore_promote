@@ -1,10 +1,9 @@
 const app = require("./app.js");
 const { testConnection } = require("./dbConfig/dbEnv.js");
 const db = require("./dbConfig/dbConfig.js");
-require("dotenv").config({ path: "./.env" });
-const passport = require("passport");
-const passportJWT = require("passport-jwt");
+require("dotenv").config();
 const setupSocket = require("./utils/socketSetup.js");
+let cluster = require('express-cluster');
 
 // Global error handlers
 process.on("uncaughtException", (err) => {
@@ -17,81 +16,53 @@ process.on("unhandledRejection", (err) => {
   process.exit(1);
 });
 
-// JWT Configuration
-const ExtractJwt = passportJWT.ExtractJwt;
-const JwtStrategy = passportJWT.Strategy;
-
-const jwtOptions = {
-  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: process.env.JWT_SECRET,
-  passReqToCallback: true
-};
-
-// JWT Strategy
-const strategy = new JwtStrategy(jwtOptions, async (req, jwt_payload, done) => {
-  try {
-    const Model = jwt_payload.obj.type === "USER" ? db.users : db.admins;
-    const user = await Model.findOne({ where: { id: jwt_payload.obj.obj.id } });
-    
-    if (user) {
-      return done(null, { type: jwt_payload.obj.type, obj: user });
-    }
-    return done(null, false);
-  } catch (error) {
-    console.error("JWT Strategy Error:", error);
-    return done(error, false);
-  }
-});
-
-passport.use("jwt", strategy);
-
 // Server initialization
-async function startServer() {
-  try {
-    // Test database connection
-    const isConnected = await testConnection(db.sequelize);
-    if (!isConnected) {
-      throw new Error("Database connection test failed");
-    }
-
-    // Sync database
-    await db.sequelize.sync({ alter: true });
-    console.log("Database synchronized successfully");
-
-    // Start HTTP server
-    const server = app.listen(process.env.PORT || 9191, () => {
-      console.log(`⚙️ Server is running at port: ${process.env.PORT || 9191}`);
-    });
-
-    // Setup WebSocket
-    const io = setupSocket(server);
-    app.set("io", io);
-
-    // Graceful shutdown
-    const shutdown = async () => {
-      console.log("Shutting down gracefully...");
-      
-      try {
-        await Promise.all([
-          new Promise((resolve) => server.close(resolve)),
-          db.sequelize.close()
-        ]);
-        console.log("Server shutdown completed");
-        process.exit(0);
-      } catch (err) {
-        console.error("Error during shutdown:", err);
-        process.exit(1);
+cluster(async function(worker) {
+    try {
+      // const app = express();
+      // Test database connection
+      const isConnected = await testConnection(db.sequelize);
+      if (!isConnected) {
+        throw new Error("Database connection test failed");
       }
-    };
-
-    process.on("SIGTERM", shutdown);
-    process.on("SIGINT", shutdown);
-
-  } catch (error) {
-    console.error("Server startup failed:", error);
-    process.exit(1);
-  }
-}
-
-// Start the server
-startServer();
+  
+      // Sync database
+      await db.sequelize.sync({ alter: true });
+      console.log("Database synchronized successfully");
+      // Start HTTP server
+      const server = app.listen(19909, function () {
+        let host = server.address().address
+        let port = server.address().port
+   
+        console.log("Worker listening at http://%s:%s", host, port); 
+    })
+  
+      // Setup WebSocket
+      const io = setupSocket(server);
+      app.set("io", io);
+  
+      // Graceful shutdown
+      const shutdown = async () => {
+        console.log("Shutting down gracefully...");
+        
+        try {
+          await Promise.all([
+            new Promise((resolve) => server.close(resolve)),
+            db.sequelize.close()
+          ]);
+          console.log("Server shutdown completed");
+          process.exit(0);
+        } catch (err) {
+          console.error("Error during shutdown:", err);
+          process.exit(1);
+        }
+      };
+  
+      process.on("SIGTERM", shutdown);
+      process.on("SIGINT", shutdown);
+  
+    } catch (error) {
+      console.error("Server startup failed:", error);
+      process.exit(1);
+    }
+  }, {count: 4});

@@ -1,5 +1,4 @@
 const db = require("../dbConfig/dbConfig.js");
-// const Layout = db.layouts;
 const Campaign = db.campaigns;
 const CustomFont = db.customFonts;
 const User = db.users;
@@ -16,7 +15,7 @@ const sanitizeFontWeight = (weight) => {
   return weight.toString().trim().toLowerCase();
 };
 
-// Upload a custom font
+//------------------Upload a custom font---------------------------------
 const uploadCustomFont = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
@@ -130,7 +129,7 @@ const uploadCustomFont = async (req, res, next) => {
   }
 };
 
-// Upload a custom font
+//------------------Upload a custom font----------------------------------
 const uploadUserCustomFont = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -331,7 +330,7 @@ const uploadUserCustomFont = async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 };
-// Get all fonts for a user
+//----------------Get all fonts for a user-------------------------------------
 const getAllFonts = async (req, res, next) => {
   try {
     // Get the campaignID from request parameters
@@ -369,7 +368,7 @@ const getAllFonts = async (req, res, next) => {
   }
 };
 
-// Get all fonts for a user
+//----------------Get all fonts for a user------------------------------------
 const getAllUserFonts = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -428,6 +427,7 @@ const getAllUserFonts = async (req, res, next) => {
   }
 };
 
+// --------------download font by specific name-------------------------------
 const downloadFontBySpecificName = asyncHandler(async (req, res, next) => {
   try {
     const { specificName } = req.query;
@@ -482,6 +482,7 @@ const downloadFontBySpecificName = asyncHandler(async (req, res, next) => {
   }
 });
 
+// ---------------font url by specific name----------------------------------------
 const fontUrlBySpecificName = asyncHandler(async (req, res, next) => {
   try {
     const { specificName } = req.query;
@@ -515,7 +516,7 @@ const fontUrlBySpecificName = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Get font by ID
+//-------------------Get font by ID-------------------------------------------------
 const getFontById = async (req, res, next) => {
   try {
     if (!req.params?.id) {
@@ -536,7 +537,8 @@ const getFontById = async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 };
-// delete fontweight file from cdn and db
+
+//------------delete fontweight file from cdn and db---------------------------------
 const deleteFontWeight = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -627,5 +629,5 @@ module.exports = {
   getAllFonts,
   getAllUserFonts,
   getFontById,
-  deleteFontWeight,
+  deleteFontWeight
 };

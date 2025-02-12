@@ -4,14 +4,8 @@ const Layout = db.layouts;
 const { Op } = require("sequelize");
 const User = db.users;
 const { uploadFiles, deleteFile } = require("../utils/cdnImplementation.js");
-const {
-  validateFiles,
-  getPagination,
-} = require("../validators/campaignValidations.js");
-const {
-  getCampaignStatus,
-  validateTiming,
-} = require("../utils/campaignStatusManager.js");
+const {validateFiles,getPagination} = require("../validators/campaignValidations.js");
+const {getCampaignStatus,validateTiming} = require("../utils/campaignStatusManager.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const shortId = require("shortid");
@@ -190,7 +184,7 @@ const createCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
-//--------------------Get all campaigns with pagination---------------------------
+//-------------------Get all campaigns with pagination---------------------------
 const getAllCampaign = asyncHandler(async (req, res, next) => {
   try {
     // const { page, size, name, startDate, endDate, status } = req.query;
@@ -260,7 +254,7 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Get a single campaign by ID
+//-------------------Get a single campaign by ID---------------------------------------
 const getOneCampaign = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.id) {
@@ -315,7 +309,7 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Update a campaign
+//------------------Update a campaign------------------------------------------------
 const updateCampaign = asyncHandler(async (req, res, next) => {
   try {
     let uploadedUrls = [];
@@ -514,162 +508,7 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
-// const updateCampaign = async (req, res) => {
-//   let uploadedUrls = [];
-
-//   try {
-//     // Fetch the existing campaign to preserve the current values
-//     const campaign = await Campaign.findByPk(req.params.id);
-//     if (!campaign) {
-//       return res.status(404).json({success:false, message: "Campaign not found" });
-//     }
-
-//     // Start with the existing data
-//     const updateData = {
-//       lastModifiedBy: req.user.id,
-//       lastModifiedDate: new Date(),
-//     };
-
-//     // Handle file uploads if present
-//     if (req.files && req.files.length > 0) {
-//       try {
-//         // Upload new files
-//         uploadedUrls = await uploadFiles(req.files);
-//         console.log('New files uploaded:', uploadedUrls);
-
-//         // Combine existing images with new uploads
-//         updateData.images = [...(campaign.images || []), ...uploadedUrls];
-//       } catch (uploadError) {
-//         console.error('File upload error:', uploadError);
-//         return res.status(500).json({
-//           success: false,
-//           message: "File upload failed",
-//           error: uploadError.message
-//         });
-//       }
-//     }
-
-//     // Parse and handle JSON data if present
-//     if (req.body.data) {
-//       let bodyData;
-//       try {
-//         bodyData = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data;
-//       } catch (error) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Invalid JSON data format"
-//         });
-//       }
-
-//       // Check and merge each field in bodyData
-//       if (bodyData.timing) {
-//         updateData.timing = { ...campaign.timing, ...bodyData.timing };
-//       }
-
-//       if (bodyData.status) {
-//         updateData.status = { ...campaign.status, ...bodyData.status };
-//       }
-
-//       if (bodyData.performance) {
-//         updateData.performance = { ...campaign.performance, ...bodyData.performance };
-//       }
-
-//       if (bodyData.socialMediaLinks) {
-//         updateData.socialMediaLinks = { ...campaign.socialMediaLinks, ...bodyData.socialMediaLinks };
-//       }
-
-//       if (bodyData.contactInfo) {
-//         updateData.contactInfo = { ...campaign.contactInfo, ...bodyData.contactInfo };
-//       }
-
-//       if (bodyData.siteInfo) {
-//         updateData.siteInfo = { ...campaign.siteInfo, ...bodyData.siteInfo };
-//       }
-
-//       // Handle image deletion if specified
-//       if (bodyData.imagesToDelete && Array.isArray(bodyData.imagesToDelete)) {
-//         try {
-//           // Delete specified images from storage
-//           await Promise.all(
-//             bodyData.imagesToDelete.map(filename => deleteFile(filename))
-//           );
-
-//           // Remove deleted images from the images array
-//           const currentImages = updateData.images || campaign.images || [];
-//           updateData.images = currentImages.filter(
-//             img => !bodyData.imagesToDelete.includes(img.filename)
-//           );
-//         } catch (deleteError) {
-//           console.error('Error deleting images:', deleteError);
-//           // Continue with update even if image deletion fails
-//         }
-//       }
-//     }
-
-//     // Ensure that createdBy and campaignID are not modified
-//     delete updateData.createdBy;
-//     delete updateData.campaignID;
-
-//     // Perform the update, passing only the modified fields
-//     const [updated] = await Campaign.update(updateData, {
-//       where: { campaignID: req.params.id },
-//       returning: true,
-//     });
-
-//     if (updated) {
-//       // Fetch the updated campaign with associations
-//       const updatedCampaign = await Campaign.findByPk(req.params.id, {
-//         include: [
-//           { model: Layout, as: "layouts" },
-//           {
-//             model: User,
-//             as: "creator",
-//             attributes: [
-//               "id",
-//               "name",
-//               "email",
-//               "phone",
-//               "isEmailVerified",
-//               "appleUserId",
-//               "googleUserId",
-//               "authProvider",
-//             ],
-//           },
-//         ],
-//       });
-
-//       return res.json({
-//         success:true,
-//         message: "Campaign updated successfully",
-//         data: updatedCampaign,
-//       });
-//     }
-
-//     return res.status(400).json({success:false, message: "Failed to update campaign" });
-
-//   } catch (error) {
-//     console.error("Error updating campaign:", error);
-
-//     // Clean up any newly uploaded files if the update fails
-//     if (uploadedUrls.length > 0) {
-//       try {
-//         await Promise.all(
-//           uploadedUrls.map(file => deleteFile(file.filename))
-//         );
-//       } catch (cleanupError) {
-//         console.error("Cleanup error:", cleanupError);
-//       }
-//     }
-
-//     res.status(400).json({
-//       success:false,
-//       message: "Failed to update campaign",
-//       error: error.message
-//     });
-//   }
-// };
-
-// Delete a campaign
+//----------------Delete a campaign---------------------------------------------
 const deleteCampaign = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.id) {
@@ -704,29 +543,7 @@ const deleteCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
-const getShortUrl = asyncHandler(async (req, res, next) => {
-  try {
-    if (!req.params?.shortCode) {
-      return next(new ErrorHandler("Missing Short Code", 400));
-    }
-    const campaignShortCode = await Campaign.findOne({
-      where: { shortCode: req.params.shortCode },
-    });
-
-    if (!campaignShortCode) {
-      return next(new ErrorHandler("Campaign Short Code not found", 404));
-    }
-    return res
-      .status(302)
-      .redirect(
-        `https://pre.xplore.xircular.io/campaign/${campaignShortCode.campaignID}`
-      );
-  } catch (error) {
-    return next(new ErrorHandler(error.message, 500));
-  }
-});
-
-// get all metadata of campaign
+//------------get all metadata of campaign-------------------------------------
 const getAllCampaignMetadata = asyncHandler(async (req, res, next) => {
   try {
     // const { page, size, name, startDate, endDate, status } = req.query;
@@ -764,13 +581,11 @@ const getAllCampaignMetadata = asyncHandler(async (req, res, next) => {
   }
 });
 
-
 module.exports = {
   createCampaign,
   getAllCampaign,
   getOneCampaign,
   updateCampaign,
   deleteCampaign,
-  getShortUrl,
   getAllCampaignMetadata
 };

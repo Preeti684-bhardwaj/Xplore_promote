@@ -13,7 +13,6 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const { isValidEmail, isPhoneValid } = require("../validators/validation.js");
 const {
-  // generateToken,
   processgmailUser,
   formatgmailUserResponse,
 } = require("../validators/userValidation.js");
@@ -22,7 +21,7 @@ const googleClient = new OAuth2Client({
   clientId: CLIENT_ID || ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID
 });
 
-async function verifyGoogleLogin(idToken) {
+const verifyGoogleLogin= async(idToken)=>{
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: idToken,
@@ -144,24 +143,6 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       campaignID,
       transaction
     );
-    // // Generate authentication token
-    // let accessToken;
-    // try {
-    //   const tokenPayload = {
-    //     type: "USER",
-    //     obj: {
-    //       id: user.id,
-    //       email: user.email,
-    //       name: user.name,
-    //       googleUserId: user.googleUserId,
-    //     },
-    //   };
-    //   accessToken = generateToken(tokenPayload);
-    //   console.log("Access token generated successfully.");
-    // } catch (tokenGenerationError) {
-    //   console.error("Error generating token:", tokenGenerationError);
-    //    return next(new ErrorHandler("Error generating access token", 500));
-    // }
     // Commit transaction
     await transaction.commit();
 
@@ -188,70 +169,5 @@ const googleLogin = asyncHandler(async (req, res, next) => {
     );
   }
 });
-//-------------------add phone--------------------------
-// const googlePhone = asyncHandler(async (req, res, next) => {
-//   try {
-//     const { phone } = req.body;
 
-//     if (!phone) {
-//       return next(new ErrorHandler("Missing phone number", 400));
-//     }
-
-//     const phoneError = isPhoneValid(phone);
-//     if (phoneError) {
-//       return next(new ErrorHandler(phoneError, 400));
-//     }
-
-//     if (
-//       !req.decodedToken ||
-//       !req.decodedToken.obj ||
-//       !req.decodedToken.obj.obj ||
-//       !req.decodedToken.obj.obj.id
-//     ) {
-//       return next(new ErrorHandler("Invalid or missing token", 401));
-//     }
-
-//     const userId = req.decodedToken.obj.obj.id;
-//     const user = await User.findOne({ where: { id: userId } });
-
-//     if (!user) {
-//       return next(new ErrorHandler("User not found", 404));
-//     }
-
-//     if (!user.isEmailVerified) {
-//       return next(
-//         new ErrorHandler(
-//           "Email not verified. Please verify your email first.",
-//           403
-//         )
-//       );
-//     }
-
-//     if (user.phone) {
-//       return next(
-//         new ErrorHandler("Phone number already exists for this user", 409)
-//       );
-//     }
-
-//     user.phone = phone;
-//     await user.save();
-
-//     return res.status(200).json({
-//       status: true,
-//       message: "Phone number added successfully",
-//       user: {
-//         id: user.id,
-//         email: user.email,
-//         phone: user.phone,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Error in googlePhone:", error);
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
-
-module.exports = {
-  googleLogin,
-  // googlePhone,
-};
+module.exports = {googleLogin};

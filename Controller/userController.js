@@ -12,7 +12,6 @@ const { deleteQRSession } = require("../utils/qrService.js");
 const shortId = require("shortid");
 const {
   isValidEmail,
-  isPhoneValid,
   isValidPassword,
   isValidLength,
 } = require("../validators/validation.js");
@@ -25,13 +24,7 @@ const { uploadFile } = require("../utils/cdnImplementation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const axios = require("axios");
-// const {
-//   RequestError,
-//   FingerprintJsServerApiClient,
-//   TooManyRequestsError,
-//   Region
-// }  =require('@fingerprintjs/fingerprintjs-pro-server-api')
-// const {FINGERPRINT_SECRETKEY} = process.env
+
 require("dotenv").config();
 const {
   KALEYRA_BASE_URL,
@@ -48,20 +41,7 @@ const KALEYRA_CONFIG = {
   phoneFlowId: KALEYRA_PHONE_FLOW_ID,
 };
 
-// const client = new FingerprintJsServerApiClient({
-//   apiKey:FINGERPRINT_SECRETKEY,
-//   region: Region.AP,
-// })
-
-// // // Get visit history of a specific visitor
-// client.getVisits('<visitorId>').then((visitorHistory) => {
-//   console.log(visitorHistory)
-// })
-// // Get a specific identification event
-// client.getEvent('<requestId>').then((event) => {
-//   console.log(event)
-// })
-
+//-------------register user-----------------------------------
 const registerUser = asyncHandler(async (req, res, next) => {
   try {
     const { name, countryCode, phone, email, password } = req.body;
@@ -279,6 +259,7 @@ const sendPhoneOtp = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 //----------phone verification----------------------------
 const phoneVerification = asyncHandler(async (req, res, next) => {
   try {
@@ -380,6 +361,7 @@ const phoneVerification = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 //-----------send OTP-------------------------------
 const sendOtp = asyncHandler(async (req, res, next) => {
   try {
@@ -458,6 +440,7 @@ const sendOtp = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 // const sendOtp = asyncHandler(async (req, res, next) => {
 //   try {
 //     const { email } = req.body;
@@ -905,6 +888,7 @@ const resetPassword = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 // --------------getUserByquery----------------------------------
 const getUserDetails = asyncHandler(async (req, res, next) => {
   try {
@@ -981,6 +965,7 @@ const getUserDetails = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
 //----------------getById---------------------------------------
 const getUserById = asyncHandler(async (req, res, next) => {
   try {
@@ -1336,6 +1321,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 //-----------------delete user--------------------------
 const deleteUser = asyncHandler(async (req, res, next) => {
   try {
@@ -1475,7 +1461,6 @@ const getUserProfile = asyncHandler(async (req, res, next) => {
 });
 
 // ---------------save visitor and campaign id--------------------------------
-
 const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
   const { visitorId, deviceId, campaignID } = req.body;
   console.log("line 1437", visitorId);
@@ -1652,6 +1637,7 @@ const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
   }
 });
 
+// -----------------get user short url-----------------------------------------------
 const getUserShortUrl = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.shortCode) {

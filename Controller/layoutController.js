@@ -3,11 +3,10 @@ const Layout = db.layouts;
 const Campaign = db.campaigns;
 const { Op } = require("sequelize");
 const {uploadFile,deleteFile}=require('../utils/cdnImplementation.js')
-const { getPagination } = require("../validators/campaignValidations.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
-// Create a new layout
+//---------------Create a new layout--------------------------------------
 const createLayout = asyncHandler(async (req, res, next) => {
   // Start a transaction
   const transaction = await db.sequelize.transaction();
@@ -139,8 +138,7 @@ const createLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
-
-// Get all layouts with pagination
+//--------------Get all layouts with pagination---------------------------------
 const getAllLayout = asyncHandler(async (req, res, next) => {
   // const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
   // const { limit, offset } = getPagination(page, size);
@@ -185,7 +183,7 @@ const getAllLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Get a single layout by ID
+//---------------Get a single layout by ID-------------------------------------
 const getOneLayout = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.id) {
@@ -207,7 +205,7 @@ const getOneLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
-// get all layout name 
+//----------------get all layout name-------------------------------------------------
 const getAllLayoutName = asyncHandler(async (req, res, next) => {
   // Get the campaignID from request parameters
   const campaignID = req.params?.campaignID;
@@ -240,7 +238,7 @@ const getAllLayoutName = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Update a layout
+//----------------Update a layout-------------------------------------------------
 const updateLayout = asyncHandler(async (req, res, next) => {
   // Start a transaction
   const transaction = await db.sequelize.transaction();
@@ -360,7 +358,7 @@ const updateLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Delete a layout
+//-----------------Delete a layout---------------------------------------------
 const deleteLayout = asyncHandler(async (req, res, next) => {
   // Start a transaction
   const transaction = await db.sequelize.transaction();
@@ -425,6 +423,7 @@ const deleteLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
+//----------------get all layout by shor code--------------------------
 const getAllLayoutByShortCode = asyncHandler(async (req, res, next) => {
   // const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
   // const { limit, offset } = getPagination(page, size);

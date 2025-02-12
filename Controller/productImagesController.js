@@ -1,53 +1,12 @@
 const db = require("../dbConfig/dbConfig.js");
 const Campaign = db.campaigns;
 const ProductImage = db.productImages;
-const { uploadFile } = require("../utils/cdnImplementation.js"); // Your existing minio client
-const { validateColor } = require("../validators/validation.js");
-const { validateFiles } = require("../validators/campaignValidations.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
-// Helper function to validate image file
-// const validateImageFile = (file) => {
-//   const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-//   const maxSize = 5 * 1024 * 1024; // 5MB
-
-//   if (!file || !file.buffer) {
-//     throw new Error('No file provided');
-//   }
-
-//   if (!allowedMimeTypes.includes(file.mimetype)) {
-//     throw new Error('Invalid file type. Only JPEG, PNG and WebP images are allowed');
-//   }
-
-//   if (file.size > maxSize) {
-//     throw new Error('File size exceeds 5MB limit');
-//   }
-// };
-
-// Helper function to validate color details
-// const validateColorDetails = (colorDetails) => {
-//   if (!Array.isArray(colorDetails)) {
-//     return next(new ErrorHandler("colorDetails must be an array", 400));
-//   }
-
-//   colorDetails.forEach((color) => {
-//     if (!color.colorName || !color.colorCode) {
-//       return next(
-//         new ErrorHandler("Each color must have colorName and colorCode", 400)
-//       );
-//     }
-//     if (!validateColor(color.colorCode)) {
-//       return next(
-//         new ErrorHandler(`Invalid color code: ${color.colorCode}`, 400)
-//       );
-//     }
-//   });
-// };
-
+//------------upload product image------------------------------------------
 const uploadProductImages = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-
   try {
     const {
       productModalId,
@@ -165,6 +124,7 @@ const uploadProductImages = asyncHandler(async (req, res, next) => {
   }
 });
 
+//--------------get product image by campaign--------------------------------
 const getProductImagesByCampaign = asyncHandler(async (req, res) => {
   try {
     const { campaignID } = req.params;
@@ -193,6 +153,7 @@ const getProductImagesByCampaign = asyncHandler(async (req, res) => {
   }
 });
 
+//-----------------get product image by id------------------------------------------
 const getProductImageById = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
@@ -228,6 +189,7 @@ const getProductImageById = asyncHandler(async (req, res) => {
   }
 });
 
+//-------------------update product images------------------------------------------- 
 const updateProductImages = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 

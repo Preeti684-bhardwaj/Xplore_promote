@@ -8,24 +8,10 @@ const sequelize = db.sequelize;
 const asyncHandler = require("../utils/asyncHandler.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const bcrypt = require("bcrypt");
-const {
-  validateFiles,
-  getPagination,
-} = require("../validators/campaignValidations.js");
-const {
-  generateToken,
-  generateOtp,
-  hashPassword,
-} = require("../validators/userValidation.js");
-const {
-  getCampaignStatus,
-  validateTiming,
-} = require("../utils/campaignStatusManager.js");
-const {
-  isValidEmail,
-  isValidPassword,
-  isValidLength,
-} = require("../validators/validation.js");
+const {getPagination} = require("../validators/campaignValidations.js");
+const {generateToken,hashPassword} = require("../validators/userValidation.js");
+const {getCampaignStatus} = require("../utils/campaignStatusManager.js");
+const {isValidEmail,isValidPassword,isValidLength} = require("../validators/validation.js");
 
 // -------------------ADMIN SIGNUP------------------------------------------------------
 const adminSignup = asyncHandler(async (req, res, next) => {
@@ -433,6 +419,7 @@ const assignCampaignToClient = asyncHandler(async (req, res, next) => {
   }
 });
 
+//--------------remove campaign from client-----------------------------------------
 const removeCampaignFromClient = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
   try {
@@ -526,6 +513,7 @@ const removeCampaignFromClient = asyncHandler(async (req, res, next) => {
   }
 });
 
+//----------------get all assigned campaign------------------------------------------
 const getAllAssignedCampaign = asyncHandler(async (req, res, next) => {
   try {
     const { page = 0, size = 10 } = req.query;
@@ -588,6 +576,7 @@ const getAllAssignedCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
+//-------------------get contact details-----------------------------------------------
 const getContactDetails = asyncHandler(async (req, res, next) => {
   try {
     const id = req.user?.id;

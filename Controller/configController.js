@@ -1,10 +1,7 @@
-// controllers/configController.js
 const db = require('../dbConfig/dbConfig.js');
 const ModelConfig = db.modelConfigs;
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
-
-
 
 const createOrUpdateConfig = asyncHandler(async (req, res, next) => {
   const {
