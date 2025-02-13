@@ -9,67 +9,14 @@ const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const crypto = require("crypto");
 const {
-  sendWhatsAppLink,
+  sendWhatsAppMessage,
   getLinkMessageInput,
   generateAuthLink,
   getOtpMessage,
+  parseSignedRequest
 } = require("../utils/whatsappHandler");
 const { v4: UUIDV4 } = require("uuid");
 const { phoneValidation } = require("../utils/phoneValidation.js");
-
-//---------Enhanced Facebook signed request parsing with security checks------------------------------
-function parseSignedRequest(signedRequest) {
-  try {
-    if (!signedRequest || typeof signedRequest !== "string") {
-      throw new Error("Invalid signed request format");
-    }
-
-    const parts = signedRequest.split(".");
-    if (parts.length !== 2) {
-      throw new Error("Invalid signed request structure");
-    }
-
-    const [encodedSig, payload] = parts;
-
-    // Verify signature (add your app secret here)
-    const sig = base64UrlDecode(encodedSig);
-    const expectedSig = crypto
-      .createHmac("sha256", process.env.FACEBOOK_APP_SECRET)
-      .update(payload)
-      .digest("base64");
-
-    if (sig !== expectedSig) {
-      throw new Error("Invalid signature");
-    }
-
-    const data = JSON.parse(base64UrlDecode(payload));
-
-    // Validate required fields
-    if (!data.user_id || !data.algorithm || data.algorithm !== "HMAC-SHA256") {
-      throw new Error("Missing or invalid required fields");
-    }
-
-    return data;
-  } catch (error) {
-    console.error("Error parsing signed request:", error);
-    return null;
-  }
-}
-
-//-----------base64 url decode------------------------------------
-function base64UrlDecode(input) {
-  try {
-    input = input.replace(/-/g, "+").replace(/_/g, "/");
-    const padding = 4 - (input.length % 4);
-    if (padding !== 4) {
-      input += "=".repeat(padding);
-    }
-    return Buffer.from(input, "base64").toString("utf-8");
-  } catch (error) {
-    console.error("Error decoding base64:", error);
-    return null;
-  }
-}
 
 //----------------send OTP via WhatsApp----------------------------------
 const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
@@ -119,7 +66,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const validPhone =cleanedCountryCode + cleanedPhone; //`+${cleanedCountryCode}${cleanedPhone}`
     const messageInput = getOtpMessage(validPhone, message);
     console.log(messageInput);
-    const response = await sendWhatsAppLink(messageInput);
+    const response = await sendWhatsAppMessage(messageInput);
 
     if (!user) {
       await User.create(
@@ -424,7 +371,7 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
       JSON.stringify(messageInput, null, 2)
     );
 
-    const response = await sendWhatsAppLink(messageInput);
+    const response = await sendWhatsAppMessage(messageInput);
 
     // Store state in user record
     let user = await User.findOne({
