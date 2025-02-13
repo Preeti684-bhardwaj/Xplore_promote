@@ -34,7 +34,6 @@ db.sequelize = sequelize;
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
 db.admins = require("../Modals/adminModal.js")(sequelize, Sequelize);
 db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
-// db.advertisements = require("../Modals/advertisementModal.js")(sequelize, Sequelize);
 db.layouts = require("../Modals/layoutModal.js")(sequelize, Sequelize);
 db.assets = require("../Modals/assetStore.js")(sequelize, Sequelize);
 db.qrSessions = require("../Modals/qrSessionModal.js")(sequelize, Sequelize);
@@ -124,17 +123,6 @@ db.productImages.belongsTo(db.campaigns, {
   as: "campaign",
   onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
 });
-// db.advertisements.hasMany(db.layouts, {
-//   foreignKey: 'advertisementID',
-//   as: 'layouts',
-//   onDelete: 'CASCADE' // Optional: deletes layout when advertisement is deleted
-// });
-
-// db.layouts.belongsTo(db.advertisements, {
-//   foreignKey: 'advertisementID',
-//   as: 'advertisement',
-//   onDelete: 'CASCADE' // Optional: deletes layout when advertisement is deleted
-// });
 
 // contact-Campaign relationship
 db.campaigns.hasMany(db.analytics, {

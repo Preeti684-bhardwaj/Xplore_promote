@@ -30,7 +30,7 @@ cluster(async function(worker) {
       await db.sequelize.sync({ alter: true });
       console.log("Database synchronized successfully");
       // Start HTTP server
-      const server = app.listen(19909, function () {
+      const server = app.listen(process.env.PORT, function () {
         let host = server.address().address
         let port = server.address().port
    
