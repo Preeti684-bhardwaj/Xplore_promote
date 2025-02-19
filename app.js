@@ -14,9 +14,9 @@ const allowedOrigins = [
   "http://localhost:5173",
   "https://xplr.live",
   "http://localhost:3000",
-  "http://localhost:6160",
+  "http://localhost:6161",
   "https://designer.xplr.live",
-  "https://xplore-campaign-app.vercel.app",
+  "https://xplore-campaign-app.vercel.app"
 ];
 
 // Configure CORS middleware
