@@ -283,10 +283,26 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     if (!Array.isArray(assetData)) {
       return next(new ErrorHandler("Invalid asset data format", 500));
     }
-    
+
+    // Extract pagination parameters from query
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 10;
+    let startIndex = (page - 1) * limit;
+    let endIndex = startIndex + limit;
+
+    // Paginate the assets
+    const paginatedAssets = assetData.slice(startIndex, endIndex);
+
     return res.status(200).json({
       success: true,
-      data: assetData,
+      data: paginatedAssets,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(assetData.length / limit),
+        totalAssets: assetData.length,
+        hasNextPage: endIndex < assetData.length,
+        hasPrevPage: startIndex > 0,
+      },
     });
   } catch (error) {
     console.error("Get Uploaded Assets Error:", error);
