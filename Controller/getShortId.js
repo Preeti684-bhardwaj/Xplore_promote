@@ -1,5 +1,5 @@
 const db = require("../dbConfig/dbConfig.js");
-const User = db.users;
+const ProfileLayout = db.profileLayout;
 const Campaign = db.campaigns;
 const Layout = db.layouts;
 const ErrorHandler = require("../utils/ErrorHandler.js");
@@ -14,21 +14,22 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
     }
 
     // First, check if the shortCode exists in the User database
-    const userShortCode = await User.findOne({
+    const profileShortCode = await ProfileLayout.findOne({
       where: { shortCode: req.params.shortCode },
     });
 
-    if (userShortCode) {
+    if (profileShortCode) {
       // If user found, parse and return user profile layout
-      const profileLayout = JSON.parse(userShortCode.profileLayoutJSon);
+      const profileLayout =profileShortCode.layoutJSON;
       return res.status(200).json({
         success: true,
         message: "User Profile Layout",
         type: "profile",
         profile: {
-          id: userShortCode.id,
-          layouts: [profileLayout],
+          id: profileShortCode.id,
+          layouts: profileLayout,
         },
+        layoutcdnurl:profileShortCode.cdnDetails.cdnUrl
       });
     }
 

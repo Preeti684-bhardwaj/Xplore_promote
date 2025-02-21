@@ -1,19 +1,21 @@
 const db = require("../dbConfig/dbConfig");
-const User = db.users;
+const Enduser = db.endusers;
+const Campaign = db.campaigns;
 const DeletionRequest = db.deletionRequest;
+const sequelize = db.sequelize;
 const {
   generateToken,
   generateOtp,
 } = require("../validators/userValidation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
-const crypto = require("crypto");
+
 const {
   sendWhatsAppMessage,
   getLinkMessageInput,
   generateAuthLink,
   getOtpMessage,
-  parseSignedRequest
+  parseSignedRequest,
 } = require("../utils/whatsappHandler");
 const { v4: UUIDV4 } = require("uuid");
 const { phoneValidation } = require("../utils/phoneValidation.js");
@@ -23,12 +25,25 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    const { countryCode, phone } = req.body;
+    const { countryCode, phone, campaignId } = req.body;
 
     if (!phone || !countryCode) {
       return next(
         new ErrorHandler("Both country code and phone number are required", 400)
       );
+    }
+    if (!campaignId) {
+      return next(new ErrorHandler("missing campaignId", 400));
+    }
+    // Find the campaign by shortCode
+    const campaign = await db.campaigns.findOne({
+      where: { campaignID: campaignId },
+      transaction,
+    });
+
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid campaign id", 400));
     }
 
     const phoneValidationResult = phoneValidation.validatePhone(
@@ -43,7 +58,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
 
     // Rate limiting check (add to user model)
-    const user = await User.findOne({
+    const user = await Enduser.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
     });
@@ -63,13 +78,13 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const expireTime = Date.now() + 5 * 60 * 1000; // 5 minutes
 
     const message = otp;
-    const validPhone =cleanedCountryCode + cleanedPhone; //`+${cleanedCountryCode}${cleanedPhone}`
+    const validPhone = cleanedCountryCode + cleanedPhone; //`+${cleanedCountryCode}${cleanedPhone}`
     const messageInput = getOtpMessage(validPhone, message);
     console.log(messageInput);
     const response = await sendWhatsAppMessage(messageInput);
 
     if (!user) {
-      await User.create(
+      await Enduser.create(
         {
           countryCode: cleanedCountryCode,
           phone: cleanedPhone,
@@ -115,7 +130,7 @@ const otpVerification = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    const { countryCode, phone, otp } = req.body;
+    const { countryCode, phone, otp, campaignId } = req.body;
 
     if (!otp?.trim()) {
       return next(new ErrorHandler("OTP is required", 400));
@@ -126,19 +141,24 @@ const otpVerification = asyncHandler(async (req, res, next) => {
         new ErrorHandler("Both country code and phone number are required", 400)
       );
     }
+    if (!campaignId) {
+      return next(new ErrorHandler("missing campaignId", 400));
+    }
 
+    // Phone validation
     const phoneValidationResult = phoneValidation.validatePhone(
       countryCode,
       phone
     );
     if (!phoneValidationResult.isValid) {
+      await transaction.rollback();
       return next(new ErrorHandler(phoneValidationResult.message, 400));
     }
 
     const cleanedPhone = phoneValidationResult.cleanedPhone;
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
 
-    const user = await User.findOne({
+    const user = await Enduser.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
     });
@@ -172,19 +192,77 @@ const otpVerification = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("OTP has expired", 400));
     }
 
-    // Update user
-    user.isPhoneVerified = true;
+    // Get campaign and brand (campaign creator) information
+    const campaign = await db.campaigns.findOne({
+      where: { campaignID: campaignId},
+     
+      transaction,
+    });
+
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid campaign or brand", 400));
+    }
+
+    const brandId = campaign.createdBy; // Campaign creator's ID
+
+    // Check if user is already verified for this brand
+    let brandVerification = await db.EndUserBrandVerification.findOne({
+      where: {
+        enduserId: user.id,
+        brandId: brandId,
+      },
+      transaction,
+    });
+
+    let isNewVerification = false;
+
+    if (!brandVerification) {
+      // First time verification for this brand
+      isNewVerification = true;
+      brandVerification = await db.EndUserBrandVerification.create(
+        {
+          enduserId: user.id,
+          brandId: brandId,
+          isVerified: true,
+          verifiedAt: new Date(),
+        },
+        { transaction }
+      );
+
+      // Associate user with all campaigns of this brand
+      const brandCampaigns = await db.campaigns.findAll({
+        include: [
+          {
+            model: db.users,
+            as: "users",
+            where: { id: brandId },
+            through: { attributes: [] },
+          },
+        ],
+        transaction,
+      });
+
+      await Promise.all(
+        brandCampaigns.map((campaign) =>
+          user.addCampaign(campaign, { transaction })
+        )
+      );
+    }
+    // Update user's OTP status
     user.metaOtp = null;
     user.metaOtpExpire = null;
     user.otpAttempts = 0;
     await user.save({ transaction });
 
+    // Generate token
     const tokenPayload = {
-      type: "USER",
+      type: "ENDUSER",
       obj: {
         id: user.id,
         countryCode: user.countryCode,
         phone: user.phone,
+        brandId: brandId, // Include brandId in token
       },
     };
 
@@ -193,11 +271,15 @@ const otpVerification = asyncHandler(async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "Phone verified successfully",
+      message: isNewVerification
+        ? "Phone verified successfully"
+        : "Login successful",
       data: {
         id: user.id,
         countryCode: user.countryCode,
         phone: user.phone,
+        isNewVerification,
+        brandId,
       },
       token: accessToken,
     });
@@ -334,15 +416,53 @@ const deletionData = asyncHandler(async (req, res, next) => {
   }
 });
 
-//----------------whatsapp link initiated---------------------------------------- 
+//----------------whatsapp link initiated----------------------------------------
 const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
-    const { countryCode, phone ,shortId} = req.body;
+    const { countryCode, phone, shortCode, layoutId } = req.body;
 
     if (!phone || !countryCode) {
       return next(
         new ErrorHandler("Both country code and phone number are required", 400)
+      );
+    }
+    if (!shortCode || !layoutId) {
+      return next(
+        new ErrorHandler("Both shortcode and layoutId are required", 400)
+      );
+    }
+    // Find campaign with its associated layouts
+    const campaign = await Campaign.findOne({
+      where: {
+        shortCode: shortCode,
+      },
+      include: [
+        {
+          model: db.layouts,
+          as: "layouts",
+          where: {
+            layoutID: layoutId,
+          },
+          required: false,
+        },
+      ],
+      transaction,
+    });
+
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    // Check if the layout exists and belongs to the campaign
+    if (!campaign.layouts || campaign.layouts.length === 0) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler(
+          "Layout not found or does not belong to this campaign",
+          404
+        )
       );
     }
 
@@ -351,19 +471,28 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
       phone
     );
     if (!phoneValidationResult.isValid) {
+      await transaction.rollback();
       return next(new ErrorHandler(phoneValidationResult.message, 400));
     }
 
     const cleanedPhone = phoneValidationResult.cleanedPhone;
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
     const validPhone = cleanedCountryCode + cleanedPhone;
+    let user = await Enduser.findOne({
+      where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
+      transaction,
+    });
 
     // Generate state for security
     const state = UUIDV4();
-    const authLink = generateAuthLink(validPhone, state);
-
-    const message = "Click the link below to login to your account:";
-    const messageInput = getLinkMessageInput(validPhone, authLink, message);
+    const authLink = generateAuthLink(
+      countryCode,
+      phone,
+      state,
+      shortCode,
+      layoutId
+    );
+    const messageInput = getLinkMessageInput(validPhone, authLink);
 
     // Log the exact payload being sent
     console.log(
@@ -373,14 +502,8 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
 
     const response = await sendWhatsAppMessage(messageInput);
 
-    // Store state in user record
-    let user = await User.findOne({
-      where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
-      transaction,
-    });
-    7;
     if (!user) {
-      user = await User.create(
+      user = await Enduser.create(
         {
           countryCode: cleanedCountryCode,
           phone: cleanedPhone,
@@ -422,15 +545,17 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    const { state, phone } = req.query;
+    const { state, countryCode, phone, shortCode, layoutId } = req.query;
 
-    if (!state || !phone) {
+    if (!state || !countryCode || !phone || !shortCode || !layoutId) {
       return next(new ErrorHandler("Invalid authentication callback", 400));
     }
 
-    const user = await User.findOne({
+    // Find the user
+    const user = await Enduser.findOne({
       where: {
-        phone: phone.slice(-10),
+        countryCode: countryCode,
+        phone: phone,
         authState: state,
         stateExpiry: { [db.Sequelize.Op.gt]: Date.now() },
       },
@@ -444,34 +569,87 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Clear auth state
-    user.authState = null;
-    user.stateExpiry = null;
-    user.isPhoneVerified = true;
-    await user.save({ transaction });
-
-    const tokenPayload = {
-      type: "USER",
-      obj: {
-        id: user.id,
-        countryCode: user.countryCode,
-        phone: user.phone,
-      },
-    };
-
-    const accessToken = generateToken(tokenPayload);
-    await transaction.commit();
-
-    // Redirect to frontend with token
-    res.redirect(
-      `${process.env.FRONTEND_URL}/auth/success?token=${accessToken}`
-    );
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error handling WhatsApp callback:", error);
-    res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
-  }
-});
+       // Get campaign and brand information
+       const campaign = await db.campaigns.findOne({
+        where: { shortCode },
+        transaction,
+      });
+  
+      if (!campaign) {
+        await transaction.rollback();
+        return next(new ErrorHandler("Invalid campaign or brand", 400));
+      }
+  
+      const brandId = campaign.createdBy;
+  
+      // Check brand verification status
+      let brandVerification = await db.EndUserBrandVerification.findOne({
+        where: {
+          enduserId: user.id,
+          brandId: brandId
+        },
+        transaction,
+      });
+  
+      let isNewVerification = false;
+  
+      if (!brandVerification) {
+        // First time verification for this brand
+        isNewVerification = true;
+        brandVerification = await db.EndUserBrandVerification.create({
+          enduserId: user.id,
+          brandId: brandId,
+          isVerified: true,
+          verifiedAt: new Date()
+        }, { transaction });
+  
+        // Associate with all brand campaigns
+        const brandCampaigns = await db.campaigns.findAll({
+          include: [{
+            model: db.users,
+            as: 'users',
+            where: { id: brandId },
+            through: { attributes: [] }
+          }],
+          transaction,
+        });
+  
+        await Promise.all(
+          brandCampaigns.map(campaign => 
+            user.addCampaign(campaign, { transaction })
+          )
+        );
+      }
+  
+      // Clear auth state
+      user.authState = null;
+      user.stateExpiry = null;
+      await user.save({ transaction });
+  
+      // Generate token
+      const tokenPayload = {
+        type: "ENDUSER",
+        obj: {
+          id: user.id,
+          countryCode: user.countryCode,
+          phone: user.phone,
+          brandId: brandId
+        },
+      };
+  
+      const accessToken = generateToken(tokenPayload);
+      await transaction.commit();
+  
+      // Redirect with appropriate parameters
+      res.redirect(
+        `${process.env.DEVELOPEMENT_BASE_URL}/${shortCode}/${layoutId}?token=${accessToken}&isNewVerification=${isNewVerification}&brandId=${brandId}`
+      );
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Error handling WhatsApp callback:", error);
+      res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
+    }
+  });
 
 module.exports = {
   sendWhatsAppOTP,

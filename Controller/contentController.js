@@ -9,9 +9,15 @@ const asyncHandler = require("../utils/asyncHandler.js");
 const uploadContent = asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user?.id;
+    const { fileType } = req.body; // Get fileType from request body
     
     if (!userId) {
       return next(new ErrorHandler("User ID is required", 400));
+    }
+
+    // Validate fileType
+    if (!fileType) {
+      return next(new ErrorHandler("File type is required", 400));
     }
 
     // Validate file request
@@ -20,18 +26,28 @@ const uploadContent = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(fileError, 400));
     }
 
+    // Validate if files match the specified fileType
+    // const invalidFiles = req.files.filter(file => !file.mimetype.includes(fileType.toLowerCase()));
+    // if (invalidFiles.length > 0) {
+    //   return next(new ErrorHandler(`Some files do not match the specified file type: ${fileType}`, 400));
+    // }
+
     // Initialize arrays for tracking results
     const uploadResults = [];
 
     // First, ensure AssetStore exists for the user
     let assetStore = await AssetStore.findOne({ 
-      where: { userId: userId } 
+      where: { 
+        userId: userId,
+        fileType: fileType  // Add fileType to query
+      } 
     });
 
     // If no AssetStore exists, create one with empty assetData
     if (!assetStore) {
       assetStore = await AssetStore.create({
         userId: userId,
+        fileType: fileType,  // Add fileType to creation
         assetData: []
       });
     }
@@ -57,10 +73,11 @@ const uploadContent = asyncHandler(async (req, res, next) => {
         const newAssetData = {
           fileName: cdnResult.filename,
           originalName: cdnResult.originalName,
-          fileType: cdnResult.type,
+          fileType: fileType,  // Use the specified fileType
           fileSize: cdnResult.size,
           cdnUrl: cdnResult.url,
           uploadedAt: new Date().toISOString(),
+          mimeType: file.mimetype  // Add actual mime type for reference
         };
 
         // Add new asset to arrays
@@ -76,16 +93,25 @@ const uploadContent = asyncHandler(async (req, res, next) => {
     // Update AssetStore with new data
     try {
       await AssetStore.update(
-        { assetData: assetData },
         { 
-          where: { userId: userId },
-          returning: true // Get the updated record
+          assetData: assetData,
+          fileType: fileType  // Ensure fileType is updated
+        },
+        { 
+          where: { 
+            userId: userId,
+            fileType: fileType  // Add fileType to where clause
+          },
+          returning: true
         }
       );
 
       // Verify the update
       const verifiedStore = await AssetStore.findOne({
-        where: { userId: userId }
+        where: { 
+          userId: userId,
+          fileType: fileType  // Add fileType to verification query
+        }
       });
 
       if (!verifiedStore) {
@@ -98,7 +124,8 @@ const uploadContent = asyncHandler(async (req, res, next) => {
         data: {
           newUploads: uploadResults,
           totalAssets: assetData.length,
-          assetStoreId: verifiedStore.id
+          assetStoreId: verifiedStore.id,
+          fileType: fileType  // Include fileType in response
         }
       });
 
@@ -112,7 +139,6 @@ const uploadContent = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
-
 //-----------------upload to files CDN------------------------------------------
 const uploadImage = asyncHandler(async (req, res, next) => {
   try {
@@ -195,16 +221,33 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     if (!Array.isArray(assetData)) {
       return next(new ErrorHandler("Invalid asset data format", 500));
     }
-    
+
+    // Extract pagination parameters from query
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 10;
+    let startIndex = (page - 1) * limit;
+    let endIndex = startIndex + limit;
+
+    // Paginate the assets
+    const paginatedAssets = assetData.slice(startIndex, endIndex);
+
     return res.status(200).json({
       success: true,
-      data: assetData,
+      data: paginatedAssets,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(assetData.length / limit),
+        totalAssets: assetData.length,
+        hasNextPage: endIndex < assetData.length,
+        hasPrevPage: startIndex > 0,
+      },
     });
   } catch (error) {
     console.error("Get Uploaded Assets Error:", error);
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 
 //------------Delete content from CDN and AssetStore--------------------------
 const deleteContent = asyncHandler(async (req, res,next) => {

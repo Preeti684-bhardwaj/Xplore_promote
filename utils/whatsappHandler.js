@@ -1,8 +1,8 @@
 const axios = require("axios");
 
 //--------------generating auth link---------------------------------------------
-function generateAuthLink(phoneNumber, state) {
-  return `${process.env.APP_URL}/auth/callback?state=${state}&phone=${phoneNumber}`;
+function generateAuthLink(countryCode, phone, state , shortCode,layoutId) {
+  return `${process.env.APP_URL}/auth/callback?state=${state}&countryCode=${countryCode}&phone=${phone}&shortCode=${shortCode}&layoutId=${layoutId}`;
 }
 
 // ---------------send message on whatsapp-------------------------------------
@@ -68,7 +68,7 @@ const getOtpMessage = (recipient, text) => {
 };
 
 // ---------generate data payload as per link based meta template----------------------------------
-const getLinkMessageInput = (recipient, link, text) => {
+const getLinkMessageInput = (recipient, link) => {
   // Ensure the link is properly encoded
   const encodedLink = encodeURI(link);
   console.log(encodedLink);
@@ -81,21 +81,16 @@ const getLinkMessageInput = (recipient, link, text) => {
     template: {
       name: "xplorebuzz_whatsapp_login",
       language: {
-        code: "en",
+          code: "en"
       },
       components: [
-        {
-          type: "body",
+          {
+           type: "body",
           parameters: [
-            {
-              type: "text",
-              parameter_name: "customer_name",
-              text: "Samad",
-            },
-            {
-              type: "text",
-              parameter_name: "login_link",
-              text: `${encodedLink}`,
+              {
+                  type: "text",
+                  parameter_name: "login_link",
+                  text:  `${encodedLink}`,
             },
           ],
         },

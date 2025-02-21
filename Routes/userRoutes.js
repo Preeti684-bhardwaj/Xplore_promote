@@ -20,23 +20,34 @@ const {
   logoutAll,
   getUserProfile,
   saveVisitorAndCampaign,
-  getUserShortUrl
+  getUserShortUrl,
+  appleLogin,
+   googleLogin
 } = require("../Controller/userController");
-const { appleLogin, googleLogin } = require("../Controller/MainUserController");
-// const {googleLogin}=require('../Controller/googleSignin')
 const { verifyJWt, authorize, verifySession } = require("../middleware/auth");
 const { verifyEncryption} = require('../middleware/encryption');
 const { getContactDetails } = require("../Controller/contactUsController");
 const{deletionData,facebookDataDeletion,sendWhatsAppOTP,otpVerification,initiateWhatsAppLogin,handleWhatsAppCallback}=require("../Controller/whatsappLogin")
+const {
+  createProfileLayout,
+  getAllProfileLayout,
+  getOneProfileLayout,
+  getAllProfileLayoutName,   
+  updateProfileLayout,
+  deleteProfileLayout,
+  // getAllProfileLayoutByShortCode
+} = require("../Controller/profileLayoutController");
 
 
-// whatsapp login api
-router.post("/auth/whatsapplink",initiateWhatsAppLogin);
-router.post("/auth/whatsappOtp",sendWhatsAppOTP);
-router.post("/auth/verifyOtp",otpVerification);
-router.post("/whatsApp/callback", handleWhatsAppCallback);
-router.post("/meta/deletion", facebookDataDeletion ); // deleted Api
-router.get("/meta/deletion/page",deletionData ); // deleted status Api
+// profile layout json api
+router.post("/profile/create",verifyJWt,authorize(["USER"]),verifySession,createProfileLayout)
+router.get("/profile/getAll",verifyJWt,authorize(["USER"]),verifySession,getAllProfileLayout)
+router.get("/profile/getAllLayoutName/:id",getAllProfileLayoutName)
+router.get("/profile/getOne/:id",getOneProfileLayout)
+router.put("/profile/update/:id",verifyJWt,authorize(["USER"]),verifySession,updateProfileLayout)
+router.delete("/profile/delete/:shortCode",verifyJWt,authorize(["USER"]),verifySession,deleteProfileLayout)
+// router.get("/profile/getLayout/:shortCode",getAllProfileLayoutByShortCode);
+
 // registration main app api
 router.post("/register", registerUser);
 router.post("/sendOtp", sendOtp);
@@ -65,4 +76,5 @@ router.post("/googleSignin", googleLogin);
 router.post("/saveVisitorAndCampaign", saveVisitorAndCampaign);
 router.get("/getSubmittedContact/:campaignID", verifyJWt,authorize(["USER"]),verifySession, getContactDetails);
 router.get("/profileLayout/:shortCode",getUserShortUrl)
+
 module.exports = router;

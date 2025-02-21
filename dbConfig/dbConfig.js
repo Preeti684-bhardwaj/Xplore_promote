@@ -32,6 +32,8 @@ db.sequelize = sequelize;
 // Import models
 // db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
+db.endusers=require("../Modals/endUserModal.js")(sequelize, Sequelize);
+db.EndUserBrandVerification=require("../Modals/enduserbrandverificationModal.js")(sequelize, Sequelize);
 db.admins = require("../Modals/adminModal.js")(sequelize, Sequelize);
 db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
 db.layouts = require("../Modals/layoutModal.js")(sequelize, Sequelize);
@@ -42,7 +44,9 @@ db.customFonts = require("../Modals/customFontModal.js")(sequelize, Sequelize);
 db.productImages = require("../Modals/productImages.js")(sequelize, Sequelize);
 db.analytics=require("../Modals/analyticsModal.js")(sequelize, Sequelize);
 db.deletionRequest=require("../Modals/metaDeletionModal.js")(sequelize, Sequelize);
-db.modelConfigs = require("../Modals/chatConfigModal.js")(sequelize, Sequelize);
+db.predibaseConfig = require("../Modals/predibaseConfigModal.js")(sequelize, Sequelize);
+db.ragConfig = require("../Modals/ragConfigModel.js")(sequelize, Sequelize);
+db.profileLayout = require("../Modals/profileLayoutModal.js")(sequelize, Sequelize);
 db.FontWeight = require("../Modals/fontWeightModal.js")(sequelize, Sequelize);
 
 // Define relationships
@@ -58,7 +62,7 @@ db.layouts.belongsTo(db.campaigns, {
   onDelete: "CASCADE", // Optional: deletes advertisement when campaign is deleted
 });
 
-// Establish relationship between Campaign and EndUser
+// Establish relationship between Campaign and user
 db.campaigns.belongsToMany(db.users, {
   through: "CampaignEndUser", // Sequelize automatically manages this table
   foreignKey: "campaignID",
@@ -73,6 +77,20 @@ db.users.belongsToMany(db.campaigns, {
   as: "campaigns",
 });
 
+// Establish relationship between Campaign and enduser
+db.campaigns.belongsToMany(db.endusers, {
+  through: "CampaignUser", // Sequelize automatically manages this table
+  foreignKey: "campaignID",
+  otherKey: "enduserID",
+  as: "endusers",
+});
+
+db.endusers.belongsToMany(db.campaigns, {
+  through: "CampaignUser",
+  foreignKey: "enduserID",
+  otherKey: "campaignID",
+  as: "campaigns",
+});
 //  // relationship between customFonts and fontWeight
 db.customFonts.hasMany(db.FontWeight, {
   foreignKey: 'customFontId', // Foreign key in FontWeight table
@@ -161,6 +179,44 @@ db.qrSessions.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
   onDelete: "CASCADE", // Optional: deletes the QR session when the associated user is deleted
+});
+
+// predibase config - campaign relationship
+db.campaigns.hasOne(db.predibaseConfig, {
+  foreignKey: "campaignId",
+  as: "predibase",
+  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+});
+
+db.predibaseConfig.belongsTo(db.campaigns, {
+  foreignKey: "campaignId",
+  as: "campaigns",
+  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+});
+
+// ragConfig config - campaign relationship
+db.campaigns.hasOne(db.ragConfig, {
+  foreignKey: "campaignId",
+  as: "rag",
+  onDelete: "CASCADE", // Optional: deletes rag config when campaign is deleted
+});
+
+db.ragConfig.belongsTo(db.campaigns, {
+  foreignKey: "campaignId",
+  as: "rag",
+  onDelete: "CASCADE", // Optional: deletes rag config when campaign is deleted
+});
+
+db.users.hasMany(db.profileLayout, {
+  foreignKey: "userId",
+  as: "layouts",
+  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
+});
+
+db.profileLayout.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "users",
+  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
 });
 
 module.exports = db;

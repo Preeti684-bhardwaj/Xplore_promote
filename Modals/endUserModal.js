@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => {
-  const User = sequelize.define("User", {
+  const Enduser = sequelize.define("Enduser", {
     id: {
       type: DataTypes.UUID,
       primaryKey: true,
@@ -19,10 +19,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true, // Allow null for Apple Sign In users
     },
-    isBusinessUser: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
     visitorIds: {
       type: DataTypes.ARRAY(DataTypes.STRING),
     },
@@ -32,29 +28,21 @@ module.exports = (sequelize, DataTypes) => {
     userImages: {
       type: DataTypes.JSON,
     },
-    companyImages: {
-      type: DataTypes.JSON,
-    },
-    address: {
-      type: DataTypes.JSON,
-    },
-    userWebsites: {
-      type: DataTypes.JSON,
-    },
-    companyWebsite: {
-      type: DataTypes.STRING,
-    },
     otp: DataTypes.STRING,
     otpExpire: DataTypes.DATE,
+    metaOtp: DataTypes.STRING,
+    metaOtpExpire: DataTypes.DATE,
+    authState: DataTypes.UUID,
+    stateExpiry: DataTypes.DATE,
     lastOtpSentAt: {
       type: DataTypes.DATE,
       allowNull: true,
-      comment: 'Timestamp of the last OTP sent to track rate limiting'
+      comment: "Timestamp of the last OTP sent to track rate limiting",
     },
     otpAttempts: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
-      comment: 'Number of failed OTP verification attempts'
+      comment: "Number of failed OTP verification attempts",
     },
     IsActive: {
       type: DataTypes.BOOLEAN,
@@ -80,8 +68,12 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM("local", "apple", "google"),
       defaultValue: "local",
     },
+    role: {
+      type: DataTypes.ENUM("ADMIN", "USER", "CLIENT"),
+      defaultValue: "USER",
+    },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   });
-  return User;
+  return Enduser;
 };
