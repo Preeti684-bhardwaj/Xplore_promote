@@ -17,7 +17,7 @@ router.post('/googleSignin', googleLogin);
 router.post("/auth/whatsapplink",initiateWhatsAppLogin);
 router.post("/auth/whatsappOtp",sendWhatsAppOTP);
 router.post("/auth/verifyOtp",otpVerification);
-router.post("/auth/callback", handleWhatsAppCallback);
+router.get("/auth/callback", handleWhatsAppCallback);
 router.post("/meta/deletion", facebookDataDeletion ); // deleted Api
 router.get("/meta/deletion/page",deletionData ); // deleted status Api
 module.exports = router;
