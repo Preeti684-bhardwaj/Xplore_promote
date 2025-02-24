@@ -2,7 +2,7 @@ const axios = require("axios");
 
 //--------------generating auth link---------------------------------------------
 function generateAuthLink(countryCode, phone, state , shortCode,layoutId) {
-  return `${process.env.APP_URL}/auth/callback?state=${state}&countryCode=${countryCode}&phone=${phone}&shortCode=${shortCode}&layoutId=${layoutId}`;
+  return `${process.env.APP_URL}/api/v1/endUser/auth/callback?state=${state}&countryCode=${countryCode}&phone=${phone}&shortCode=${shortCode}&layoutId=${layoutId}`;
 }
 
 // ---------------send message on whatsapp-------------------------------------
