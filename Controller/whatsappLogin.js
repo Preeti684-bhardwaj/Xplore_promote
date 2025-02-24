@@ -642,7 +642,7 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
   
       // Redirect with appropriate parameters
       res.redirect(
-        `${process.env.DEVELOPEMENT_BASE_URL}/${shortCode}/${layoutId}?token=${accessToken}&isNewVerification=${isNewVerification}&brandId=${brandId}`
+        `${process.env.DEVELOPEMENT_BASE_URL}/${shortCode}/${layoutId}?token=${accessToken}`
       );
     } catch (error) {
       await transaction.rollback();
