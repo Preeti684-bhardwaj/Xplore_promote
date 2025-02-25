@@ -1,10 +1,11 @@
 const db = require("../dbConfig/dbConfig.js");
-const User = db.users;
+const ProfileLayout = db.profileLayout;
 const Campaign = db.campaigns;
 const Layout = db.layouts;
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
+//-------------------get layout of campaign by short code-------------------------------------
 const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
   try {
     // Check if shortCode is provided
@@ -13,21 +14,22 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
     }
 
     // First, check if the shortCode exists in the User database
-    const userShortCode = await User.findOne({
+    const profileShortCode = await ProfileLayout.findOne({
       where: { shortCode: req.params.shortCode },
     });
 
-    if (userShortCode) {
+    if (profileShortCode) {
       // If user found, parse and return user profile layout
-      const profileLayout = JSON.parse(userShortCode.profileLayoutJSon);
+      const profileLayout =profileShortCode.layoutJSON;
       return res.status(200).json({
         success: true,
         message: "User Profile Layout",
         type: "profile",
         profile: {
-          id: userShortCode.id,
-          layouts: [profileLayout],
+          id: profileShortCode.id,
+          layouts: profileLayout,
         },
+        layoutcdnurl:profileShortCode.cdnDetails.cdnUrl
       });
     }
 
@@ -77,47 +79,5 @@ const getLayoutByShortCode = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
-const getPreviewByShortCode = asyncHandler(async (req, res, next) => {
-  try {
-    const shortCode = req.params[0];
 
-    // Reuse your existing logic to fetch data
-    const user = await User.findOne({ where: { shortCode } });
-    if (user) {
-      return res.send(`
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <title>${user.name}</title>
-                        <meta property="og:title" content="${user.name}" />
-                        <meta property="og:description" content="${user.bio}" />
-                        <meta property="og:image" content="${user.avatar}" />
-                    </head>
-                    <body>Redirecting...</body>
-                </html>
-            `);
-    }
-
-    const campaign = await Campaign.findOne({ where: { shortCode } });
-    if (campaign) {
-      return res.send(`
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <title>${campaign.name}</title>
-                        <meta property="og:title" content="${campaign.name}" />
-                        <meta property="og:description" content="${campaign.description}" />
-                        <meta property="og:image" content="${campaign.images[0].url}" />
-                    </head>
-                    <body>Redirecting...</body>
-                </html>
-            `);
-    }
-
-    return next(new ErrorHandler("Resource not found", 404));
-  } catch (error) {
-    next(error);
-  }
-});
-
-module.exports = { getLayoutByShortCode,getPreviewByShortCode};
+module.exports = { getLayoutByShortCode};

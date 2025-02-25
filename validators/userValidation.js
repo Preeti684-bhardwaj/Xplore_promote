@@ -85,80 +85,6 @@ const validateAppleToken = (idToken) => {
   }
 };
 
-
-// Process User
-async function processUser({
-  existingUser,
-  decodedToken,
-  email,
-  name,
-  appleUserId,
-  deviceId,
-  visitorId,
-  campaignID,
-  transaction,
-}) {
-  let user;
-  let userStatus = "existing";
-
-  if (existingUser) {
-    // Scenario 1: User exists with visitorId, but has null email, name, and appleUserId
-    if (!existingUser.email && !existingUser.name && !existingUser.appleUserId) {
-      user = await updateUserWithAppleDetails(
-        existingUser,
-        {
-          appleUserId: decodedToken.sub,
-          email,
-          name,
-          deviceId,
-          visitorId,
-        },
-        campaignID,
-        transaction
-      );
-    } 
-    // Scenario 2: User exists with Apple User ID
-    else if (existingUser.appleUserId) {
-      user = await updateExistingUserWithAppleId(
-        existingUser,
-        { deviceId, visitorId },
-        transaction
-      );
-    } 
-    // Scenario 3: User exists without Apple User ID
-    else {
-      user = await updateUserWithAppleDetails(
-        existingUser,
-        {
-          appleUserId: decodedToken.sub,
-          email,
-          name,
-          deviceId,
-          visitorId,
-        },
-        campaignID,
-        transaction
-      );
-    }
-  } else {
-    // Scenario 4: Create new user
-    user = await createNewUser(
-      {
-        appleUserId: decodedToken.sub,
-        email,
-        name,
-        deviceId,
-        visitorId,
-      },
-      campaignID,
-      transaction
-    );
-    userStatus = "new";
-  }
-
-  return [user, userStatus];
-}
-
 // Update Existing User with Apple ID
 async function updateExistingUserWithAppleId(
   user,
@@ -237,81 +163,6 @@ async function createNewUser(
   await user.addCampaign(campaignID, { transaction });
   return user;
 }
-// Determine User Message
-function getUserMessage(userStatus) {
-  return userStatus === "new" ? "Signup successful" : "Login successful";
-}
-
-// Format User Response
-function formatUserResponse(user) {
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    appleUserId: user.appleUserId,
-    deviceId: user.deviceId,
-    visitorIds: user.visitorIds,
-    isEmailVerified: user.isEmailVerified,
-  };
-}
-
-// Process User
-async function processgmailUser(existingUser, googlePayload, campaignID, transaction) {
-  // Validate email if present
-  if (googlePayload.email && !isValidEmail(googlePayload.email)) {
-    throw new ErrorHandler("Invalid email format from Google account", 400);
-  }
-
-  let user;
-  if (!existingUser) {
-    // Create new user
-    try {
-      user = await User.create({
-        email: googlePayload.email,
-        name: googlePayload.name,
-        googleUserId: googlePayload.sub,
-        isEmailVerified: true,
-        authProvider: "google",
-        IsActive: true,
-      }, { transaction });
-    } catch (error) {
-      if (error.name === "SequelizeUniqueConstraintError") {
-        throw new ErrorHandler("Account already exists with this email", 409);
-      }
-      throw error;
-    }
-  } else {
-    // Update existing user
-    user = await updategmailExistingUser(existingUser, googlePayload, transaction);
-
-    // Check if user is active
-    if (!user.IsActive) {
-      throw new ErrorHandler("This account has been deactivated", 403);
-    }
-  }
-
-  return user;
-}
-
-// Update Existing User
-async function updategmailExistingUser(existingUser, googlePayload, transaction) {
-  return await existingUser.update({
-    googleUserId: googlePayload.sub,
-    name: existingUser.name || googlePayload.name,
-  }, { transaction });
-}
-
-// Format User Response
-function formatgmailUserResponse(user) {
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    isEmailVerified: user.isEmailVerified,
-    phone: user.phone,
-  };
-}
-
 
 const createOrUpdateUser = async (
     email,
@@ -393,12 +244,7 @@ module.exports = {
   hashPassword,
   validateAppleToken,
   createOrUpdateUser,
-  processUser,
   updateExistingUserWithAppleId,
   updateUserWithAppleDetails,
   createNewUser,
-  getUserMessage,
-  formatUserResponse,
-  processgmailUser,
-  formatgmailUserResponse
 };

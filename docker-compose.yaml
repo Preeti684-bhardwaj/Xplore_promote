@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./
+    ports:
+      - "9190:9190"
+    env_file:
+      - ./.env
+    depends_on:
+      - database
+    networks:
+      - app-network
+
+  database:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${PASSWORD}
+      POSTGRES_DB: ${DATABASE}
+    ports:
+      - "5436:5432"
+    networks:
+      - app-network
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgdata:

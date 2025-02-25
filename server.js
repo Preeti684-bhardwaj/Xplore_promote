@@ -32,7 +32,7 @@ const strategy = new JwtStrategy(jwtOptions, async (req, jwt_payload, done) => {
   try {
     const Model = jwt_payload.obj.type === "USER" ? db.users : db.admins;
     const user = await Model.findOne({ where: { id: jwt_payload.obj.obj.id } });
-    
+
     if (user) {
       return done(null, { type: jwt_payload.obj.type, obj: user });
     }
@@ -42,7 +42,6 @@ const strategy = new JwtStrategy(jwtOptions, async (req, jwt_payload, done) => {
     return done(error, false);
   }
 });
-
 passport.use("jwt", strategy);
 
 // Server initialization
@@ -70,7 +69,7 @@ async function startServer() {
     // Graceful shutdown
     const shutdown = async () => {
       console.log("Shutting down gracefully...");
-      
+
       try {
         await Promise.all([
           new Promise((resolve) => server.close(resolve)),
@@ -86,7 +85,7 @@ async function startServer() {
 
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
-
+                                          
   } catch (error) {
     console.error("Server startup failed:", error);
     process.exit(1);
@@ -95,3 +94,4 @@ async function startServer() {
 
 // Start the server
 startServer();
+                 

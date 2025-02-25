@@ -1,85 +1,49 @@
 const db = require("../dbConfig/dbConfig");
-const User = db.users;
+const Enduser = db.endusers;
+const Campaign = db.campaigns;
 const DeletionRequest = db.deletionRequest;
+const sequelize = db.sequelize;
 const {
   generateToken,
   generateOtp,
 } = require("../validators/userValidation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
-const crypto = require("crypto");
+
 const {
-  sendWhatsAppLink,
+  sendWhatsAppMessage,
   getLinkMessageInput,
   generateAuthLink,
+  getOtpMessage,
+  parseSignedRequest,
 } = require("../utils/whatsappHandler");
 const { v4: UUIDV4 } = require("uuid");
 const { phoneValidation } = require("../utils/phoneValidation.js");
 
-// Enhanced Facebook signed request parsing with security checks
-function parseSignedRequest(signedRequest) {
-  try {
-    if (!signedRequest || typeof signedRequest !== "string") {
-      throw new Error("Invalid signed request format");
-    }
-
-    const parts = signedRequest.split(".");
-    if (parts.length !== 2) {
-      throw new Error("Invalid signed request structure");
-    }
-
-    const [encodedSig, payload] = parts;
-
-    // Verify signature (add your app secret here)
-    const sig = base64UrlDecode(encodedSig);
-    const expectedSig = crypto
-      .createHmac("sha256", process.env.FACEBOOK_APP_SECRET)
-      .update(payload)
-      .digest("base64");
-
-    if (sig !== expectedSig) {
-      throw new Error("Invalid signature");
-    }
-
-    const data = JSON.parse(base64UrlDecode(payload));
-
-    // Validate required fields
-    if (!data.user_id || !data.algorithm || data.algorithm !== "HMAC-SHA256") {
-      throw new Error("Missing or invalid required fields");
-    }
-
-    return data;
-  } catch (error) {
-    console.error("Error parsing signed request:", error);
-    return null;
-  }
-}
-
-function base64UrlDecode(input) {
-  try {
-    input = input.replace(/-/g, "+").replace(/_/g, "/");
-    const padding = 4 - (input.length % 4);
-    if (padding !== 4) {
-      input += "=".repeat(padding);
-    }
-    return Buffer.from(input, "base64").toString("utf-8");
-  } catch (error) {
-    console.error("Error decoding base64:", error);
-    return null;
-  }
-}
-
-// Controller function to send OTP via WhatsApp
+//----------------send OTP via WhatsApp----------------------------------
 const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    const { countryCode, phone } = req.body;
+    const { countryCode, phone, campaignId } = req.body;
 
     if (!phone || !countryCode) {
       return next(
         new ErrorHandler("Both country code and phone number are required", 400)
       );
+    }
+    if (!campaignId) {
+      return next(new ErrorHandler("missing campaignId", 400));
+    }
+    // Find the campaign by shortCode
+    const campaign = await db.campaigns.findOne({
+      where: { campaignID: campaignId },
+      transaction,
+    });
+
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid campaign id", 400));
     }
 
     const phoneValidationResult = phoneValidation.validatePhone(
@@ -94,7 +58,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
 
     // Rate limiting check (add to user model)
-    const user = await User.findOne({
+    const user = await Enduser.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
     });
@@ -113,14 +77,14 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const otp = generateOtp();
     const expireTime = Date.now() + 5 * 60 * 1000; // 5 minutes
 
-    const message = `Your verification code is: ${otp}. This code will expire in 5 minutes. Please do not share this code with anyone.`;
-    const validPhone = cleanedCountryCode + cleanedPhone;
-    const messageInput = getTextMessageInput(validPhone, message);
-
-    const response = await sendMessage(JSON.parse(messageInput));
+    const message = otp;
+    const validPhone = cleanedCountryCode + cleanedPhone; //`+${cleanedCountryCode}${cleanedPhone}`
+    const messageInput = getOtpMessage(validPhone, message);
+    console.log(messageInput);
+    const response = await sendWhatsAppMessage(messageInput);
 
     if (!user) {
-      await User.create(
+      await Enduser.create(
         {
           countryCode: cleanedCountryCode,
           phone: cleanedPhone,
@@ -146,7 +110,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
       message: "OTP sent successfully",
       data: {
         messageId: response.data.messages[0].id,
-        ...(process.env.NODE_ENV === "development" && { otp }),
+        otp,
       },
     });
   } catch (error) {
@@ -161,11 +125,12 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   }
 });
 
+//---------------whatsapp otp verification-----------------------------------
 const otpVerification = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    const { countryCode, phone, otp } = req.body;
+    const { countryCode, phone, otp, campaignId } = req.body;
 
     if (!otp?.trim()) {
       return next(new ErrorHandler("OTP is required", 400));
@@ -176,19 +141,24 @@ const otpVerification = asyncHandler(async (req, res, next) => {
         new ErrorHandler("Both country code and phone number are required", 400)
       );
     }
+    if (!campaignId) {
+      return next(new ErrorHandler("missing campaignId", 400));
+    }
 
+    // Phone validation
     const phoneValidationResult = phoneValidation.validatePhone(
       countryCode,
       phone
     );
     if (!phoneValidationResult.isValid) {
+      await transaction.rollback();
       return next(new ErrorHandler(phoneValidationResult.message, 400));
     }
 
     const cleanedPhone = phoneValidationResult.cleanedPhone;
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
 
-    const user = await User.findOne({
+    const user = await Enduser.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
     });
@@ -222,19 +192,77 @@ const otpVerification = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("OTP has expired", 400));
     }
 
-    // Update user
-    user.isPhoneVerified = true;
+    // Get campaign and brand (campaign creator) information
+    const campaign = await db.campaigns.findOne({
+      where: { campaignID: campaignId},
+     
+      transaction,
+    });
+
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid campaign or brand", 400));
+    }
+
+    const brandId = campaign.createdBy; // Campaign creator's ID
+
+    // Check if user is already verified for this brand
+    let brandVerification = await db.EndUserBrandVerification.findOne({
+      where: {
+        enduserId: user.id,
+        brandId: brandId,
+      },
+      transaction,
+    });
+
+    let isNewVerification = false;
+
+    if (!brandVerification) {
+      // First time verification for this brand
+      isNewVerification = true;
+      brandVerification = await db.EndUserBrandVerification.create(
+        {
+          enduserId: user.id,
+          brandId: brandId,
+          isVerified: true,
+          verifiedAt: new Date(),
+        },
+        { transaction }
+      );
+
+      // Associate user with all campaigns of this brand
+      const brandCampaigns = await db.campaigns.findAll({
+        include: [
+          {
+            model: db.users,
+            as: "users",
+            where: { id: brandId },
+            through: { attributes: [] },
+          },
+        ],
+        transaction,
+      });
+
+      await Promise.all(
+        brandCampaigns.map((campaign) =>
+          user.addCampaign(campaign, { transaction })
+        )
+      );
+    }
+    // Update user's OTP status
     user.metaOtp = null;
     user.metaOtpExpire = null;
     user.otpAttempts = 0;
     await user.save({ transaction });
 
+    // Generate token
     const tokenPayload = {
-      type: "USER",
+      type: "ENDUSER",
       obj: {
         id: user.id,
         countryCode: user.countryCode,
         phone: user.phone,
+        brandId: brandId, // Include brandId in token
       },
     };
 
@@ -243,11 +271,15 @@ const otpVerification = asyncHandler(async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "Phone verified successfully",
+      message: isNewVerification
+        ? "Phone verified successfully"
+        : "Login successful",
       data: {
         id: user.id,
         countryCode: user.countryCode,
         phone: user.phone,
+        isNewVerification,
+        brandId,
       },
       token: accessToken,
     });
@@ -258,6 +290,8 @@ const otpVerification = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
+//--------------- facebook user data deletion-------------------------------------
 const facebookDataDeletion = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
 
@@ -351,6 +385,7 @@ const facebookDataDeletion = asyncHandler(async (req, res, next) => {
   }
 });
 
+//------------------deletion of data-------------------------------------------------
 const deletionData = asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.query;
@@ -381,15 +416,53 @@ const deletionData = asyncHandler(async (req, res, next) => {
   }
 });
 
+//----------------whatsapp link initiated----------------------------------------
 const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-
   try {
-    const { countryCode, phone } = req.body;
+    const { countryCode, phone, shortCode, layoutId } = req.body;
 
     if (!phone || !countryCode) {
       return next(
         new ErrorHandler("Both country code and phone number are required", 400)
+      );
+    }
+    if (!shortCode || !layoutId) {
+      return next(
+        new ErrorHandler("Both shortcode and layoutId are required", 400)
+      );
+    }
+    // Find campaign with its associated layouts
+    const campaign = await Campaign.findOne({
+      where: {
+        shortCode: shortCode,
+      },
+      include: [
+        {
+          model: db.layouts,
+          as: "layouts",
+          where: {
+            layoutID: layoutId,
+          },
+          required: false,
+        },
+      ],
+      transaction,
+    });
+
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    // Check if the layout exists and belongs to the campaign
+    if (!campaign.layouts || campaign.layouts.length === 0) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler(
+          "Layout not found or does not belong to this campaign",
+          404
+        )
       );
     }
 
@@ -398,33 +471,39 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
       phone
     );
     if (!phoneValidationResult.isValid) {
+      await transaction.rollback();
       return next(new ErrorHandler(phoneValidationResult.message, 400));
     }
 
     const cleanedPhone = phoneValidationResult.cleanedPhone;
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
     const validPhone = cleanedCountryCode + cleanedPhone;
-
-    // Generate state for security
-    const state = UUIDV4();
-    const authLink = generateAuthLink(validPhone, state);
-
-    const message = "Click the link below to login to your account:";
-    const messageInput = getLinkMessageInput(validPhone, authLink, message);
-
-    // Log the exact payload being sent
-    console.log('WhatsApp API Request Payload:', JSON.stringify(messageInput, null, 2));
-
-    const response = await sendWhatsAppLink(messageInput);
-
-    // Store state in user record
-    let user = await User.findOne({
+    let user = await Enduser.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
     });
 
+    // Generate state for security
+    const state = UUIDV4();
+    const authLink = generateAuthLink(
+      countryCode,
+      phone,
+      state,
+      shortCode,
+      layoutId
+    );
+    const messageInput = getLinkMessageInput(validPhone, authLink);
+
+    // Log the exact payload being sent
+    console.log(
+      "WhatsApp API Request Payload:",
+      JSON.stringify(messageInput, null, 2)
+    );
+
+    const response = await sendWhatsAppMessage(messageInput);
+
     if (!user) {
-      user = await User.create(
+      user = await Enduser.create(
         {
           countryCode: cleanedCountryCode,
           phone: cleanedPhone,
@@ -461,19 +540,22 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
   }
 });
 
+//------------------handle whtsapp callback----------------------------------------
 const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    const { state, phone } = req.query;
+    const { state, countryCode, phone, shortCode, layoutId } = req.query;
 
-    if (!state || !phone) {
+    if (!state || !countryCode || !phone || !shortCode || !layoutId) {
       return next(new ErrorHandler("Invalid authentication callback", 400));
     }
 
-    const user = await User.findOne({
+    // Find the user
+    const user = await Enduser.findOne({
       where: {
-        phone: phone.slice(-10),
+        countryCode: countryCode,
+        phone: phone,
         authState: state,
         stateExpiry: { [db.Sequelize.Op.gt]: Date.now() },
       },
@@ -487,34 +569,87 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Clear auth state
-    user.authState = null;
-    user.stateExpiry = null;
-    user.isPhoneVerified = true;
-    await user.save({ transaction });
-
-    const tokenPayload = {
-      type: "USER",
-      obj: {
-        id: user.id,
-        countryCode: user.countryCode,
-        phone: user.phone,
-      },
-    };
-
-    const accessToken = generateToken(tokenPayload);
-    await transaction.commit();
-
-    // Redirect to frontend with token
-    res.redirect(
-      `${process.env.FRONTEND_URL}/auth/success?token=${accessToken}`
-    );
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error handling WhatsApp callback:", error);
-    res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
-  }
-});
+       // Get campaign and brand information
+       const campaign = await db.campaigns.findOne({
+        where: { shortCode },
+        transaction,
+      });
+  
+      if (!campaign) {
+        await transaction.rollback();
+        return next(new ErrorHandler("Invalid campaign or brand", 400));
+      }
+  
+      const brandId = campaign.createdBy;
+  
+      // Check brand verification status
+      let brandVerification = await db.EndUserBrandVerification.findOne({
+        where: {
+          enduserId: user.id,
+          brandId: brandId
+        },
+        transaction,
+      });
+  
+      let isNewVerification = false;
+  
+      if (!brandVerification) {
+        // First time verification for this brand
+        isNewVerification = true;
+        brandVerification = await db.EndUserBrandVerification.create({
+          enduserId: user.id,
+          brandId: brandId,
+          isVerified: true,
+          verifiedAt: new Date()
+        }, { transaction });
+  
+        // Associate with all brand campaigns
+        const brandCampaigns = await db.campaigns.findAll({
+          include: [{
+            model: db.users,
+            as: 'users',
+            where: { id: brandId },
+            through: { attributes: [] }
+          }],
+          transaction,
+        });
+  
+        await Promise.all(
+          brandCampaigns.map(campaign => 
+            user.addCampaign(campaign, { transaction })
+          )
+        );
+      }
+  
+      // Clear auth state
+      user.authState = null;
+      user.stateExpiry = null;
+      await user.save({ transaction });
+  
+      // Generate token
+      const tokenPayload = {
+        type: "ENDUSER",
+        obj: {
+          id: user.id,
+          countryCode: user.countryCode,
+          phone: user.phone,
+          brandId: brandId
+        },
+      };
+  
+      const accessToken = generateToken(tokenPayload);
+      await transaction.commit();
+  
+      // Redirect with appropriate parameters
+      res.redirect(
+        `${process.env.DEVELOPEMENT_BASE_URL}/${shortCode}/${layoutId}?token=${accessToken}`
+      );
+    } catch (error) {
+      await transaction.rollback();
+      console.error("Error handling WhatsApp callback:", error);
+      res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
+    }
+  });
 
 module.exports = {
   sendWhatsAppOTP,

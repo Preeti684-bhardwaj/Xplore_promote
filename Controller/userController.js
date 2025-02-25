@@ -12,7 +12,6 @@ const { deleteQRSession } = require("../utils/qrService.js");
 const shortId = require("shortid");
 const {
   isValidEmail,
-  isPhoneValid,
   isValidPassword,
   isValidLength,
 } = require("../validators/validation.js");
@@ -20,19 +19,21 @@ const {
   generateToken,
   generateOtp,
   hashPassword,
+  createOrUpdateUser,
+  validateAppleToken
 } = require("../validators/userValidation.js");
 const { uploadFile } = require("../utils/cdnImplementation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const axios = require("axios");
-// const {
-//   RequestError,
-//   FingerprintJsServerApiClient,
-//   TooManyRequestsError,
-//   Region
-// }  =require('@fingerprintjs/fingerprintjs-pro-server-api')
-// const {FINGERPRINT_SECRETKEY} = process.env
 require("dotenv").config();
+const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =
+  process.env;
+const { OAuth2Client } = require("google-auth-library");
+
+const googleClient = new OAuth2Client({
+  clientId: CLIENT_ID || ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID
+});
 const {
   KALEYRA_BASE_URL,
   KALEYRA_API_KEY,
@@ -48,20 +49,7 @@ const KALEYRA_CONFIG = {
   phoneFlowId: KALEYRA_PHONE_FLOW_ID,
 };
 
-// const client = new FingerprintJsServerApiClient({
-//   apiKey:FINGERPRINT_SECRETKEY,
-//   region: Region.AP,
-// })
-
-// // // Get visit history of a specific visitor
-// client.getVisits('<visitorId>').then((visitorHistory) => {
-//   console.log(visitorHistory)
-// })
-// // Get a specific identification event
-// client.getEvent('<requestId>').then((event) => {
-//   console.log(event)
-// })
-
+//-------------register user-----------------------------------
 const registerUser = asyncHandler(async (req, res, next) => {
   try {
     const { name, countryCode, phone, email, password } = req.body;
@@ -279,6 +267,7 @@ const sendPhoneOtp = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 //----------phone verification----------------------------
 const phoneVerification = asyncHandler(async (req, res, next) => {
   try {
@@ -380,6 +369,7 @@ const phoneVerification = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 //-----------send OTP-------------------------------
 const sendOtp = asyncHandler(async (req, res, next) => {
   try {
@@ -458,6 +448,7 @@ const sendOtp = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 // const sendOtp = asyncHandler(async (req, res, next) => {
 //   try {
 //     const { email } = req.body;
@@ -905,6 +896,7 @@ const resetPassword = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 // --------------getUserByquery----------------------------------
 const getUserDetails = asyncHandler(async (req, res, next) => {
   try {
@@ -981,6 +973,7 @@ const getUserDetails = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
 //----------------getById---------------------------------------
 const getUserById = asyncHandler(async (req, res, next) => {
   try {
@@ -1336,6 +1329,7 @@ const updateUser = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 //-----------------delete user--------------------------
 const deleteUser = asyncHandler(async (req, res, next) => {
   try {
@@ -1475,7 +1469,6 @@ const getUserProfile = asyncHandler(async (req, res, next) => {
 });
 
 // ---------------save visitor and campaign id--------------------------------
-
 const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
   const { visitorId, deviceId, campaignID } = req.body;
   console.log("line 1437", visitorId);
@@ -1652,6 +1645,7 @@ const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
   }
 });
 
+// -----------------get user short url-----------------------------------------------
 const getUserShortUrl = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.shortCode) {
@@ -1676,6 +1670,224 @@ const getUserShortUrl = asyncHandler(async (req, res, next) => {
   }
 });
 
+const verifyGoogleLogin= async(idToken)=> {
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: idToken,
+      audience: [
+        CLIENT_ID, 
+        ANDROID_ENDUSER_CLIENT_ID, 
+        WEB_ENDUSER_CLIENT_ID
+      ]
+    });
+    
+    const payload = ticket.getPayload();
+    console.log("Full token payload:", JSON.stringify(payload, null, 2));
+    console.log("Token audience:", payload.aud);
+    
+    return payload;
+  } catch (error) {
+    console.error("Detailed error verifying Google token:", {
+      message: error.message,
+      stack: error.stack
+    });
+    return null;
+  }
+}
+
+// ---------------apple signin---------------------------------
+const appleLogin = asyncHandler(async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const authHeader = req.headers["authorization"];
+    const idToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : authHeader;
+    // Extract and validate inputs
+    const { email, name, appleUserId } = req.body;
+    const decodedToken = validateAppleToken(idToken);
+    console.log("decodedToken", decodedToken);
+    // Pass the transaction to the createOrUpdateUser function
+    const userResponse = await createOrUpdateUser(
+      email,
+      name,
+      appleUserId,
+      decodedToken.sub,
+      decodedToken,
+      transaction
+    );
+    // Check if the response indicates an error
+    if (!userResponse.success) {
+      console.error("User creation/update error:", userResponse.message);
+      await transaction.rollback(); // Rollback the transaction
+      return res.status(userResponse.status).json({
+        success: false,
+        message: userResponse.message,
+      });
+    }
+      
+    const user = userResponse.data;
+    console.log("appleUserId", decodedToken.sub);
+    const obj = {
+      type: "USER",
+      obj:{
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+    };
+  
+    const accessToken = generateToken(obj);
+    console.log("user after createOrUpdateUser function", user);
+
+    // Audit log for successful login
+    console.log(`Successful Apple login for user ID: ${user.appleUserId}`);
+
+    await transaction.commit(); // Commit the transaction
+
+    return res.status(200).json({
+      status: true,
+      message: "Login successful",
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        appleUserId: user.appleUserId,
+      },
+      token:accessToken
+    });
+  }catch (error) {
+    console.error("Apple login error:", error);
+    await transaction.rollback(); // Rollback the transaction on error
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+//-----------------google signin------------------
+const googleLogin = asyncHandler(async (req, res, next) => {
+  // Start a transaction
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    // Get token from Authorization header and remove 'Bearer ' if present
+    const authHeader = req.headers["authorization"];
+    const idToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : authHeader;
+  
+    if (!idToken || idToken === "null") {
+     return next(new ErrorHandler("No authentication token provided", 401));
+    }
+     
+    // Verify Google token
+    let googlePayload;
+    try {
+      googlePayload = await verifyGoogleLogin(idToken);
+    } catch (error) {
+      await transaction.rollback();
+      if (error.message.includes("Token used too late")) {
+        return next(
+          new ErrorHandler(
+            "Authentication token has expired. Please login again.",
+            401
+          )
+        );
+      }
+      return next(new ErrorHandler("Invalid authentication token", 401));
+    }
+
+    if (!googlePayload?.sub) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid Google account information", 400));
+    }
+
+    // Try to find user by Google ID or email
+    let user = await User.findOne({ 
+      where: {
+        [db.Sequelize.Op.or]: [
+          { googleUserId: googlePayload.sub },
+          { email: googlePayload.email }
+        ]
+      },
+      transaction // Pass transaction to findOne
+    });
+
+    if (!user) {
+      // Validate email if present
+      if (googlePayload.email && !isValidEmail(googlePayload.email)) {
+        await transaction.rollback();
+        return next(new ErrorHandler("Invalid email format from Google account", 400));
+      }
+      
+      try {
+        // Create new user within transaction
+        user = await User.create({
+          email: googlePayload.email,
+          name: googlePayload.name,
+          googleUserId: googlePayload.sub,
+          isEmailVerified: true,
+          authProvider: "google",
+          IsActive: true
+        }, { transaction }); // Pass transaction to create
+      } catch (error) {
+        await transaction.rollback();
+        console.error("Error creating user:", error);
+        if (error.name === 'SequelizeUniqueConstraintError') {
+          return next(new ErrorHandler("Account already exists with this email", 409));
+        }
+        throw error;
+      }
+    } else {
+      // Update existing user's Google information within transaction
+      await user.update({
+        googleUserId: googlePayload.sub,
+        name: user.name || googlePayload.name
+      }, { transaction });
+    }
+
+    if (!user.IsActive) {
+      await transaction.rollback();
+      return next(new ErrorHandler("This account has been deactivated", 403));
+    }
+
+    // Commit transaction
+    await transaction.commit();
+
+    const obj = {
+      type: "USER",
+      obj: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+    };
+    
+    const accessToken = generateToken(obj);
+    
+    // Return response
+    return res.status(200).json({
+      status: true,
+      message: "Login successful",
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+        isEmailVerified: user.isEmailVerified,
+        phone: user.phone
+      },
+      token: accessToken,
+    });
+  } catch (error) {
+    // Ensure transaction is rolled back in case of any unexpected error
+    await transaction.rollback();
+    
+    // Log and handle errors
+    console.error("Google login error:", error);
+    return next(new ErrorHandler(error.message || "An error occurred during login. Please try again later.", 500));
+  }
+});
+
 module.exports = {
   registerUser,
   phoneVerification,
@@ -1696,4 +1908,6 @@ module.exports = {
   getUserProfile,
   saveVisitorAndCampaign,
   getUserShortUrl,
+  appleLogin,
+  googleLogin
 };

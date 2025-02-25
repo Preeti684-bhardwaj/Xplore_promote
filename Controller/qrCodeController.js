@@ -1,14 +1,9 @@
 const crypto = require("crypto");
 const db = require("../dbConfig/dbConfig");
-const {
-  // createQRSession,
-  getQRSession,
-  deleteQRSession,
-//   isSocketConnected
-} = require("../utils/qrService");
+const { getQRSession, deleteQRSession } = require("../utils/qrService");
 const { getPagination } = require("../validators/campaignValidations");
 const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler= require("../utils/asyncHandler.js");
+const asyncHandler = require("../utils/asyncHandler.js");
 
 // Store active QR sessions
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
@@ -30,9 +25,9 @@ const generateQR = asyncHandler(async (req, res, next) => {
     // await createQRSession(channelHash, token, os);
     try {
       await db.qrSessions.create({
-        channel:channelHash,
-        token:token,
-        os:os,
+        channel: channelHash,
+        token: token,
+        os: os,
         createdAt: new Date(),
       });
     } catch (error) {
@@ -40,7 +35,7 @@ const generateQR = asyncHandler(async (req, res, next) => {
         channel,
         token,
         os,
-        errorStack: error.stack
+        errorStack: error.stack,
       });
       return next(new ErrorHandler(error.message, 500));
     }
@@ -179,13 +174,12 @@ const getQrSession = asyncHandler(async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error fetching campaigns:", error);
-    return next(new ErrorHandler(error.message,500));
+    return next(new ErrorHandler(error.message, 500));
   }
 });
-
 
 module.exports = {
   generateQR,
   verifyQRLogin,
-  getQrSession
+  getQrSession,
 };

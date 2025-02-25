@@ -1,12 +1,24 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const {handleChatRequest} = require('../Controller/chatController');
-const {createOrUpdateConfig}=require('../Controller/configController');
-const {verifyAdmin, authorize } = require("../middleware/auth");
-const { verifyEncryption} = require('../middleware/encryption');
+const { handleChatRequest } = require("../Controller/chatController");
+const {
+  uploadPredibaseConfig,
+  getCsvFile,
+  getJsonFile,
+  updateProxyConfig,
+  updateAdapterName
+} = require("../Controller/configController");
+const {verifyJWt, verifyAdmin, authorize,verifySession } = require("../middleware/auth");
+const { verifyEncryption } = require("../middleware/encryption");
+const upload = require("../middleware/multer");
 
-router.post('/config',verifyAdmin,
-    authorize(["ADMIN"]), createOrUpdateConfig);
-router.post('/chat', handleChatRequest);
+// router.post('/config',verifyAdmin,
+//     authorize(["ADMIN"]), createOrUpdateConfig);
+router.post("/upload" ,verifyAdmin,authorize(["ADMIN","USER"]),verifySession,upload.array("files"),uploadPredibaseConfig);
+router.get("/getcsvfile",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, getCsvFile);
+router.get("/getjsonfile", getJsonFile);
+router.post("/config",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, updateProxyConfig);
+router.put("/update",verifyAdmin,authorize(["ADMIN","USER"]),verifySession,updateAdapterName)
+router.post("/chat", handleChatRequest);
 
 module.exports = router;

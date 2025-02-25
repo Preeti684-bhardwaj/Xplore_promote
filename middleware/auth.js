@@ -134,11 +134,11 @@ const verifyAdmin = async (req, res, next) => {
     }
 
     // Determine platform and OS
-    // const userAgent = req.headers["user-agent"];
-    // const platform = getPlatform(userAgent);
+    const userAgent = req.headers["user-agent"];
+    const platform = getPlatform(userAgent);
 
     // Attach info to request
-    // req.platform = platform;
+    req.platform = platform;
     req.admin = admin;
     // req.token = token;
     console.log(req.admin);

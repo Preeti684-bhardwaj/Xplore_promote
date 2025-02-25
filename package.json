@@ -20,6 +20,7 @@
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
+    "express-cluster": "^0.0.5",
     "google-auth-library": "^9.14.2",
     "is-url": "^1.2.4",
     "jsonwebtoken": "^9.0.2",

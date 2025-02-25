@@ -1,8 +1,8 @@
-const crypto = require("crypto");
 const asyncHandler = require("../utils/asyncHandler");
 require("dotenv").config();
 const axios = require("axios");
 
+//--------------webhook for getting event logs on server--------------------
 const webhookEvent =asyncHandler(async (req, res,next) => {
     // log incoming messages
     console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
@@ -52,7 +52,7 @@ const webhookEvent =asyncHandler(async (req, res,next) => {
     res.sendStatus(200);
   });
   
-// Main webhook handler
+//--------------webhook verification--------------------------------------- 
 const handleWebhook= asyncHandler(async(req,res,next)=> {
   try {
     const mode = req.query["hub.mode"];
