@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => {
-  const Enduser = sequelize.define("Enduser", {
+  const EndUser = sequelize.define("EndUser", {
     id: {
       type: DataTypes.UUID,
       primaryKey: true,
@@ -10,7 +10,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    professionalEmail: DataTypes.STRING,
     countryCode: {
       type: DataTypes.STRING,
     },
@@ -68,12 +67,8 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM("local", "apple", "google"),
       defaultValue: "local",
     },
-    role: {
-      type: DataTypes.ENUM("ADMIN", "USER", "CLIENT"),
-      defaultValue: "USER",
-    },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   });
-  return Enduser;
+  return EndUser;
 };

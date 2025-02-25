@@ -32,7 +32,7 @@ db.sequelize = sequelize;
 // Import models
 // db.endUsers=require("../Modals/endUserModal.js")(sequelize,Sequelize);
 db.users = require("../Modals/userModal.js")(sequelize, Sequelize);
-db.endusers=require("../Modals/endUserModal.js")(sequelize, Sequelize);
+db.endUsers=require("../Modals/endUserModal.js")(sequelize, Sequelize);
 db.EndUserBrandVerification=require("../Modals/enduserbrandverificationModal.js")(sequelize, Sequelize);
 db.admins = require("../Modals/adminModal.js")(sequelize, Sequelize);
 db.campaigns = require("../Modals/campaignModal.js")(sequelize, Sequelize);
@@ -44,8 +44,7 @@ db.customFonts = require("../Modals/customFontModal.js")(sequelize, Sequelize);
 db.productImages = require("../Modals/productImages.js")(sequelize, Sequelize);
 db.analytics=require("../Modals/analyticsModal.js")(sequelize, Sequelize);
 db.deletionRequest=require("../Modals/metaDeletionModal.js")(sequelize, Sequelize);
-db.predibaseConfig = require("../Modals/predibaseConfigModal.js")(sequelize, Sequelize);
-db.ragConfig = require("../Modals/ragConfigModel.js")(sequelize, Sequelize);
+db.chatBotConfig = require("../Modals/ChatBotConfigModal.js")(sequelize, Sequelize);
 db.profileLayout = require("../Modals/profileLayoutModal.js")(sequelize, Sequelize);
 db.FontWeight = require("../Modals/fontWeightModal.js")(sequelize, Sequelize);
 
@@ -78,14 +77,14 @@ db.users.belongsToMany(db.campaigns, {
 });
 
 // Establish relationship between Campaign and enduser
-db.campaigns.belongsToMany(db.endusers, {
+db.campaigns.belongsToMany(db.endUsers, {
   through: "CampaignUser", // Sequelize automatically manages this table
   foreignKey: "campaignID",
   otherKey: "enduserID",
   as: "endusers",
 });
 
-db.endusers.belongsToMany(db.campaigns, {
+db.endUsers.belongsToMany(db.campaigns, {
   through: "CampaignUser",
   foreignKey: "enduserID",
   otherKey: "campaignID",
@@ -182,29 +181,16 @@ db.qrSessions.belongsTo(db.users, {
 });
 
 // predibase config - campaign relationship
-db.campaigns.hasOne(db.predibaseConfig, {
+db.campaigns.hasOne(db.chatBotConfig, {
   foreignKey: "campaignId",
-  as: "predibase",
+  as: "chatbot",
   onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
 });
 
-db.predibaseConfig.belongsTo(db.campaigns, {
+db.chatBotConfig.belongsTo(db.campaigns, {
   foreignKey: "campaignId",
   as: "campaigns",
   onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
-});
-
-// ragConfig config - campaign relationship
-db.campaigns.hasOne(db.ragConfig, {
-  foreignKey: "campaignId",
-  as: "rag",
-  onDelete: "CASCADE", // Optional: deletes rag config when campaign is deleted
-});
-
-db.ragConfig.belongsTo(db.campaigns, {
-  foreignKey: "campaignId",
-  as: "rag",
-  onDelete: "CASCADE", // Optional: deletes rag config when campaign is deleted
 });
 
 db.users.hasMany(db.profileLayout, {

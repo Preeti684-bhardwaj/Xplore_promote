@@ -1,7 +1,7 @@
 const axios = require("axios");
 const OpenAI = require("openai");
 const db = require("../dbConfig/dbConfig.js");
-const Predibase = db.predibaseConfig;
+const ChatBotConfig = db.chatBotConfig;
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
@@ -47,7 +47,7 @@ const updateSummary = (response) => {
 
 const handleChatRequest = asyncHandler(async (req, res,next) => {
   try {
-    const {api_token,adapter_name,campaignId}=req.query
+    const {campaignId}=req.query
     if (!req.body.Question) {
       return next(
         new ErrorHandler("Missing required field: Question", 400));
@@ -85,12 +85,9 @@ const handleChatRequest = asyncHandler(async (req, res,next) => {
       return res.end();
     }
 
-    const config = await Predibase.findOne({
+    const config = await ChatBotConfig.findOne({
       where: {
-        adapter_name:adapter_name ,
-        campaignId: campaignId,
-        api_token:api_token
-       
+        campaignId: campaignId
       },
     });
 
@@ -98,14 +95,14 @@ const handleChatRequest = asyncHandler(async (req, res,next) => {
       return next(
         new ErrorHandler("Configuration not found", 404));
     }
-    console.log(config.tenant_id);
-    console.log(config.deployment_name);
+    console.log(config.otherDetails.tenant_id);
+    console.log(config.otherDetails.deployment_name);
 
     
     const BASE_PROMPT=config.base_prompt
     const openai = new OpenAI({
-      apiKey: config.api_token,
-      baseURL: `https://serving.app.predibase.com/${config.tenant_id}/deployments/v2/llms/${config.deployment_name}/v1`,
+      apiKey: config.api_key,
+      baseURL: `https://serving.app.predibase.com/${config.otherDetails.tenant_id}/deployments/v2/llms/${config.otherDetails.deployment_name}/v1`,
     });
 
     const previousSummary = generateSummary();
@@ -115,9 +112,9 @@ const handleChatRequest = asyncHandler(async (req, res,next) => {
 
     let accumulatedResponse = '';
     const stream = await openai.completions.create({
-      model:config.adapter_id,
+      model:config.otherDetails.adapter_id,
       prompt: fullPrompt,
-      max_tokens: config.max_new_tokens,
+      max_tokens: config.otherDetails.max_new_tokens,
       temperature: 0.2,
       top_p: 0.1,
       stream: true,
@@ -136,7 +133,7 @@ const handleChatRequest = asyncHandler(async (req, res,next) => {
 
     // Parse the accumulated response and update summary
     try {
-      const parsedResponse = JSON.parse(accumulatedResponse);
+      const parsedResponse =accumulatedResponse;
       updateSummary(parsedResponse);
     } catch (parseError) {
       console.error("Error parsing response:", parseError);

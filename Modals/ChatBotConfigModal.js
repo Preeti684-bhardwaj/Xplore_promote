@@ -1,34 +1,34 @@
 module.exports = (sequelize, DataTypes) => {
-  const RagConfig = sequelize.define(
-    "RagConfig",
+  const ChatBotConfig = sequelize.define(
+    "ChatBotConfig",
     {
       id: {
         type: DataTypes.UUID,
         primaryKey: true,
         defaultValue: DataTypes.UUIDV4,
       },
-      qdrant_api_key: {
+      name: {
         type: DataTypes.STRING,
-        allowNull: false,
+        // allowNull: false,
       },
-      qdrant_url: {
-        type: DataTypes.STRING,
-        allowNull: false,
-      },
-      collection_name: {
+      api_key: {
         type: DataTypes.TEXT,
         allowNull: false,
       },
-      llm_key: {
+      otherDetails:{
+        type:DataTypes.JSON
+      },
+      json_file:{
         type: DataTypes.STRING,
       },
-      llm_model_name: {
-        type: DataTypes.STRING,
+      base_prompt: {
+        type: DataTypes.TEXT,
+        // allowNull: false,
       },
     },
     {
       timestamps: true,
     }
   );
-  return RagConfig;
+  return ChatBotConfig;
 };

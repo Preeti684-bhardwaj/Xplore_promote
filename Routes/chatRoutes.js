@@ -6,7 +6,8 @@ const {
   getCsvFile,
   getJsonFile,
   updateProxyConfig,
-  updateAdapterName
+  updateAdapterName,
+  uploadGeminiConfig
 } = require("../Controller/configController");
 const {verifyJWt, verifyAdmin, authorize,verifySession } = require("../middleware/auth");
 const { verifyEncryption } = require("../middleware/encryption");
@@ -15,6 +16,7 @@ const upload = require("../middleware/multer");
 // router.post('/config',verifyAdmin,
 //     authorize(["ADMIN"]), createOrUpdateConfig);
 router.post("/upload" ,verifyAdmin,authorize(["ADMIN","USER"]),verifySession,upload.array("files"),uploadPredibaseConfig);
+router.post("/geminiconfig" ,verifyAdmin,authorize(["ADMIN","USER"]),verifySession,upload.array("files"),uploadGeminiConfig);
 router.get("/getcsvfile",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, getCsvFile);
 router.get("/getjsonfile", getJsonFile);
 router.post("/config",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, updateProxyConfig);

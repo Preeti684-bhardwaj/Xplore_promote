@@ -1,6 +1,6 @@
 const db = require("../dbConfig/dbConfig.js");
 const sequelize = db.sequelize;
-const Enduser = db.endusers;
+const Enduser = db.endUsers;
 const Campaign = db.campaigns;
 const jwt = require("jsonwebtoken");
 require("dotenv").config();

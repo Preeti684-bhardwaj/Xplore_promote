@@ -1,5 +1,5 @@
 const db = require("../dbConfig/dbConfig");
-const Enduser = db.endusers;
+const Enduser = db.endUsers;
 const Campaign = db.campaigns;
 const DeletionRequest = db.deletionRequest;
 const sequelize = db.sequelize;
