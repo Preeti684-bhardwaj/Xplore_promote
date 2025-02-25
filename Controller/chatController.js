@@ -25,7 +25,7 @@ After answering the customer's question:
 2. Format the complete response as JSON with the following sections:
    {
        "answer": "<Your short and concise, conversational answer>",
-       "questions": "[<Projected Question 1>, <Projected Question 2>]",
+       "questions": [<Projected Question 1>, <Projected Question 2>],
        "summary": "<A summary of the previous 2 questions & responses, excluding the latest>"
    }
 
@@ -101,7 +101,7 @@ const handleChatRequest = asyncHandler(async (req, res) => {
       res.write(
         `data: ${JSON.stringify({
           type: "stream",
-          content: response.answer,
+          content: response,
         })}\n\n`
       );
       res.write(`data: ${JSON.stringify(response)}\n\n`);

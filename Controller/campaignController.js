@@ -343,15 +343,22 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
       lastModifiedDate: new Date(),
     };
 
-    // Handle file uploads if present
-    if (req.files) {
-      if (req.files?.length > 1) {
+         // Only handle file operations if files are present in the request
+    if (req.files && req.files.length > 0) {
+      if (req.files.length > 1) {
         return next(new ErrorHandler(`Maximum ${1} files allowed`, 400));
       }
       try {
-        // Directly assign to uploadedUrls which is now defined in the outer scope
+        // Delete existing images first
+         if (campaign.images && campaign.images.length > 0) {
+          await Promise.all(
+          campaign.images.map((image) => deleteFile(image.filename))
+          );
+        }
+        
+        // Upload new images and directly assign to updateData
         uploadedUrls.push(...(await uploadFiles(req.files)));
-        updateData.images = [...(campaign.images || []), ...uploadedUrls];
+        updateData.images = uploadedUrls; // Replace instead of concatenate
       } catch (uploadError) {
         console.error("File upload error:", uploadError);
         return next(
@@ -416,18 +423,19 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
         updateData.siteInfo = { ...campaign.siteInfo, ...bodyData.siteInfo };
       }
 
-      // Handle image deletion if specified
       if (bodyData.imagesToDelete && Array.isArray(bodyData.imagesToDelete)) {
         try {
           await Promise.all(
             bodyData.imagesToDelete.map((filename) => deleteFile(filename))
           );
-          const currentImages = updateData.images || campaign.images || [];
+          // Only update images array if we're specifically deleting images
+          const currentImages = campaign.images || [];
           updateData.images = currentImages.filter(
             (img) => !bodyData.imagesToDelete.includes(img.filename)
           );
         } catch (deleteError) {
           console.error("Error deleting images:", deleteError);
+          // Continue with the update even if image deletion fails
         }
       }
     }
@@ -513,6 +521,12 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
+
+
+
+
+
 
 // const updateCampaign = async (req, res) => {
 //   let uploadedUrls = [];
