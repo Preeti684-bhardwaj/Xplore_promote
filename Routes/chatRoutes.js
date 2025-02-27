@@ -4,7 +4,7 @@ const { handleChatRequest } = require("../Controller/chatController");
 const {
   uploadPredibaseConfig,
   getCsvFile,
-  getJsonFile,
+  getJsonQuestion,
   updateProxyConfig,
   updateAdapterName,
   uploadGeminiConfig
@@ -18,7 +18,7 @@ const upload = require("../middleware/multer");
 router.post("/upload" ,verifyAdmin,authorize(["ADMIN","USER"]),verifySession,upload.array("files"),uploadPredibaseConfig);
 router.post("/geminiconfig" ,verifyAdmin,authorize(["ADMIN","USER"]),verifySession,upload.array("files"),uploadGeminiConfig);
 router.get("/getcsvfile",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, getCsvFile);
-router.get("/getjsonfile", getJsonFile);
+router.get("/getquestions", getJsonQuestion);
 router.post("/config",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, updateProxyConfig);
 router.put("/update",verifyAdmin,authorize(["ADMIN","USER"]),verifySession,updateAdapterName)
 router.post("/chat", handleChatRequest);

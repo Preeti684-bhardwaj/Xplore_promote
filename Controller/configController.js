@@ -162,7 +162,7 @@ const getCsvFile = asyncHandler(async (req, res, next) => {
   }
 });
 
-const getJsonFile = asyncHandler(async (req, res, next) => {
+const getJsonQuestion = asyncHandler(async (req, res, next) => {
   try {
     const { campaignId } = req.query;
     if (!campaignId) {
@@ -173,7 +173,7 @@ const getJsonFile = asyncHandler(async (req, res, next) => {
       where: {
         campaignId: campaignId,
       },
-      attributes: ['id', 'campaignId', 'json_file', 'createdAt', 'updatedAt'],
+      attributes: ['id', 'campaignId', 'json_file'],
     });
     
     if (!chatbotData) {
@@ -194,12 +194,15 @@ const getJsonFile = asyncHandler(async (req, res, next) => {
       
       const jsonData = await response.json();
       
+      // Extract only the questions from the JSON data
+      const questionsOnly = jsonData.map(item => item.question);
+      
       return res.status(200).json({ 
         success: true, 
         data: {
           id: chatbotData.id,
           campaignId: chatbotData.campaignId,
-          json_content: jsonData  
+          questions: questionsOnly  // Only include the questions
         }
       });
     } catch (fetchError) {
@@ -594,7 +597,7 @@ const uploadGeminiConfig = asyncHandler(async (req, res, next) => {
 module.exports = {
   uploadPredibaseConfig,
   getCsvFile,
-  getJsonFile,
+  getJsonQuestion,
   updateProxyConfig,
   updateAdapterName,
   uploadGeminiConfig
