@@ -5,9 +5,6 @@ const Campaign = db.campaigns;
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { isValidEmail } = require("../validators/validation.js");
-const {
-  generateToken,
-} = require("../validators/userValidation.js");
 const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =
   process.env;
 const { OAuth2Client } = require("google-auth-library");
@@ -197,7 +194,7 @@ const appleLogin = asyncHandler(async (req, res, next) => {
       },
     };
 
-    const accessToken = generateToken(tokenPayload);
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
     await transaction.commit();
 
     return res.status(200).json({
@@ -340,7 +337,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       },
     };
 
-    const accessToken = generateToken(tokenPayload);
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
     await transaction.commit();
 
     return res.status(200).json({

@@ -2,9 +2,9 @@ const db = require("../dbConfig/dbConfig");
 const Enduser = db.endUsers;
 const Campaign = db.campaigns;
 const DeletionRequest = db.deletionRequest;
+const jwt = require("jsonwebtoken");
 const sequelize = db.sequelize;
 const {
-  generateToken,
   generateOtp,
 } = require("../validators/userValidation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
@@ -266,7 +266,7 @@ const otpVerification = asyncHandler(async (req, res, next) => {
       },
     };
 
-    const accessToken = generateToken(tokenPayload);
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
     await transaction.commit();
 
     return res.status(200).json({
@@ -637,7 +637,7 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
         },
       };
   
-      const accessToken = generateToken(tokenPayload);
+      const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
       await transaction.commit();
   
       // Redirect with appropriate parameters
