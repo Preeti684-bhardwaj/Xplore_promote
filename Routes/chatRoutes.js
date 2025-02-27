@@ -18,9 +18,9 @@ const upload = require("../middleware/multer");
 router.post("/upload" ,verifyAdmin,authorize(["ADMIN","USER"]),verifySession,upload.array("files"),uploadPredibaseConfig);
 router.post("/geminiconfig" ,verifyAdmin,authorize(["ADMIN","USER"]),verifySession,upload.array("files"),uploadGeminiConfig);
 router.get("/getcsvfile",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, getCsvFile);
-router.get("/getquestions", getJsonQuestion);
-router.post("/config",verifyAdmin,authorize(["ADMIN","USER"]),verifySession, updateProxyConfig);
+router.get("/getquestions",verifyEncryption, getJsonQuestion);
+router.post("/config",verifyAdmin,authorize(["ADMIN","USER"]),verifySession,verifyEncryption, updateProxyConfig);
 router.put("/update",verifyAdmin,authorize(["ADMIN","USER"]),verifySession,updateAdapterName)
-router.post("/chat", handleChatRequest);
+router.post("/chat", verifyEncryption,handleChatRequest);
 
 module.exports = router;

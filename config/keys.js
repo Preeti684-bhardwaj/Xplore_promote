@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 
 class AuthKeyManager {
-    constructor(options = {}) {
-        this.keyDuration = options.keyDuration || 24 * 60 * 60 * 1000; // 24 hours default
+    constructor() {
+        this.keyDuration =24 * 60 * 60 * 1000; // 24 hours default
         this.currentKey = null;
         this.keyExpiry = null;
         this.generateNewKey();

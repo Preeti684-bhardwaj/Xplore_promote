@@ -166,7 +166,7 @@ const getJsonQuestion = asyncHandler(async (req, res, next) => {
   try {
     const { campaignId } = req.query;
     if (!campaignId) {
-      return next(new ErrorHandler("Campaign ID and API key are required", 400));
+      return next(new ErrorHandler("Campaign ID is required", 400));
     }
     
     const chatbotData = await ChatBotConfig.findOne({
@@ -202,7 +202,7 @@ const getJsonQuestion = asyncHandler(async (req, res, next) => {
         data: {
           id: chatbotData.id,
           campaignId: chatbotData.campaignId,
-          questions: questionsOnly  // Only include the questions
+          questions: questionsOnly 
         }
       });
     } catch (fetchError) {
