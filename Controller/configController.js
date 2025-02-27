@@ -164,7 +164,7 @@ const getCsvFile = asyncHandler(async (req, res, next) => {
 
 const getJsonFile = asyncHandler(async (req, res, next) => {
   try {
-    const { campaignId} = req.query;
+    const { campaignId } = req.query;
     if (!campaignId) {
       return next(new ErrorHandler("Campaign ID and API key are required", 400));
     }
@@ -173,7 +173,7 @@ const getJsonFile = asyncHandler(async (req, res, next) => {
       where: {
         campaignId: campaignId,
       },
-      attributes: ['id', 'campaignId', 'json_file'],
+      attributes: ['id', 'campaignId', 'json_file', 'createdAt', 'updatedAt'],
     });
     
     if (!chatbotData) {
@@ -181,15 +181,31 @@ const getJsonFile = asyncHandler(async (req, res, next) => {
         new ErrorHandler(`Data not found for campaignId ${campaignId}`, 404)
       );
     }
+
+    // Fetch the JSON data from the URL
+    const jsonFileUrl = chatbotData.json_file;
     
-    return res.status(200).json({ 
-      success: true, 
-      data: {
-        id: chatbotData.id,
-        campaignId: chatbotData.campaignId,
-        json_file: chatbotData.json_file
+    try {
+      const response = await fetch(jsonFileUrl);
+      
+      if (!response.ok) {
+        return next(new ErrorHandler(`Failed to fetch JSON data: ${response.statusText}`, 500));
       }
-    });
+      
+      const jsonData = await response.json();
+      
+      return res.status(200).json({ 
+        success: true, 
+        data: {
+          id: chatbotData.id,
+          campaignId: chatbotData.campaignId,
+          json_content: jsonData  
+        }
+      });
+    } catch (fetchError) {
+      return next(new ErrorHandler(`Error fetching JSON data: ${fetchError.message}`, 500));
+    }
+    
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
