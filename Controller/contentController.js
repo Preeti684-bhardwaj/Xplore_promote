@@ -222,6 +222,21 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Invalid asset data format", 500));
     }
 
+    // Filter by fileType if provided
+    const fileType = req.query.fileType;
+    let filteredAssets = assetData;
+    
+    if (fileType) {
+      filteredAssets = assetData.filter(asset => asset.fileType === fileType);
+    }
+    
+    // Sort by most recent first using the "uploadedAt" field
+    filteredAssets.sort((a, b) => {
+      const dateA = new Date(a.uploadedAt || 0);
+      const dateB = new Date(b.uploadedAt || 0);
+      return dateB - dateA; // Most recent first
+    });
+
     // Extract pagination parameters from query
     let page = parseInt(req.query.page) || 1;
     let limit = parseInt(req.query.limit) || 10;
@@ -229,16 +244,16 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     let endIndex = startIndex + limit;
 
     // Paginate the assets
-    const paginatedAssets = assetData.slice(startIndex, endIndex);
+    const paginatedAssets = filteredAssets.slice(startIndex, endIndex);
 
     return res.status(200).json({
       success: true,
       data: paginatedAssets,
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(assetData.length / limit),
-        totalAssets: assetData.length,
-        hasNextPage: endIndex < assetData.length,
+        totalPages: Math.ceil(filteredAssets.length / limit),
+        totalAssets: filteredAssets.length,
+        hasNextPage: endIndex < filteredAssets.length,
         hasPrevPage: startIndex > 0,
       },
     });
@@ -247,7 +262,6 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
-
 
 //------------Delete content from CDN and AssetStore--------------------------
 const deleteContent = asyncHandler(async (req, res,next) => {
