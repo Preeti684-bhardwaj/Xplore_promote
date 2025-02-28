@@ -215,7 +215,7 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     const assetData =
       typeof assetStore.assetData === "string"
         ? JSON.parse(assetStore.assetData)
-        : assetStore.assetData;
+        : assetStore.assetData;                                                                                         
 
     // Check if the assetData is an array
     if (!Array.isArray(assetData)) {
@@ -225,7 +225,7 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     // Filter by fileType if provided
     const fileType = req.query.fileType;
     let filteredAssets = assetData;
-    
+    console.log(assetData)
     if (fileType) {
       filteredAssets = assetData.filter(asset => asset.fileType === fileType);
     }
