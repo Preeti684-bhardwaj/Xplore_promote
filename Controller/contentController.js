@@ -1,11 +1,7 @@
 const db = require("../dbConfig/dbConfig.js");
 const AssetStore = db.assets;
-const {
-  uploadFile,
-  deleteFile,
-  listFiles,
-} = require("../utils/cdnImplementation.js");
-const { validateFiles } = require("../validators/campaignValidations.js");
+const {uploadFile,deleteFile,listFiles} = require("../utils/cdnImplementation.js");
+const {validateFiles} = require("../validators/campaignValidations.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 
@@ -14,7 +10,7 @@ const uploadContent = asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user?.id;
     const { fileType } = req.body; // Get fileType from request body
-
+    
     if (!userId) {
       return next(new ErrorHandler("User ID is required", 400));
     }
@@ -40,29 +36,28 @@ const uploadContent = asyncHandler(async (req, res, next) => {
     const uploadResults = [];
 
     // First, ensure AssetStore exists for the user
-    let assetStore = await AssetStore.findOne({
-      where: {
+    let assetStore = await AssetStore.findOne({ 
+      where: { 
         userId: userId,
-        fileType: fileType, // Add fileType to query
-      },
+        fileType: fileType  // Add fileType to query
+      } 
     });
 
     // If no AssetStore exists, create one with empty assetData
     if (!assetStore) {
       assetStore = await AssetStore.create({
         userId: userId,
-        fileType: fileType, // Add fileType to creation
-        assetData: [],
+        fileType: fileType,  // Add fileType to creation
+        assetData: []
       });
     }
 
     // Parse existing assetData
     let assetData = [];
     try {
-      assetData =
-        typeof assetStore.assetData === "string"
-          ? JSON.parse(assetStore.assetData)
-          : assetStore.assetData || [];
+      assetData = typeof assetStore.assetData === "string" 
+        ? JSON.parse(assetStore.assetData) 
+        : assetStore.assetData || [];
     } catch (parseError) {
       console.error("Error parsing assetData:", parseError);
       assetData = [];
@@ -78,21 +73,18 @@ const uploadContent = asyncHandler(async (req, res, next) => {
         const newAssetData = {
           fileName: cdnResult.filename,
           originalName: cdnResult.originalName,
-          fileType: fileType, // Use the specified fileType
+          fileType: fileType,  // Use the specified fileType
           fileSize: cdnResult.size,
           cdnUrl: cdnResult.url,
           uploadedAt: new Date().toISOString(),
-          mimeType: file.mimetype, // Add actual mime type for reference
+          mimeType: file.mimetype  // Add actual mime type for reference
         };
 
         // Add new asset to arrays
         assetData.push(newAssetData);
         uploadResults.push(newAssetData);
       } catch (uploadError) {
-        console.error(
-          `Error uploading file ${file.originalname}:`,
-          uploadError
-        );
+        console.error(`Error uploading file ${file.originalname}:`, uploadError);
         // Continue with other files if one fails
         continue;
       }
@@ -101,25 +93,25 @@ const uploadContent = asyncHandler(async (req, res, next) => {
     // Update AssetStore with new data
     try {
       await AssetStore.update(
-        {
+        { 
           assetData: assetData,
-          fileType: fileType, // Ensure fileType is updated
+          fileType: fileType  // Ensure fileType is updated
         },
-        {
-          where: {
+        { 
+          where: { 
             userId: userId,
-            fileType: fileType, // Add fileType to where clause
+            fileType: fileType  // Add fileType to where clause
           },
-          returning: true,
+          returning: true
         }
       );
 
       // Verify the update
       const verifiedStore = await AssetStore.findOne({
-        where: {
+        where: { 
           userId: userId,
-          fileType: fileType, // Add fileType to verification query
-        },
+          fileType: fileType  // Add fileType to verification query
+        }
       });
 
       if (!verifiedStore) {
@@ -133,13 +125,15 @@ const uploadContent = asyncHandler(async (req, res, next) => {
           newUploads: uploadResults,
           totalAssets: assetData.length,
           assetStoreId: verifiedStore.id,
-          fileType: fileType, // Include fileType in response
-        },
+          fileType: fileType  // Include fileType in response
+        }
       });
+
     } catch (updateError) {
       console.error("Error updating AssetStore:", updateError);
       return next(new ErrorHandler("Failed to update asset store", 500));
     }
+
   } catch (error) {
     console.error("Upload Content Error:", error);
     return next(new ErrorHandler(error.message, 500));
@@ -180,14 +174,9 @@ const uploadImage = asyncHandler(async (req, res, next) => {
 
         uploadResults.push(uploadData);
       } catch (uploadError) {
-        console.error(
-          `Error uploading file ${file.originalname}:`,
-          uploadError
-        );
+        console.error(`Error uploading file ${file.originalname}:`, uploadError);
         // Optional: you can choose to stop processing or continue
-        return next(
-          new ErrorHandler(`Failed to upload ${file.originalname}`, 500)
-        );
+        return next(new ErrorHandler(`Failed to upload ${file.originalname}`, 500));
       }
     }
 
@@ -195,8 +184,9 @@ const uploadImage = asyncHandler(async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: `Successfully uploaded ${uploadResults.length} file(s)`,
-      data: uploadResults,
+      data: uploadResults
     });
+
   } catch (error) {
     console.error("Upload Content Error:", error);
     return next(new ErrorHandler("Upload failed", 500));
@@ -213,37 +203,44 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Unauthenticated", 401));
     }
 
-    // Fetch the AssetStore record for the user
-    const assetStore = await AssetStore.findOne({ where: { userId: userId } });
-      // Check if the AssetStore record exists
+    // Get query parameters
+    const requestedFileType = req.query.fileType;
+    
+    // Prepare query options
+    const queryOptions = { 
+      where: { userId: userId } 
+    };
+    
+    // Add fileType to query if provided
+    if (requestedFileType) {
+      queryOptions.where.fileType = requestedFileType;
+    }
+
+    // Fetch the AssetStore record for the user with optional fileType filter
+    const assetStore = await AssetStore.findOne(queryOptions);
+
+    // Check if the AssetStore record exists
     if (!assetStore) {
       return next(new ErrorHandler("AssetStore not found", 404));
     }
 
-    //Parse the assetData if it's a string, otherwise use it directly.
-    const assetData =
+    // Parse the assetData if it's a string, otherwise use it directly
+    let assetData =
       typeof assetStore.assetData === "string"
         ? JSON.parse(assetStore.assetData)
         : assetStore.assetData;
 
-    //Check if the assetData is an array
+    // Check if the assetData is an array
     if (!Array.isArray(assetData)) {
       return next(new ErrorHandler("Invalid asset data format", 500));
     }
 
-    // Filter by fileType if provided
-    const fileType = req.query.fileType;
-    let filteredAssets = assetData;
-    console.log(assetData);
-    if (fileType) {
-      filteredAssets = assetStore.filter((asset) => asset.fileType === fileType);
-    }
-
-    // Sort by most recent first using the "uploadedAt" field
-    filteredAssets.sort((a, b) => {
-      const dateA = new Date(a.uploadedAt || 0);
-      const dateB = new Date(b.uploadedAt || 0);
-      return dateB - dateA; // Most recent first
+    // Sort by most recent first (using uploadedAt field)
+    assetData.sort((a, b) => {
+      // Ensure we're working with Date objects
+      const dateA = a.uploadedAt ? new Date(a.uploadedAt) : new Date(0);
+      const dateB = b.uploadedAt ? new Date(b.uploadedAt) : new Date(0);
+      return dateB - dateA; // Most recent first (descending order)
     });
 
     // Extract pagination parameters from query
@@ -253,16 +250,16 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     let endIndex = startIndex + limit;
 
     // Paginate the assets
-    const paginatedAssets = filteredAssets.slice(startIndex, endIndex);
+    const paginatedAssets = assetData.slice(startIndex, endIndex);
 
     return res.status(200).json({
       success: true,
       data: paginatedAssets,
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(filteredAssets.length / limit),
-        totalAssets: filteredAssets.length,
-        hasNextPage: endIndex < filteredAssets.length,
+        totalPages: Math.ceil(assetData.length / limit),
+        totalAssets: assetData.length,
+        hasNextPage: endIndex < assetData.length,
         hasPrevPage: startIndex > 0,
       },
     });
@@ -273,25 +270,23 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
 });
 
 //------------Delete content from CDN and AssetStore--------------------------
-const deleteContent = asyncHandler(async (req, res, next) => {
+const deleteContent = asyncHandler(async (req, res,next) => {
   try {
     const { fileName } = req.query;
-    const userId = req.user?.id;
+    const userId = req.user?.id; 
 
     // Validate fileName
     if (!fileName) {
-      return next(
-        new ErrorHandler("File name is required in query parameters", 400)
-      );
+      return next(new ErrorHandler("File name is required in query parameters",400));
     }
 
     // Find the asset store for the user
     const assetStore = await AssetStore.findOne({
-      where: { userId: userId },
+      where: { userId: userId }
     });
 
     if (!assetStore) {
-      return next(new ErrorHandler(`No assets found for user ${userId}`, 404));
+     return next(new ErrorHandler(`No assets found for user ${userId}`,404));
     }
 
     // Get current assetData array
@@ -306,7 +301,7 @@ const deleteContent = asyncHandler(async (req, res, next) => {
     );
 
     if (fileIndex === -1) {
-      return next(new ErrorHandler("File not found in user's assets", 404));
+      return next(new ErrorHandler( "File not found in user's assets",404));
     }
 
     try {
@@ -334,26 +329,22 @@ const deleteContent = asyncHandler(async (req, res, next) => {
       });
     } catch (error) {
       // If CDN deletion fails, don't update database
-      return next(
-        new ErrorHandler(`CDN deletion failed: ${error.message}`, 500)
-      );
+     return next(new ErrorHandler(`CDN deletion failed: ${error.message}`,500));
     }
   } catch (error) {
     console.error("Delete Content Error:", error);
-    return next(new ErrorHandler(`Deletion failed: ${error.message}`, 500));
+    return next(new ErrorHandler(`Deletion failed: ${error.message}`,500));
   }
 });
 
 //------------Delete content from CDN -----------------------------------
-const deleteContentCdn = asyncHandler(async (req, res, next) => {
+const deleteContentCdn = asyncHandler(async (req, res,next) => {
   try {
     const { fileName } = req.query;
 
     // Validate fileName
     if (!fileName) {
-      return next(
-        new ErrorHandler("File name is required in query parameters", 400)
-      );
+      return next(new ErrorHandler( "File name is required in query parameters",400));
     }
 
     try {
@@ -366,18 +357,16 @@ const deleteContentCdn = asyncHandler(async (req, res, next) => {
       });
     } catch (error) {
       // If CDN deletion fails, don't update database
-      return next(
-        new ErrorHandler(`CDN deletion failed: ${error.message}`, 500)
-      );
+     return next(new ErrorHandler(`CDN deletion failed: ${error.message}`,500));
     }
   } catch (error) {
     console.error("Delete Content Error:", error);
-    return next(new ErrorHandler(`Deletion failed: ${error.message}`, 500));
+    return next(new ErrorHandler(`Deletion failed: ${error.message}`,500));
   }
 });
 
 //------------get listing of files from CDN--------------------------------
-const getFiles = asyncHandler(async (req, res, next) => {
+const getFiles = asyncHandler(async (req, res,next) => {
   try {
     const cdnFiles = await listFiles();
 
@@ -389,9 +378,7 @@ const getFiles = asyncHandler(async (req, res, next) => {
     });
   } catch (error) {
     console.error("Get Files Error:", error);
-    return next(
-      new ErrorHandler(`Failed to retrieve files: ${error.message}`, 500)
-    );
+    return next(new ErrorHandler(`Failed to retrieve files: ${error.message}`,500));
   }
 });
 
@@ -401,5 +388,5 @@ module.exports = {
   deleteContentCdn,
   deleteContent,
   uploadImage,
-  getFiles,
+  getFiles
 };
