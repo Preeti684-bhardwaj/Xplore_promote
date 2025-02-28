@@ -215,8 +215,7 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
 
     // Fetch the AssetStore record for the user
     const assetStore = await AssetStore.findOne({ where: { userId: userId } });
-    console.log("db asset", assetStore);
-    // Check if the AssetStore record exists
+      // Check if the AssetStore record exists
     if (!assetStore) {
       return next(new ErrorHandler("AssetStore not found", 404));
     }
@@ -237,7 +236,7 @@ const getUploadedAssets = asyncHandler(async (req, res, next) => {
     let filteredAssets = assetData;
     console.log(assetData);
     if (fileType) {
-      filteredAssets = assetData.filter((asset) => asset.fileType === fileType);
+      filteredAssets = assetStore.filter((asset) => asset.fileType === fileType);
     }
 
     // Sort by most recent first using the "uploadedAt" field
