@@ -26,6 +26,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
 
   try {
     const { countryCode, phone, campaignId } = req.body;
+    
 
     if (!phone || !countryCode) {
       return next(
@@ -92,6 +93,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
           metaOtpExpire: expireTime,
           lastOtpSentAt: Date.now(),
           otpAttempts: 0,
+          authProvider: "whatsapp",
         },
         { transaction }
       );
@@ -109,8 +111,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
       success: true,
       message: "OTP sent successfully",
       data: {
-        messageId: response.data.messages[0].id,
-        otp,
+        messageId: response.data.messages[0].id
       },
     });
   } catch (error) {
@@ -291,131 +292,6 @@ const otpVerification = asyncHandler(async (req, res, next) => {
   }
 });
 
-//--------------- facebook user data deletion-------------------------------------
-const facebookDataDeletion = asyncHandler(async (req, res, next) => {
-  const transaction = await sequelize.transaction();
-
-  try {
-    const signedRequest = req.body.signed_request;
-    const data = parseSignedRequest(signedRequest);
-
-    if (!data) {
-      return next(new ErrorHandler("Invalid signed request", 400));
-    }
-
-    const userId = data?.user_id;
-
-    // Check if there is an existing deletion request for the user
-    const existingDeletionRequest = await DeletionRequest.findOne({
-      where: { userId },
-      order: [["createdAt", "DESC"]],
-      transaction,
-    });
-
-    let BASE_URL =
-      process.env.PRODUCTION_BASE_URL || process.env.DEVELOPEMENT_BASE_URL;
-
-    if (existingDeletionRequest) {
-      if (existingDeletionRequest.status === "pending") {
-        // Return the URL and confirmation code of the existing request if pending
-        const statusUrl = `${BASE_URL}/deletion?id=${existingDeletionRequest.id}`;
-        const responseData = {
-          url: statusUrl,
-          confirmation_code: existingDeletionRequest.confirmationCode,
-        };
-
-        await transaction.commit();
-        return res.json(responseData);
-      } else if (existingDeletionRequest.status === "completed") {
-        // Delete the user's data again if a completed deletion request exists
-        const user = await User.findOne({ where: { id: userId }, transaction });
-        console.log(user);
-        if (user) {
-          await User.destroy({ where: { id: userId }, transaction });
-
-          const statusUrl = `${BASE_URL}/deletion?id=${existingDeletionRequest.id}`;
-          const responseData = {
-            url: statusUrl,
-            confirmation_code: existingDeletionRequest.confirmationCode,
-          };
-          await transaction.commit();
-          return res.json(responseData);
-        }
-      } else if (existingDeletionRequest.status === "user_not_found") {
-        // Retry the deletion process for the user if user_not_found status
-        await DeletionRequest.destroy({ where: { userId }, transaction });
-        // continue with the deletion process
-      }
-    }
-
-    // Start data deletion for the user
-    const user = await User.findOne({ where: { userId }, transaction });
-    let status;
-    if (user) {
-      await User.destroy({ where: { userId }, transaction });
-      status = "completed";
-    } else {
-      status = "user_not_found";
-    }
-
-    const confirmationCode = UUIDV4(); // Generate a unique code for the deletion request
-    const deleteDataCreation = await DeletionRequest.create(
-      {
-        userId,
-        confirmationCode,
-        status,
-      },
-      { transaction }
-    );
-
-    await transaction.commit();
-
-    const statusUrl = `${BASE_URL}/deletion?id=${deleteDataCreation.id}`; // URL to track the deletion
-    const responseData = {
-      url: statusUrl,
-      confirmation_code: confirmationCode,
-    };
-    res.json(responseData);
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error processing deletion request:", error);
-    return next(
-      new ErrorHandler(error.message || "Internal server error", 500)
-    );
-  }
-});
-
-//------------------deletion of data-------------------------------------------------
-const deletionData = asyncHandler(async (req, res, next) => {
-  try {
-    const { id } = req.query;
-
-    // Check if the deletion request ID is provided
-    if (!id) {
-      return next(new ErrorHandler("Deletion request ID is required", 400));
-    }
-
-    const deletionRequest = await DeletionRequest.findOne({ where: { id } });
-
-    // Check if the deletion request exists
-    if (!deletionRequest) {
-      return next(new ErrorHandler("Deletion request not found", 404));
-    }
-
-    // Return the status of the deletion request
-    res.status(200).json({
-      status: deletionRequest.status, // 'pending', 'completed', 'user_not_found', etc.
-      confirmation_code: deletionRequest.confirmationCode,
-    });
-  } catch (error) {
-    // Handle any other errors
-    console.error("Error retrieving deletion data:", error);
-    return next(
-      new ErrorHandler(error.message || "Internal server error", 500)
-    );
-  }
-});
-
 //----------------whatsapp link initiated----------------------------------------
 const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
@@ -509,6 +385,7 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
           phone: cleanedPhone,
           authState: state,
           stateExpiry: Date.now() + 5 * 60 * 1000,
+          authProvider: "whatsapp",
         },
         { transaction }
       );
@@ -650,6 +527,131 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
       res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
     }
   });
+
+  //--------------- facebook user data deletion-------------------------------------
+const facebookDataDeletion = asyncHandler(async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const signedRequest = req.body.signed_request;
+    const data = parseSignedRequest(signedRequest);
+
+    if (!data) {
+      return next(new ErrorHandler("Invalid signed request", 400));
+    }
+
+    const userId = data?.user_id;
+
+    // Check if there is an existing deletion request for the user
+    const existingDeletionRequest = await DeletionRequest.findOne({
+      where: { userId },
+      order: [["createdAt", "DESC"]],
+      transaction,
+    });
+
+    let BASE_URL =
+      process.env.PRODUCTION_BASE_URL || process.env.DEVELOPEMENT_BASE_URL;
+
+    if (existingDeletionRequest) {
+      if (existingDeletionRequest.status === "pending") {
+        // Return the URL and confirmation code of the existing request if pending
+        const statusUrl = `${BASE_URL}/deletion?id=${existingDeletionRequest.id}`;
+        const responseData = {
+          url: statusUrl,
+          confirmation_code: existingDeletionRequest.confirmationCode,
+        };
+
+        await transaction.commit();
+        return res.json(responseData);
+      } else if (existingDeletionRequest.status === "completed") {
+        // Delete the user's data again if a completed deletion request exists
+        const user = await User.findOne({ where: { id: userId }, transaction });
+        console.log(user);
+        if (user) {
+          await User.destroy({ where: { id: userId }, transaction });
+
+          const statusUrl = `${BASE_URL}/deletion?id=${existingDeletionRequest.id}`;
+          const responseData = {
+            url: statusUrl,
+            confirmation_code: existingDeletionRequest.confirmationCode,
+          };
+          await transaction.commit();
+          return res.json(responseData);
+        }
+      } else if (existingDeletionRequest.status === "user_not_found") {
+        // Retry the deletion process for the user if user_not_found status
+        await DeletionRequest.destroy({ where: { userId }, transaction });
+        // continue with the deletion process
+      }
+    }
+
+    // Start data deletion for the user
+    const user = await User.findOne({ where: { userId }, transaction });
+    let status;
+    if (user) {
+      await User.destroy({ where: { userId }, transaction });
+      status = "completed";
+    } else {
+      status = "user_not_found";
+    }
+
+    const confirmationCode = UUIDV4(); // Generate a unique code for the deletion request
+    const deleteDataCreation = await DeletionRequest.create(
+      {
+        userId,
+        confirmationCode,
+        status,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    const statusUrl = `${BASE_URL}/deletion?id=${deleteDataCreation.id}`; // URL to track the deletion
+    const responseData = {
+      url: statusUrl,
+      confirmation_code: confirmationCode,
+    };
+    res.json(responseData);
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error processing deletion request:", error);
+    return next(
+      new ErrorHandler(error.message || "Internal server error", 500)
+    );
+  }
+});
+
+//------------------deletion of data-------------------------------------------------
+const deletionData = asyncHandler(async (req, res, next) => {
+  try {
+    const { id } = req.query;
+
+    // Check if the deletion request ID is provided
+    if (!id) {
+      return next(new ErrorHandler("Deletion request ID is required", 400));
+    }
+
+    const deletionRequest = await DeletionRequest.findOne({ where: { id } });
+
+    // Check if the deletion request exists
+    if (!deletionRequest) {
+      return next(new ErrorHandler("Deletion request not found", 404));
+    }
+
+    // Return the status of the deletion request
+    res.status(200).json({
+      status: deletionRequest.status, // 'pending', 'completed', 'user_not_found', etc.
+      confirmation_code: deletionRequest.confirmationCode,
+    });
+  } catch (error) {
+    // Handle any other errors
+    console.error("Error retrieving deletion data:", error);
+    return next(
+      new ErrorHandler(error.message || "Internal server error", 500)
+    );
+  }
+});
 
 module.exports = {
   sendWhatsAppOTP,

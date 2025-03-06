@@ -3,6 +3,7 @@ const sequelize = db.sequelize;
 const Enduser = db.endUsers;
 const Campaign = db.campaigns;
 const jwt = require("jsonwebtoken");
+const axios = require("axios");
 require("dotenv").config();
 const { isValidEmail } = require("../validators/validation.js");
 const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =
@@ -10,6 +11,7 @@ const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =
 const { OAuth2Client } = require("google-auth-library");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
+const { phoneValidation } = require("../utils/phoneValidation.js");
 
 const googleClient = new OAuth2Client({
   clientId: CLIENT_ID || ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
@@ -66,6 +68,379 @@ const verifyGoogleLogin = async (idToken) => {
     return null;
   }
 };
+
+const {
+  KALEYRA_BASE_URL,
+  KALEYRA_API_KEY,
+  KALEYRA_FLOW_ID,
+  KALEYRA_PHONE_FLOW_ID,
+} = process.env;
+
+// Kaleyra API configuration
+const KALEYRA_CONFIG = {
+  baseURL: KALEYRA_BASE_URL,
+  apiKey: KALEYRA_API_KEY,
+  flowId: KALEYRA_FLOW_ID,
+  phoneFlowId: KALEYRA_PHONE_FLOW_ID,
+};
+
+//----------send phone otp----------------------------
+const sendPhoneOtp = asyncHandler(async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    const { countryCode, phone, campaignId } = req.body;
+
+    // Validate required fields
+    if (!phone || !countryCode) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler("Both country code and phone number are required", 400)
+      );
+    }
+
+    if (!campaignId) {
+      await transaction.rollback();
+      return next(new ErrorHandler("missing campaignId", 400));
+    }
+
+    // Find the campaign by campaignID
+    const campaign = await db.campaigns.findOne({
+      where: { campaignID: campaignId },
+      transaction,
+    });
+
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid campaign id", 400));
+    }
+
+    // Phone validation
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
+
+    if (!phoneValidationResult.isValid) {
+      await transaction.rollback();
+      return next(new ErrorHandler(phoneValidationResult.message, 400));
+    }
+
+    const cleanedPhone = phoneValidationResult.cleanedPhone;
+    const cleanedCountryCode = phoneValidationResult.cleanedCode;
+
+    // Rate limiting check
+    const user = await Enduser.findOne({
+      where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
+      transaction,
+    });
+
+    if (user && user.lastOtpSentAt) {
+      const timeDiff = Date.now() - user.lastOtpSentAt;
+      if (timeDiff < 60000) {
+        // 1 minute cooldown
+        await transaction.rollback();
+        return next(
+          new ErrorHandler("Please wait before requesting another OTP", 429)
+        );
+      }
+    }
+
+    // Construct full phone number
+    const fullPhoneNumber = `+${cleanedCountryCode}${cleanedPhone}`;
+
+    try {
+      // Call Kaleyra API to send OTP
+      const response = await axios({
+        method: "post",
+        url: `${KALEYRA_CONFIG.baseURL}/verify`,
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": KALEYRA_CONFIG.apiKey,
+        },
+        data: {
+          flow_id: KALEYRA_CONFIG.phoneFlowId,
+          to: {
+            mobile: fullPhoneNumber,
+          },
+        },
+      });
+
+      const verifyId = response.data.data.verify_id;
+      const expireTime = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+      if (!user) {
+        // Create new user if not exists
+        await Enduser.create(
+          {
+            countryCode: cleanedCountryCode,
+            phone: cleanedPhone,
+            otp: verifyId,
+            otpExpire: expireTime,
+            lastOtpSentAt: Date.now(),
+            otpAttempts: 0,
+            authProvider: "sms",
+          },
+          { transaction }
+        );
+      } else {
+        // Update existing user
+        user.otp = verifyId;
+        user.otpExpire = expireTime;
+        user.lastOtpSentAt = Date.now();
+        user.otpAttempts = 0;
+        await user.save({ transaction });
+      }
+
+      await transaction.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: "OTP sent successfully",
+        data: {
+          phone: fullPhoneNumber,
+        },
+      });
+    } catch (error) {
+      // Handle Kaleyra API errors
+      if (error.response?.data?.error) {
+        const kaleyraError = error.response.data.error;
+        await transaction.rollback();
+        return next(new ErrorHandler(kaleyraError.message, 400));
+      }
+      throw error;
+    }
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error sending SMS OTP:", error);
+    return next(
+      new ErrorHandler(
+        error.response?.data?.message || "Failed to send OTP",
+        error.response?.status || 500
+      )
+    );
+  }
+});
+
+//----------phone verification----------------------------
+const phoneVerification = asyncHandler(async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    const { countryCode, phone, otp, campaignId } = req.body;
+
+    if (!otp?.trim()) {
+      await transaction.rollback();
+      return next(new ErrorHandler("OTP is required", 400));
+    }
+
+    if (!phone || !countryCode) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler("Both country code and phone number are required", 400)
+      );
+    }
+
+    if (!campaignId) {
+      await transaction.rollback();
+      return next(new ErrorHandler("missing campaignId", 400));
+    }
+
+    // Phone validation
+    const phoneValidationResult = phoneValidation.validatePhone(
+      countryCode,
+      phone
+    );
+
+    if (!phoneValidationResult.isValid) {
+      await transaction.rollback();
+      return next(new ErrorHandler(phoneValidationResult.message, 400));
+    }
+
+    const cleanedPhone = phoneValidationResult.cleanedPhone;
+    const cleanedCountryCode = phoneValidationResult.cleanedCode;
+
+    // Find user
+    const user = await Enduser.findOne({
+      where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
+      transaction,
+    });
+
+    if (!user) {
+      await transaction.rollback();
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    // Check OTP attempts
+    if (user.otpAttempts >= 3) {
+      await transaction.rollback();
+      return next(
+        new ErrorHandler(
+          "Too many failed attempts. Please request a new OTP",
+          429
+        )
+      );
+    }
+
+    // Check if OTP exists
+    if (!user.otp) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Please request a new OTP", 400));
+    }
+
+    // Check if OTP has expired
+    if (user.otpExpire < Date.now()) {
+      await transaction.rollback();
+      return next(new ErrorHandler("OTP has expired", 400));
+    }
+
+    try {
+      // Validate OTP with Kaleyra
+      const response = await axios({
+        method: "post",
+        url: `${KALEYRA_CONFIG.baseURL}/verify/validate`,
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": KALEYRA_CONFIG.apiKey,
+        },
+        data: {
+          verify_id: user.otp,
+          otp: otp,
+        },
+      });
+
+      // Get campaign and brand information
+      const campaign = await db.campaigns.findOne({
+        where: { campaignID: campaignId },
+        transaction,
+      });
+
+      if (!campaign) {
+        await transaction.rollback();
+        return next(new ErrorHandler("Invalid campaign or brand", 400));
+      }
+
+      const brandId = campaign.createdBy; // Campaign creator's ID
+
+      // Check if user is already verified for this brand
+      let brandVerification = await db.EndUserBrandVerification.findOne({
+        where: {
+          enduserId: user.id,
+          brandId: brandId,
+        },
+        transaction,
+      });
+
+      let isNewVerification = false;
+
+      if (!brandVerification) {
+        // First time verification for this brand
+        isNewVerification = true;
+        brandVerification = await db.EndUserBrandVerification.create(
+          {
+            enduserId: user.id,
+            brandId: brandId,
+            isVerified: true,
+            verifiedAt: new Date(),
+          },
+          { transaction }
+        );
+
+        // Associate user with all campaigns of this brand
+        const brandCampaigns = await db.campaigns.findAll({
+          include: [
+            {
+              model: db.users,
+              as: "users",
+              where: { id: brandId },
+              through: { attributes: [] },
+            },
+          ],
+          transaction,
+        });
+
+        await Promise.all(
+          brandCampaigns.map((campaign) =>
+            user.addCampaign(campaign, { transaction })
+          )
+        );
+      }
+
+      // Update user's OTP status
+      user.isPhoneVerified = true;
+      user.otp = null;
+      user.otpExpire = null;
+      user.otpAttempts = 0;
+      await user.save({ transaction });
+
+      // Generate token
+      const tokenPayload = {
+        type: "ENDUSER",
+        obj: {
+          id: user.id,
+          countryCode: user.countryCode,
+          phone: user.phone,
+          brandId: brandId, // Include brandId in token
+        },
+      };
+
+      const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
+      await transaction.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: isNewVerification
+          ? "Phone verified successfully"
+          : "Login successful",
+        data: {
+          id: user.id,
+          countryCode: user.countryCode,
+          phone: user.phone,
+          isNewVerification,
+          brandId,
+        },
+        token: accessToken,
+      });
+    } catch (error) {
+      // Increment attempts on failed verification
+      user.otpAttempts += 1;
+      await user.save({ transaction });
+      await transaction.commit();
+
+      // Handle Kaleyra API errors
+      if (error.response?.data?.error) {
+        const kaleyraError = error.response.data.error;
+        return next(
+          new ErrorHandler(kaleyraError.message || "Invalid OTP", 400)
+        );
+      }
+      throw error;
+    }
+  } catch (error) {
+    await transaction.rollback();
+    return next(
+      new ErrorHandler(error.message || "Internal server error", 500)
+    );
+  }
+});
+
+// get user detail by token
+const getUserByToken = asyncHandler(async (req, res, next) => {
+  try {
+    const id = req.user?.id;
+    const user = await Enduser.findByPk(id, {
+      attributes: { exclude: ["password", "otp", "otpExpire"] },
+    });
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    } else {
+      return res.status(200).json({ success: true, data: user });
+    }
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
 // ---------------apple signin---------------------------------
 const appleLogin = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
@@ -173,7 +548,14 @@ const appleLogin = asyncHandler(async (req, res, next) => {
 
       // Associate user with all campaigns of this brand
       const brandCampaigns = await db.campaigns.findAll({
-        where: { createdBy: brandId },
+        include: [
+          {
+            model: db.users,
+            as: "users",
+            where: { id: brandId },
+            through: { attributes: [] },
+          },
+        ],
         transaction,
       });
 
@@ -316,7 +698,14 @@ const googleLogin = asyncHandler(async (req, res, next) => {
 
       // Associate user with all campaigns of this brand
       const brandCampaigns = await db.campaigns.findAll({
-        where: { createdBy: brandId },
+        include: [
+          {
+            model: db.users,
+            as: "users",
+            where: { id: brandId },
+            through: { attributes: [] },
+          },
+        ],
         transaction,
       });
 
@@ -508,6 +897,8 @@ const saveVisitorAndCampaign = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  sendPhoneOtp,
+  phoneVerification,
   appleLogin,
   googleLogin,
   saveVisitorAndCampaign,

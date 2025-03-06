@@ -25,6 +25,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         // allowNull: false,
       },
+      model_provider:{
+        type: DataTypes.STRING,
+      }
     },
     {
       timestamps: true,
