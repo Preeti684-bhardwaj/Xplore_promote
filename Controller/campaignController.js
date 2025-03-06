@@ -529,7 +529,7 @@ const deleteCampaign = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Campaign not found", 404));
     }
     // Delete associated files first
-    if (campaign.images?.length > 0) {
+     if (campaign.images?.length > 0) {
       await Promise.all(
         campaign.images.map((image) => deleteFile(image.filename))
       );
