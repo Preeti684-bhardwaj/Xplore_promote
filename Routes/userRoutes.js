@@ -172,6 +172,7 @@ router.post(
   verifyJWt,
   authorize(["USER"]),
   verifySession,
+  upload.array('files'),
   createProfileLayout
 );
 router.get(
@@ -187,7 +188,7 @@ router.put(
   "/profile/update/:id",
   verifyJWt,
   authorize(["USER"]),
-  verifySession,
+  verifySession,upload.array('files'),
   updateProfileLayout
 );
 router.delete(
