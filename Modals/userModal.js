@@ -80,21 +80,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM("local", "apple", "google"),
       defaultValue: "local",
     },
-    kaleyra_key:{
-      type: DataTypes.STRING
-    },
-    chatBot_key:{
-      type: DataTypes.JSON
-    },
-    payment_key:{
-      type: DataTypes.STRING
-    },
-    whatsapp_key:{
-      type: DataTypes.TEXT
-    },
-    twilio_key:{
-      type: DataTypes.STRING
-    },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   });

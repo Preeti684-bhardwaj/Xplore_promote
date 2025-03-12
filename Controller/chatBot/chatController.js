@@ -1,9 +1,9 @@
 const axios = require("axios");
 const OpenAI = require("openai");
-const db = require("../dbConfig/dbConfig.js");
+const db = require("../../dbConfig/dbConfig.js");
 const ChatBotConfig = db.chatBotConfig;
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler = require("../utils/asyncHandler.js");
+const ErrorHandler = require("../../utils/ErrorHandler.js");
+const asyncHandler = require("../../utils/asyncHandler.js");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const PROMPT_SUFFIX = " Sales Expert's JSON Answer:";
@@ -59,7 +59,7 @@ async function handleGeminiRequest(config, question, res, next) {
   try {
     const openai = new OpenAI({
       apiKey: config.api_key,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
     });
 
     const BASE_PROMPT = config.base_prompt;
@@ -72,14 +72,14 @@ async function handleGeminiRequest(config, question, res, next) {
     const stream = await openai.chat.completions.create({
       model: "gemini-1.5-flash-001", // Use the appropriate Gemini model
       messages: [
-        { 
-          "role": "system", 
-          "content": BASE_PROMPT 
+        {
+          role: "system",
+          content:BASE_PROMPT,
         },
-        { 
-          "role": "user", 
-          "content": `${question}${SUMMARY}${previousSummary}` 
-        }
+        {
+          role: "user",
+          content: `${question}${SUMMARY}${previousSummary}`,
+        },
       ],
       temperature: 0.2,
       top_p: 0.1,
@@ -89,18 +89,23 @@ async function handleGeminiRequest(config, question, res, next) {
     for await (const chunk of stream) {
       const token = chunk.choices[0]?.delta?.content || "";
       accumulatedResponse += token;
-      res.write(`data: ${JSON.stringify({
-        type: "stream",
-        content: token
-      })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          type: "stream",
+          content: token,
+        })}\n\n`
+      );
     }
 
     // Parse structured response
     const jsonData = extractJson(accumulatedResponse) || {};
     const parsedResponse = {
       answer: jsonData.answer || accumulatedResponse,
-      questions: jsonData.questions || ["Would you like more details?", "Any other aspects you're interested in?"],
-      summary: previousSummary
+      questions: jsonData.questions || [
+        "Would you like more details?",
+        "Any other aspects you're interested in?",
+      ],
+      summary: previousSummary,
     };
 
     updateSummary(parsedResponse);
@@ -112,13 +117,14 @@ async function handleGeminiRequest(config, question, res, next) {
 
     res.write('data: {"type": "end"}\n\n');
     res.end();
-
   } catch (error) {
     console.error("Gemini Error:", error);
-    res.write(`data: ${JSON.stringify({
-      type: "error", 
-      error: error.message || "Failed to generate response"
-    })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({
+        type: "error",
+        error: error.message || "Failed to generate response",
+      })}\n\n`
+    );
     res.end();
   }
 }
@@ -144,7 +150,7 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
     if (!config) return next(new ErrorHandler("Configuration not found", 404));
 
     // Handle different providers
-    if (config.model_provider === "predibase") {
+    if (config.provider === "predibase") {
       // Handle greeting
       if (isGreeting(question)) {
         const response = {
@@ -173,19 +179,20 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
       const BASE_PROMPT = config.base_prompt;
       const openai = new OpenAI({
         apiKey: config.api_key,
-        baseURL: `https://serving.app.predibase.com/${config.otherDetails.tenant_id}/deployments/v2/llms/${config.otherDetails.deployment_name}/v1`,
+        baseURL: `https://serving.app.predibase.com/${config.otherDetails.tenant_id}/deployments/v2/llms/${config.name}/v1`,
       });
 
       const previousSummary = generateSummary();
       const fullPrompt = `${BASE_PROMPT}${question}${SUMMARY}${previousSummary}${PROMPT_SUFFIX}`;
 
       res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
+      console.log("line 189",config.otherDetails.adapter_id);
 
       let accumulatedResponse = "";
       const stream = await openai.completions.create({
         model: config.otherDetails.adapter_id,
         prompt: fullPrompt,
-        max_tokens: config.otherDetails.max_new_tokens,
+        max_tokens: config.otherDetails.max_new_tokens ,
         temperature: 0.2,
         top_p: 0.1,
         stream: true,
@@ -211,7 +218,7 @@ const handleChatRequest = asyncHandler(async (req, res, next) => {
       }
       res.write('data: {"type": "end"}\n\n');
       res.end();
-    } else if (config.model_provider === "gemini") {
+    } else if (config.provider === "gemini") {
       await handleGeminiRequest(config, question, res, next);
     }
   } catch (error) {

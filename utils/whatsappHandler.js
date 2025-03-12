@@ -1,23 +1,73 @@
 const axios = require("axios");
+const db = require("../dbConfig/dbConfig");
+const WhatsappConfig = db.whatsappConfig;
+const crypto = require("crypto");
 
-//--------------generating auth link---------------------------------------------
-function generateAuthLink(countryCode, phone, state , shortCode,layoutId) {
-  return `${process.env.APP_URL}/api/v1/endUser/auth/callback?state=${state}&countryCode=${countryCode}&phone=${phone}&shortCode=${shortCode}&layoutId=${layoutId}`;
+//-------Get WhatsApp configuration for a specific campaign-----------------------
+const getWhatsAppConfig = async (campaignId) => {
+  try {
+    // Find the configuration associated with this campaign
+    const config = await WhatsappConfig.findOne({
+      where: { campaignId },
+      include: [
+        {
+          model: db.campaigns,
+          as: "campaigns",
+        }
+      ]
+    });
+
+    if (!config) {
+      throw new Error(`No WhatsApp configuration found for campaign ${campaignId}`);
+    }
+
+    return config;
+  } catch (error) {
+    console.error("Error fetching WhatsApp configuration:", error);
+    throw error;
+  }
+};
+
+// Generate authentication link using campaign-specific configuration
+async function generateAuthLink(countryCode, phone, state, shortCode, layoutId) {
+  try {
+    // Get the campaign first
+    const campaign = await db.campaigns.findOne({
+      where: { shortCode },
+    });
+    
+    if (!campaign) {
+      throw new Error(`Campaign not found with shortCode: ${shortCode}`);
+    }
+    
+    // Get the config for this campaign
+    const config = await getWhatsAppConfig(campaign.campaignID);
+    
+    // Use the campaign-specific URL
+    return `${process.env.PRODUCTION_BASE_URL}/api/v1/endUser/auth/callback?state=${state}&countryCode=${countryCode}&phone=${phone}&shortCode=${shortCode}&layoutId=${layoutId}`;
+  } catch (error) {
+    console.error("Error generating auth link:", error);
+    throw error;
+  }
 }
 
-// ---------------send message on whatsapp-------------------------------------
-const sendWhatsAppMessage = async (data) => {
-  const config = {
-    method: "post",
-    url: `https://graph.facebook.com/${process.env.VERSION}/${process.env.PHONE_NUMBER_ID}/messages`,
-    headers: {
-      Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    data: data,
-  };
+//-----WhatsApp message using campaign-specific configuration
+const sendWhatsAppMessage = async (data, campaignId) => {
   try {
-    const response = await axios(config);
+    // Get the configuration for this campaign
+    const config = await getWhatsAppConfig(campaignId);
+    
+    const apiConfig = {
+      method: "post",
+      url: `https://graph.facebook.com/${config.version}/${config.phone_number_id}/messages`,
+      headers: {
+        Authorization: `Bearer ${config.meta_app_access_token}`,
+        "Content-Type": "application/json",
+      },
+      data: data,
+    };
+    
+    const response = await axios(apiConfig);
     return response;
   } catch (error) {
     console.error("WhatsApp API Error:", {
@@ -29,15 +79,19 @@ const sendWhatsAppMessage = async (data) => {
   }
 };
 
-// -------------generate data payload as per otp based meta template-----------------------------
-const getOtpMessage = (recipient, text) => {
+// Generate OTP message template with campaign-specific details
+const getOtpMessage = async (recipient, text, campaignId) => {
+  // Get the configuration for this campaign
+  const config = await getWhatsAppConfig(campaignId);
+  
+  // Use the template_name from the config instead of hardcoded value
   return {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to: recipient,
     type: "template",
     template: {
-      name: "xplore_whatsapp_otp_login",
+      name: config.otp_template_name || "xplore_whatsapp_otp_login", // Use template_name from config
       language: {
         code: "en",
       },
@@ -67,8 +121,11 @@ const getOtpMessage = (recipient, text) => {
   };
 };
 
-// ---------generate data payload as per link based meta template----------------------------------
-const getLinkMessageInput = (recipient, link) => {
+// Generate link message template with campaign-specific details
+const getLinkMessageInput = async (recipient, link, campaignId) => {
+  // Get the configuration for this campaign
+  const config = await getWhatsAppConfig(campaignId);
+  
   // Ensure the link is properly encoded
   const encodedLink = encodeURI(link);
   console.log(encodedLink);
@@ -79,18 +136,18 @@ const getLinkMessageInput = (recipient, link) => {
     to: recipient,
     type: "template",
     template: {
-      name: "xplorebuzz_whatsapp_login",
+      name: config.link_template_name || "xplorebuzz_whatsapp_login", // Use template_name from config
       language: {
-          code: "en"
+        code: "en"
       },
       components: [
-          {
-           type: "body",
+        {
+          type: "body",
           parameters: [
-              {
-                  type: "text",
-                  parameter_name: "login_link",
-                  text:  `${encodedLink}`,
+            {
+              type: "text",
+              parameter_name: "login_link",
+              text: `${encodedLink}`,
             },
           ],
         },
@@ -99,13 +156,16 @@ const getLinkMessageInput = (recipient, link) => {
   };
 };
 
-//---------Enhanced Facebook signed request parsing with security checks------------------------------
-function parseSignedRequest(signedRequest) {
+// Parse signed request with campaign-specific app secret
+async function parseSignedRequest(signedRequest, campaignId) {
   try {
     if (!signedRequest || typeof signedRequest !== "string") {
       throw new Error("Invalid signed request format");
     }
 
+    // Get the configuration for this campaign
+    const config = await getWhatsAppConfig(campaignId);
+    
     const parts = signedRequest.split(".");
     if (parts.length !== 2) {
       throw new Error("Invalid signed request structure");
@@ -113,10 +173,11 @@ function parseSignedRequest(signedRequest) {
 
     const [encodedSig, payload] = parts;
 
-    // Verify signature (add your app secret here)
+    // Verify signature using the campaign-specific app secret
+    // Note: You might need to add a facebook_app_secret field to your WhatsappConfig model
     const sig = base64UrlDecode(encodedSig);
     const expectedSig = crypto
-      .createHmac("sha256", process.env.FACEBOOK_APP_SECRET)
+      .createHmac("sha256", config.facebook_app_secret || "")
       .update(payload)
       .digest("base64");
 
@@ -138,7 +199,7 @@ function parseSignedRequest(signedRequest) {
   }
 }
 
-//-----------base64 url decode------------------------------------
+// Base64 URL decode helper function
 function base64UrlDecode(input) {
   try {
     input = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -152,10 +213,12 @@ function base64UrlDecode(input) {
     return null;
   }
 }
+
 module.exports = {
   sendWhatsAppMessage,
   getLinkMessageInput,
   generateAuthLink,
+  getWhatsAppConfig,
   getOtpMessage,
   parseSignedRequest
 };

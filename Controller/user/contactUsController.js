@@ -1,14 +1,14 @@
-const db = require("../dbConfig/dbConfig.js");
+const db = require("../../dbConfig/dbConfig.js");
 const ExcelJS = require('exceljs');
 const Contact = db.contacts;
 const User = db.users;
 const Campaign = db.campaigns;
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler = require("../utils/asyncHandler.js");
+const ErrorHandler = require("../../utils/ErrorHandler.js");
+const asyncHandler = require("../../utils/asyncHandler.js");
 const { Op } = require("sequelize");
 const sequelize = db.sequelize;
-const { phoneValidation } = require("../utils/phoneValidation.js");
-const { isValidEmail, isValidLength } = require("../validators/validation.js");
+const { phoneValidation } = require("../../utils/phoneValidation.js");
+const { isValidEmail, isValidLength } = require("../../validators/validation.js");
 
 // //----------contact us---------------------------------------
 const contactUs = asyncHandler(async (req, res, next) => {

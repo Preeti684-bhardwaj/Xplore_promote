@@ -1,4 +1,4 @@
-const db = require("../dbConfig/dbConfig.js");
+const db = require("..//dbConfig/dbConfig.js");
 const Campaign = db.campaigns;
 const Layout = db.layouts;
 const { Op } = require("sequelize");
@@ -535,8 +535,16 @@ const deleteCampaign = asyncHandler(async (req, res, next) => {
       );
     }
 
+    
     // Delete campaign with transaction
     await db.sequelize.transaction(async (t) => {
+      // First delete all associated ContactUs records
+      await db.contacts.destroy({
+        where: { campaignId: req.params.id },
+        transaction: t
+      });
+      
+      // Then delete the campaign
       await Campaign.destroy({
         where: { campaignID: req.params.id },
         transaction: t,

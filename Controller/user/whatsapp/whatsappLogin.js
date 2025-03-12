@@ -1,24 +1,26 @@
-const db = require("../dbConfig/dbConfig");
+const db = require("../../../dbConfig/dbConfig.js");
 const Enduser = db.endUsers;
 const Campaign = db.campaigns;
+const WhatsappConfig = db.whatsappConfig;
 const DeletionRequest = db.deletionRequest;
 const jwt = require("jsonwebtoken");
 const sequelize = db.sequelize;
 const {
   generateOtp,
-} = require("../validators/userValidation.js");
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler = require("../utils/asyncHandler.js");
+} = require("../../../validators/userValidation.js");
+const ErrorHandler = require("../../../utils/ErrorHandler.js");
+const asyncHandler = require("../../../utils/asyncHandler.js");
 
 const {
   sendWhatsAppMessage,
   getLinkMessageInput,
   generateAuthLink,
+  getWhatsAppConfig,
   getOtpMessage,
   parseSignedRequest,
-} = require("../utils/whatsappHandler");
+} = require("../../../utils/whatsappHandler.js");
 const { v4: UUIDV4 } = require("uuid");
-const { phoneValidation } = require("../utils/phoneValidation.js");
+const { phoneValidation } = require("../../../utils/phoneValidation.js");
 
 //----------------send OTP via WhatsApp----------------------------------
 const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
@@ -27,7 +29,6 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   try {
     const { countryCode, phone, campaignId } = req.body;
     
-
     if (!phone || !countryCode) {
       return next(
         new ErrorHandler("Both country code and phone number are required", 400)
@@ -36,7 +37,8 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     if (!campaignId) {
       return next(new ErrorHandler("missing campaignId", 400));
     }
-    // Find the campaign by shortCode
+    
+    // Find the campaign by campaignID
     const campaign = await db.campaigns.findOne({
       where: { campaignID: campaignId },
       transaction,
@@ -45,6 +47,13 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     if (!campaign) {
       await transaction.rollback();
       return next(new ErrorHandler("Invalid campaign id", 400));
+    }
+    
+    // Validate WhatsApp configuration for this campaign
+    const whatsappConfig = await getWhatsAppConfig(campaignId);
+    if (!whatsappConfig) {
+      await transaction.rollback();
+      return next(new ErrorHandler("WhatsApp not configured for this campaign", 400));
     }
 
     const phoneValidationResult = phoneValidation.validatePhone(
@@ -58,7 +67,7 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const cleanedPhone = phoneValidationResult.cleanedPhone;
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
 
-    // Rate limiting check (add to user model)
+    // Rate limiting check
     const user = await Enduser.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
@@ -79,10 +88,13 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
     const expireTime = Date.now() + 5 * 60 * 1000; // 5 minutes
 
     const message = otp;
-    const validPhone = cleanedCountryCode + cleanedPhone; //`+${cleanedCountryCode}${cleanedPhone}`
-    const messageInput = getOtpMessage(validPhone, message);
+    const validPhone = cleanedCountryCode + cleanedPhone;
+    
+    // Use campaign-specific template and configuration
+    const messageInput = await getOtpMessage(validPhone, message, campaignId);
     console.log(messageInput);
-    const response = await sendWhatsAppMessage(messageInput);
+    
+    const response = await sendWhatsAppMessage(messageInput, campaignId);
 
     if (!user) {
       await Enduser.create(
@@ -145,6 +157,13 @@ const otpVerification = asyncHandler(async (req, res, next) => {
     if (!campaignId) {
       return next(new ErrorHandler("missing campaignId", 400));
     }
+    
+    // Validate WhatsApp configuration for this campaign
+    const whatsappConfig = await getWhatsAppConfig(campaignId);
+    if (!whatsappConfig) {
+      await transaction.rollback();
+      return next(new ErrorHandler("WhatsApp not configured for this campaign", 400));
+    }
 
     // Phone validation
     const phoneValidationResult = phoneValidation.validatePhone(
@@ -193,10 +212,9 @@ const otpVerification = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("OTP has expired", 400));
     }
 
-    // Get campaign and brand (campaign creator) information
+    // Get campaign and brand information
     const campaign = await db.campaigns.findOne({
       where: { campaignID: campaignId},
-     
       transaction,
     });
 
@@ -250,6 +268,7 @@ const otpVerification = asyncHandler(async (req, res, next) => {
         )
       );
     }
+    
     // Update user's OTP status
     user.metaOtp = null;
     user.metaOtpExpire = null;
@@ -308,6 +327,7 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
         new ErrorHandler("Both shortcode and layoutId are required", 400)
       );
     }
+    
     // Find campaign with its associated layouts
     const campaign = await Campaign.findOne({
       where: {
@@ -329,6 +349,13 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
     if (!campaign) {
       await transaction.rollback();
       return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    // Validate WhatsApp configuration for this campaign
+    const whatsappConfig = await getWhatsAppConfig(campaign.campaignID);
+    if (!whatsappConfig) {
+      await transaction.rollback();
+      return next(new ErrorHandler("WhatsApp not configured for this campaign", 400));
     }
 
     // Check if the layout exists and belongs to the campaign
@@ -354,6 +381,7 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
     const cleanedPhone = phoneValidationResult.cleanedPhone;
     const cleanedCountryCode = phoneValidationResult.cleanedCode;
     const validPhone = cleanedCountryCode + cleanedPhone;
+    
     let user = await Enduser.findOne({
       where: { countryCode: cleanedCountryCode, phone: cleanedPhone },
       transaction,
@@ -361,14 +389,15 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
 
     // Generate state for security
     const state = UUIDV4();
-    const authLink = generateAuthLink(
+    const authLink = await generateAuthLink(
       countryCode,
       phone,
       state,
       shortCode,
       layoutId
     );
-    const messageInput = getLinkMessageInput(validPhone, authLink);
+    
+    const messageInput = await getLinkMessageInput(validPhone, authLink, campaign.campaignID);
 
     // Log the exact payload being sent
     console.log(
@@ -376,7 +405,7 @@ const initiateWhatsAppLogin = asyncHandler(async (req, res, next) => {
       JSON.stringify(messageInput, null, 2)
     );
 
-    const response = await sendWhatsAppMessage(messageInput);
+    const response = await sendWhatsAppMessage(messageInput, campaign.campaignID);
 
     if (!user) {
       user = await Enduser.create(
@@ -446,95 +475,118 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
       );
     }
 
-       // Get campaign and brand information
-       const campaign = await db.campaigns.findOne({
-        where: { shortCode },
-        transaction,
-      });
-  
-      if (!campaign) {
-        await transaction.rollback();
-        return next(new ErrorHandler("Invalid campaign or brand", 400));
-      }
-  
-      const brandId = campaign.createdBy;
-  
-      // Check brand verification status
-      let brandVerification = await db.EndUserBrandVerification.findOne({
-        where: {
-          enduserId: user.id,
-          brandId: brandId
-        },
-        transaction,
-      });
-  
-      let isNewVerification = false;
-  
-      if (!brandVerification) {
-        // First time verification for this brand
-        isNewVerification = true;
-        brandVerification = await db.EndUserBrandVerification.create({
-          enduserId: user.id,
-          brandId: brandId,
-          isVerified: true,
-          verifiedAt: new Date()
-        }, { transaction });
-  
-        // Associate with all brand campaigns
-        const brandCampaigns = await db.campaigns.findAll({
-          include: [{
-            model: db.users,
-            as: 'users',
-            where: { id: brandId },
-            through: { attributes: [] }
-          }],
-          transaction,
-        });
-  
-        await Promise.all(
-          brandCampaigns.map(campaign => 
-            user.addCampaign(campaign, { transaction })
-          )
-        );
-      }
-  
-      // Clear auth state
-      user.authState = null;
-      user.stateExpiry = null;
-      await user.save({ transaction });
-  
-      // Generate token
-      const tokenPayload = {
-        type: "ENDUSER",
-        obj: {
-          id: user.id,
-          countryCode: user.countryCode,
-          phone: user.phone,
-          brandId: brandId
-        },
-      };
-  
-      const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
-      await transaction.commit();
-  
-      // Redirect with appropriate parameters
-      res.redirect(
-        `${process.env.DEVELOPEMENT_BASE_URL}/${shortCode}/${layoutId}?token=${accessToken}`
-      );
-    } catch (error) {
-      await transaction.rollback();
-      console.error("Error handling WhatsApp callback:", error);
-      res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
-    }
-  });
+    // Get campaign and brand information
+    const campaign = await db.campaigns.findOne({
+      where: { shortCode },
+      transaction,
+    });
 
-  //--------------- facebook user data deletion-------------------------------------
+    if (!campaign) {
+      await transaction.rollback();
+      return next(new ErrorHandler("Invalid campaign or brand", 400));
+    }
+    
+    // Get the WhatsApp configuration for this campaign
+    const whatsappConfig = await getWhatsAppConfig(campaign.campaignID);
+    if (!whatsappConfig) {
+      await transaction.rollback();
+      return next(new ErrorHandler("WhatsApp not configured for this campaign", 400));
+    }
+
+    const brandId = campaign.createdBy;
+
+    // Check brand verification status
+    let brandVerification = await db.EndUserBrandVerification.findOne({
+      where: {
+        enduserId: user.id,
+        brandId: brandId
+      },
+      transaction,
+    });
+
+    let isNewVerification = false;
+
+    if (!brandVerification) {
+      // First time verification for this brand
+      isNewVerification = true;
+      brandVerification = await db.EndUserBrandVerification.create({
+        enduserId: user.id,
+        brandId: brandId,
+        isVerified: true,
+        verifiedAt: new Date()
+      }, { transaction });
+
+      // Associate with all brand campaigns
+      const brandCampaigns = await db.campaigns.findAll({
+        include: [{
+          model: db.users,
+          as: 'users',
+          where: { id: brandId },
+          through: { attributes: [] }
+        }],
+        transaction,
+      });
+
+      await Promise.all(
+        brandCampaigns.map(campaign => 
+          user.addCampaign(campaign, { transaction })
+        )
+      );
+    }
+
+    // Clear auth state
+    user.authState = null;
+    user.stateExpiry = null;
+    await user.save({ transaction });
+
+    // Generate token
+    const tokenPayload = {
+      type: "ENDUSER",
+      obj: {
+        id: user.id,
+        countryCode: user.countryCode,
+        phone: user.phone,
+        brandId: brandId
+      },
+    };
+
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
+    await transaction.commit();
+
+    res.redirect(
+      `${process.env.PRODUCTION_BASE_URL}/${shortCode}/${layoutId}?token=${accessToken}`
+    );
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error handling WhatsApp callback:", error);
+    
+    // Get a generic redirect URL from an available config, or use the environment fallback
+   const redirectUrl = `${process.env.PRODUCTION_BASE_URL}/auth/error`;
+    
+    return res.redirect(redirectUrl);
+  }
+});
+
+
+//--------------- facebook user data deletion-------------------------------------
 const facebookDataDeletion = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const signedRequest = req.body.signed_request;
-    const data = parseSignedRequest(signedRequest);
+    const { signed_request, campaignId } = req.body;
+    
+    if (!campaignId) {
+      return next(new ErrorHandler("Campaign ID is required", 400));
+    }
+    
+    // Validate WhatsApp configuration for this campaign
+    const whatsappConfig = await getWhatsAppConfig(campaignId);
+    if (!whatsappConfig) {
+      await transaction.rollback();
+      return next(new ErrorHandler("WhatsApp not configured for this campaign", 400));
+    }
+    
+    const data = await parseSignedRequest(signed_request, campaignId);
 
     if (!data) {
       return next(new ErrorHandler("Invalid signed request", 400));
@@ -549,13 +601,10 @@ const facebookDataDeletion = asyncHandler(async (req, res, next) => {
       transaction,
     });
 
-    let BASE_URL =
-      process.env.PRODUCTION_BASE_URL || process.env.DEVELOPEMENT_BASE_URL;
-
     if (existingDeletionRequest) {
       if (existingDeletionRequest.status === "pending") {
         // Return the URL and confirmation code of the existing request if pending
-        const statusUrl = `${BASE_URL}/deletion?id=${existingDeletionRequest.id}`;
+        const statusUrl = `${process.env.PRODUCTION_BASE_URL}/deletion?id=${existingDeletionRequest.id}`;
         const responseData = {
           url: statusUrl,
           confirmation_code: existingDeletionRequest.confirmationCode,
@@ -566,7 +615,6 @@ const facebookDataDeletion = asyncHandler(async (req, res, next) => {
       } else if (existingDeletionRequest.status === "completed") {
         // Delete the user's data again if a completed deletion request exists
         const user = await User.findOne({ where: { id: userId }, transaction });
-        console.log(user);
         if (user) {
           await User.destroy({ where: { id: userId }, transaction });
 

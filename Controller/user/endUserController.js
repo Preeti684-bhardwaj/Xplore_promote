@@ -1,21 +1,62 @@
-const db = require("../dbConfig/dbConfig.js");
+const db = require("../../dbConfig/dbConfig.js");
 const sequelize = db.sequelize;
+const { Op } = require("sequelize");
 const Enduser = db.endUsers;
 const Campaign = db.campaigns;
+const SmsConfig = db.smsConfig;
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 require("dotenv").config();
-const { isValidEmail } = require("../validators/validation.js");
+const { isValidEmail } = require("../../validators/validation.js");
 const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =
   process.env;
 const { OAuth2Client } = require("google-auth-library");
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler = require("../utils/asyncHandler.js");
-const { phoneValidation } = require("../utils/phoneValidation.js");
+const ErrorHandler = require("../../utils/ErrorHandler.js");
+const asyncHandler = require("../../utils/asyncHandler.js");
+const { phoneValidation } = require("../../utils/phoneValidation.js");
 
 const googleClient = new OAuth2Client({
   clientId: CLIENT_ID || ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
 });
+
+// Helper function to get SMS configuration for a campaign
+const getSmsConfigForCampaign = async (campaignId, transaction) => {
+  // Try to find campaign-specific configuration first
+  let smsConfig = await SmsConfig.findOne({
+    where: { campaignId },
+    transaction,
+  });
+
+  if (!smsConfig) {
+    // If no campaign-specific config exists, get the campaign to find the user (brand)
+    const campaign = await Campaign.findOne({
+      where: { campaignID: campaignId },
+      transaction,
+    });
+
+    if (!campaign) {
+      throw new ErrorHandler("Campaign not found", 404);
+    }
+
+    // Look for user/brand level configuration
+    smsConfig = await SmsConfig.findOne({
+      where: { userId: campaign.createdBy },
+      transaction,
+    });
+
+    if (!smsConfig) {
+      throw new ErrorHandler("SMS configuration not found for this campaign", 400);
+    }
+  }
+
+  return {
+    baseURL: smsConfig.base_url,
+    apiKey: smsConfig.api_key,
+    flowId: smsConfig.otherDetails?.flow_id,
+    phoneFlowId: smsConfig.account_id,
+    provider: smsConfig.provider,
+  };
+};
 
 const validateAppleToken = (idToken) => {
   if (!idToken || idToken === "null") {
@@ -69,21 +110,6 @@ const verifyGoogleLogin = async (idToken) => {
   }
 };
 
-const {
-  KALEYRA_BASE_URL,
-  KALEYRA_API_KEY,
-  KALEYRA_FLOW_ID,
-  KALEYRA_PHONE_FLOW_ID,
-} = process.env;
-
-// Kaleyra API configuration
-const KALEYRA_CONFIG = {
-  baseURL: KALEYRA_BASE_URL,
-  apiKey: KALEYRA_API_KEY,
-  flowId: KALEYRA_FLOW_ID,
-  phoneFlowId: KALEYRA_PHONE_FLOW_ID,
-};
-
 //----------send phone otp----------------------------
 const sendPhoneOtp = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
@@ -114,6 +140,9 @@ const sendPhoneOtp = asyncHandler(async (req, res, next) => {
       await transaction.rollback();
       return next(new ErrorHandler("Invalid campaign id", 400));
     }
+
+    // Get SMS configuration for this campaign
+    const SMS_CONFIG = await getSmsConfigForCampaign(campaignId, transaction);
 
     // Phone validation
     const phoneValidationResult = phoneValidation.validatePhone(
@@ -150,16 +179,16 @@ const sendPhoneOtp = asyncHandler(async (req, res, next) => {
     const fullPhoneNumber = `+${cleanedCountryCode}${cleanedPhone}`;
 
     try {
-      // Call Kaleyra API to send OTP
+      // Call SMS Provider API to send OTP (using config)
       const response = await axios({
         method: "post",
-        url: `${KALEYRA_CONFIG.baseURL}/verify`,
+        url: `${SMS_CONFIG.baseURL}/verify`,
         headers: {
           "Content-Type": "application/json",
-          "api-key": KALEYRA_CONFIG.apiKey,
+          "api-key": SMS_CONFIG.apiKey,
         },
         data: {
-          flow_id: KALEYRA_CONFIG.phoneFlowId,
+          flow_id: SMS_CONFIG.phoneFlowId,
           to: {
             mobile: fullPhoneNumber,
           },
@@ -202,11 +231,11 @@ const sendPhoneOtp = asyncHandler(async (req, res, next) => {
         },
       });
     } catch (error) {
-      // Handle Kaleyra API errors
+      // Handle SMS API errors
       if (error.response?.data?.error) {
-        const kaleyraError = error.response.data.error;
+        const smsError = error.response.data.error;
         await transaction.rollback();
-        return next(new ErrorHandler(kaleyraError.message, 400));
+        return next(new ErrorHandler(smsError.message, 400));
       }
       throw error;
     }
@@ -245,6 +274,9 @@ const phoneVerification = asyncHandler(async (req, res, next) => {
       await transaction.rollback();
       return next(new ErrorHandler("missing campaignId", 400));
     }
+
+    // Get SMS configuration for this campaign
+    const SMS_CONFIG = await getSmsConfigForCampaign(campaignId, transaction);
 
     // Phone validation
     const phoneValidationResult = phoneValidation.validatePhone(
@@ -295,13 +327,13 @@ const phoneVerification = asyncHandler(async (req, res, next) => {
     }
 
     try {
-      // Validate OTP with Kaleyra
+      // Validate OTP with SMS provider
       const response = await axios({
         method: "post",
-        url: `${KALEYRA_CONFIG.baseURL}/verify/validate`,
+        url: `${SMS_CONFIG.baseURL}/verify/validate`,
         headers: {
           "Content-Type": "application/json",
-          "api-key": KALEYRA_CONFIG.apiKey,
+          "api-key": SMS_CONFIG.apiKey,
         },
         data: {
           verify_id: user.otp,
@@ -407,11 +439,11 @@ const phoneVerification = asyncHandler(async (req, res, next) => {
       await user.save({ transaction });
       await transaction.commit();
 
-      // Handle Kaleyra API errors
+      // Handle SMS API errors
       if (error.response?.data?.error) {
-        const kaleyraError = error.response.data.error;
+        const smsError = error.response.data.error;
         return next(
-          new ErrorHandler(kaleyraError.message || "Invalid OTP", 400)
+          new ErrorHandler(smsError.message || "Invalid OTP", 400)
         );
       }
       throw error;

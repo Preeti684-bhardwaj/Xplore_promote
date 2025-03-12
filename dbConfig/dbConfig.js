@@ -47,6 +47,9 @@ db.deletionRequest=require("../Modals/metaDeletionModal.js")(sequelize, Sequeliz
 db.chatBotConfig = require("../Modals/ChatBotConfigModal.js")(sequelize, Sequelize);
 db.profileLayout = require("../Modals/profileLayoutModal.js")(sequelize, Sequelize);
 db.FontWeight = require("../Modals/fontWeightModal.js")(sequelize, Sequelize);
+db.whatsappConfig=require("../Modals/whatsappConfigModal.js")(sequelize, Sequelize);
+db.smsConfig=require("../Modals/smsConfigModal.js")(sequelize, Sequelize);
+db.paymentConfig=require("../Modals/paymentConfigModal.js")(sequelize, Sequelize);
 
 // Define relationships
 db.campaigns.hasMany(db.layouts, {
@@ -127,6 +130,107 @@ db.customFonts.belongsTo(db.users, {
   as: "user",
   onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
 });
+// chatbotconfig - campaign relationship
+db.campaigns.hasOne(db.chatBotConfig, {
+  foreignKey: "campaignId",
+  as: "chatbot",
+  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+});
+
+db.chatBotConfig.belongsTo(db.campaigns, {
+  foreignKey: "campaignId",
+  as: "campaigns",
+  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+});
+
+// relationship between chatbot and User
+db.users.hasMany(db.chatBotConfig, {
+  foreignKey: "userId",
+  as: "chatbot",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+db.chatBotConfig.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "user",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+// relationship between whatsapp and User
+db.users.hasMany(db.whatsappConfig, {
+  foreignKey: "userId",
+  as: "whatsapp",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+db.whatsappConfig.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "user",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+// chatbotconfig - campaign relationship
+db.campaigns.hasOne(db.whatsappConfig, {
+  foreignKey: "campaignId",
+  as: "whatsapp",
+  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+});
+
+db.whatsappConfig.belongsTo(db.campaigns, {
+  foreignKey: "campaignId",
+  as: "campaigns",
+  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+});
+
+// relationship between smsConfig and User
+db.users.hasMany(db.smsConfig, {
+  foreignKey: "userId",
+  as: "sms",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+db.smsConfig.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "user",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+// chatbotconfig - campaign relationship
+db.campaigns.hasOne(db.smsConfig, {
+  foreignKey: "campaignId",
+  as: "sms",
+  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+});
+
+db.smsConfig.belongsTo(db.campaigns, {
+  foreignKey: "campaignId",
+  as: "campaigns",
+  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+});
+// relationship between paymentConfig and User
+db.users.hasMany(db.paymentConfig, {
+  foreignKey: "userId",
+  as: "payment",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+
+db.paymentConfig.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "user",
+  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+});
+// chatbotconfig - campaign relationship
+db.campaigns.hasOne(db.paymentConfig, {
+  foreignKey: "campaignId",
+  as: "payment",
+  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+});
+
+db.paymentConfig.belongsTo(db.campaigns, {
+  foreignKey: "campaignId",
+  as: "campaigns",
+  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+});
 
 // relationship between productImages and Campaign
 db.campaigns.hasMany(db.productImages, {
@@ -178,19 +282,6 @@ db.qrSessions.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
   onDelete: "CASCADE", // Optional: deletes the QR session when the associated user is deleted
-});
-
-// predibase config - campaign relationship
-db.campaigns.hasOne(db.chatBotConfig, {
-  foreignKey: "campaignId",
-  as: "chatbot",
-  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
-});
-
-db.chatBotConfig.belongsTo(db.campaigns, {
-  foreignKey: "campaignId",
-  as: "campaigns",
-  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
 });
 
 db.users.hasMany(db.profileLayout, {

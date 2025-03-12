@@ -1,30 +1,30 @@
-const db = require("../dbConfig/dbConfig.js");
+const db = require("../../dbConfig/dbConfig.js");
 const User = db.users;
 const QRSession = db.qrSessions;
 const Campaign = db.campaigns;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sequelize = db.sequelize;
-const sendEmail = require("../utils/sendEmail.js");
-const { phoneValidation } = require("../utils/phoneValidation.js");
-const { validateFiles } = require("../validators/campaignValidations.js");
-const { deleteQRSession } = require("../utils/qrService.js");
+const sendEmail = require("../../utils/sendEmail.js");
+const { phoneValidation } = require("../../utils/phoneValidation.js");
+const { validateFiles } = require("../../validators/campaignValidations.js");
+const { deleteQRSession } = require("../../utils/qrService.js");
 const shortId = require("shortid");
 const {
   isValidEmail,
   isValidPassword,
   isValidLength,
-} = require("../validators/validation.js");
+} = require("../../validators/validation.js");
 const {
   generateToken,
   generateOtp,
   hashPassword,
   createOrUpdateUser,
   validateAppleToken,
-} = require("../validators/userValidation.js");
-const { uploadFile } = require("../utils/cdnImplementation.js");
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler = require("../utils/asyncHandler.js");
+} = require("../../validators/userValidation.js");
+const { uploadFile } = require("../../utils/cdnImplementation.js");
+const ErrorHandler = require("../../utils/ErrorHandler.js");
+const asyncHandler = require("../../utils/asyncHandler.js");
 const axios = require("axios");
 require("dotenv").config();
 const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =

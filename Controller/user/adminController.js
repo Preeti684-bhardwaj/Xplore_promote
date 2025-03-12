@@ -1,17 +1,17 @@
-const db = require("../dbConfig/dbConfig.js");
+const db = require("../../dbConfig/dbConfig.js");
 const Admin = db.admins;
 const User = db.users;
 const Layout = db.layouts;
 const Campaign = db.campaigns;
 const Contact=db.contacts;
 const sequelize = db.sequelize;
-const asyncHandler = require("../utils/asyncHandler.js");
-const ErrorHandler = require("../utils/ErrorHandler.js");
+const asyncHandler = require("../../utils/asyncHandler.js");
+const ErrorHandler = require("../../utils/ErrorHandler.js");
 const bcrypt = require("bcrypt");
-const {getPagination} = require("../validators/campaignValidations.js");
-const {generateToken,hashPassword} = require("../validators/userValidation.js");
-const {getCampaignStatus} = require("../utils/campaignStatusManager.js");
-const {isValidEmail,isValidPassword,isValidLength} = require("../validators/validation.js");
+const {getPagination} = require("../../validators/campaignValidations.js");
+const {generateToken,hashPassword} = require("../../validators/userValidation.js");
+const {getCampaignStatus} = require("../../utils/campaignStatusManager.js");
+const {isValidEmail,isValidPassword,isValidLength} = require("../../validators/validation.js");
 
 // -------------------ADMIN SIGNUP------------------------------------------------------
 const adminSignup = asyncHandler(async (req, res, next) => {

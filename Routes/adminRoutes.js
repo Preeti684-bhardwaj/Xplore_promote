@@ -8,7 +8,7 @@ const {
   assignCampaignToClient,
   removeCampaignFromClient,
   getAllAssignedCampaign
-} = require("../Controller/adminController");
+} = require("../Controller/user/adminController");
 const {verifyJWt, verifyAdmin, authorize } = require("../middleware/auth");
 
 router.post("/signUp", adminSignup);

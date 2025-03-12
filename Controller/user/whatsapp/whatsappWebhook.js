@@ -1,4 +1,4 @@
-const asyncHandler = require("../utils/asyncHandler");
+const asyncHandler = require("../../../utils/asyncHandler");
 require("dotenv").config();
 const axios = require("axios");
 
@@ -73,6 +73,7 @@ const handleWebhook= asyncHandler(async(req,res,next)=> {
     return { status: 500, data: { error: "Internal server error" } };
   }
 });
+
 
 module.exports = {
   handleWebhook,

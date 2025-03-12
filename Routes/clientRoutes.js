@@ -1,14 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const {
-  getAllAssignedCampaign
-} = require("../Controller/adminController");
-const {
   loginUser
-} = require("../Controller/userController");
-const {exportContactsToExcel}=require("../Controller/contactUsController")
+} = require("../Controller/user/userController");
+const {exportContactsToExcel}=require("../Controller/user/contactUsController")
 const {verifyJWt,authorize } = require("../middleware/auth");
-const { getContactDetails } = require("../Controller/adminController");
+const { getAllAssignedCampaign,getContactDetails } = require("../Controller/user/adminController");
 
 
 // ------------login client----------------------------

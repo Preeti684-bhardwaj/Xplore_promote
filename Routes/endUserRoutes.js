@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const {contactUs,updateInterestedProduct} = require("../Controller/contactUsController");
-const{deletionData,facebookDataDeletion,sendWhatsAppOTP,otpVerification,initiateWhatsAppLogin,handleWhatsAppCallback}=require("../Controller/whatsappLogin")
-const {saveVisitorAndCampaign,googleLogin,appleLogin,sendPhoneOtp,phoneVerification} = require("../Controller/endUserController");
+const {contactUs,updateInterestedProduct} = require("../Controller/user/contactUsController");
+const{deletionData,facebookDataDeletion,sendWhatsAppOTP,otpVerification,initiateWhatsAppLogin,handleWhatsAppCallback}=require("../Controller/user/whatsapp/whatsappLogin")
+const {saveVisitorAndCampaign,googleLogin,appleLogin,sendPhoneOtp,phoneVerification} = require("../Controller/user/endUserController");
 // const { verifyEncryption } = require('../middleware/encryption');
 
 router.post("/saveVisitorAndCampaign",saveVisitorAndCampaign);
