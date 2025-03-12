@@ -12,7 +12,7 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
 
   try {
     const userId = req.user?.id;
-    let { name, layoutJSON } = req.body;
+    let { name, layoutJSON, designation } = req.body;
 
     // Validate required fields
     if (!name || !layoutJSON) {
@@ -83,46 +83,87 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Prepare layout data
-    const layoutData = {
-      name: name,
-      shortCode: shortCode,
-      shortUrl: shortUrl,
-      layoutJSON: layoutJSON,
-      userId: userId,
-      cdnDetails: {
-        cdnUrl: layoutFileUpload.url,
-        fileName: layoutFileUpload.filename,
-        originalName: layoutFileUpload.originalName,
-        fileType: layoutFileUpload.mimetype,
-        fileSize: layoutFileUpload.size,
-        uploadedAt: new Date().toISOString(),
-      },
-    };
+ // Handle userImage upload if provided
+ let userImageData = null;
+ if (req.files?.userImage) {
+   try {
+     const userImageFile = Array.isArray(req.files.userImage) 
+       ? req.files.userImage[0]  // Take the first image if multiple are provided
+       : req.files.userImage;
+       
+     // Validate file
+     const fileError = validateFiles([userImageFile], "user image");
+     if (fileError) {
+       await transaction.rollback();
+       return next(new ErrorHandler(fileError, 400));
+     }
+     
+     // Upload the image to CDN
+     const uploadResult = await uploadFile(userImageFile);
+     
+     userImageData = {
+       fileName: uploadResult.filename,
+       originalName: userImageFile.originalname,
+       fileType: userImageFile.mimetype,
+       fileSize: userImageFile.size,
+       cdnUrl: uploadResult.url,
+       uploadedAt: new Date().toISOString(),
+     };
+   } catch (uploadError) {
+     await transaction.rollback();
+     return next(
+       new ErrorHandler(
+         `Failed to upload user image: ${uploadError.message}`,
+         500
+       )
+     );
+   }
+ }
 
-    // Create layout within the transaction
-    const layout = await ProfileLayout.create(layoutData, { transaction });
+ // Prepare layout data
+ const layoutData = {
+   name: name,
+   shortCode: shortCode,
+   shortUrl: shortUrl,
+   layoutJSON: layoutJSON,
+   userId: userId,
+   designation: designation || null,
+   userImage: userImageData,
+   cdnDetails: {
+     cdnUrl: layoutFileUpload.url,
+     fileName: layoutFileUpload.filename,
+     originalName: layoutFileUpload.originalName,
+     fileType: layoutFileUpload.mimetype,
+     fileSize: layoutFileUpload.size,
+     uploadedAt: new Date().toISOString(),
+   },
+ };
 
-    // Commit the transaction
-    await transaction.commit();
+ // Create layout within the transaction
+ const layout = await ProfileLayout.create(layoutData, { transaction });
 
-    return res.status(201).json({
-      success: true,
-      message: "Layout created successfully",
-      data: {
-        ...layout.toJSON(),
-      },
-    });
-  } catch (error) {
-    // Rollback the transaction in case of any error
-    if (transaction) await transaction.rollback();
+ // Commit the transaction
+ await transaction.commit();
 
-    console.error("Error creating layout:", error);
-    return next(
-      new ErrorHandler(error.message || "Failed to create layout", 500)
-    );
-  }
+ return res.status(201).json({
+   success: true,
+   message: "Layout created successfully",
+   data: {
+     ...layout.toJSON(),
+   },
+ });
+} catch (error) {
+ // Rollback the transaction in case of any error
+ if (transaction) await transaction.rollback();
+
+ console.error("Error creating layout:", error);
+ return next(
+   new ErrorHandler(error.message || "Failed to create layout", 500)
+ );
+}
 });
+
+
 //--------------Get all layouts with pagination---------------------------------
 const getAllProfileLayout = asyncHandler(async (req, res, next) => {
   // const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
@@ -293,6 +334,50 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
         );
       }
     }
+     // Handle userImage upload if provided
+     if (req.files?.userImage) {
+      try {
+        const userImageFile = Array.isArray(req.files.userImage) 
+          ? req.files.userImage[0]  // Take the first image if multiple are provided
+          : req.files.userImage;
+          
+        // Validate file
+        const fileError = validateFiles([userImageFile], "user image");
+        if (fileError) {
+          await transaction.rollback();
+          return next(new ErrorHandler(fileError, 400));
+        }
+        
+        // Delete existing user image from CDN if it exists
+        if (layout.userImage && layout.userImage.fileName) {
+          try {
+            await deleteFile(layout.userImage.fileName);
+          } catch (deleteError) {
+            console.warn("Could not delete old user image:", deleteError);
+          }
+        }
+        
+        // Upload the new image to CDN
+        const uploadResult = await uploadFile(userImageFile);
+        
+        updatedLayoutData.userImage = {
+          fileName: uploadResult.filename,
+          originalName: userImageFile.originalname,
+          fileType: userImageFile.mimetype,
+          fileSize: userImageFile.size,
+          cdnUrl: uploadResult.url,
+          uploadedAt: new Date().toISOString(),
+        };
+      } catch (uploadError) {
+        await transaction.rollback();
+        return next(
+          new ErrorHandler(
+            `Failed to upload user image: ${uploadError.message}`,
+            500
+          )
+        );
+      }
+    }
 
     // Update the layout in the database
     const [updated] = await ProfileLayout.update(updatedLayoutData, {
@@ -363,6 +448,17 @@ const deleteProfileLayout = asyncHandler(async (req, res, next) => {
         // Continue with database deletion even if CDN deletion fails
       }
     }
+
+    // Delete userImage from CDN if exists
+    if (layout.userImage && layout.userImage.fileName) {
+      try {
+        await deleteFile(layout.userImage.fileName);
+      } catch (deleteError) {
+        console.warn("Could not delete user image from CDN:", deleteError);
+        // Continue with database deletion even if CDN deletion fails
+      }
+    }
+
 
     // Destroy the layout from database
     const deleted = await ProfileLayout.destroy({
