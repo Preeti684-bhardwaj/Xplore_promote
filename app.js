@@ -52,7 +52,7 @@ const analyticsRouter = require("./Routes/analyticsRoutes");
 const productImageRouter = require("./Routes/productImagesRoutes");
 const chatBotRouter = require("./Routes/chatRoutes");
 const {getLayoutByShortCode} = require("./Controller/getShortId");
-const {handleWebhook,webhookEvent} = require("./Controller/whatsappWebhook.js");
+const {handleWebhook,webhookEvent} = require("./Controller/user/whatsapp/whatsappWebhook.js");
 
 // Routes declaration
 app.use("/v1/auth", authRouter);

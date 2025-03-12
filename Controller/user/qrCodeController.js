@@ -1,9 +1,9 @@
 const crypto = require("crypto");
-const db = require("../dbConfig/dbConfig");
-const { getQRSession, deleteQRSession } = require("../utils/qrService");
-const { getPagination } = require("../validators/campaignValidations");
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler = require("../utils/asyncHandler.js");
+const db = require("../../dbConfig/dbConfig.js");
+const { getQRSession, deleteQRSession } = require("../../utils/qrService.js");
+const { getPagination } = require("../../validators/campaignValidations.js");
+const ErrorHandler = require("../../utils/ErrorHandler.js");
+const asyncHandler = require("../../utils/asyncHandler.js");
 
 // Store active QR sessions
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes

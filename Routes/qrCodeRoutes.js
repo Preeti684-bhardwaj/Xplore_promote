@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { generateQR, verifyQRLogin,getQrSession } = require('../Controller/qrCodeController');
+const { generateQR, verifyQRLogin,getQrSession } = require('../Controller/user/qrCodeController')
 const { verifyJWt ,authorize, verifyUserAgent} = require("../middleware/auth");
 
 

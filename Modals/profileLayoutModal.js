@@ -9,6 +9,12 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
+      designation:{
+        type: DataTypes.STRING,
+      },
+      userImage: {
+        type: DataTypes.JSON,
+      },
       layoutJSON: {
         type: DataTypes.JSON,
         allowNull: false,

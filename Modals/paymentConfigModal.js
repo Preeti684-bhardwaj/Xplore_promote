@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
-  const ChatBotConfig = sequelize.define(
-    "ChatBotConfig",
+  const paymentConfig = sequelize.define(
+    "paymentConfig",
     {
       id: {
         type: DataTypes.UUID,
@@ -9,29 +9,29 @@ module.exports = (sequelize, DataTypes) => {
       },
       name: {
         type: DataTypes.STRING,
-        // allowNull: false,
-      },
-      api_key: {
-        type: DataTypes.TEXT,
         allowNull: false,
       },
-      otherDetails:{
-        type:DataTypes.JSON
+      secret_key: {
+        type: DataTypes.STRING,
+        allowNull: false,
       },
-      json_file:{
+      api_key: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      webhook_url: {
         type: DataTypes.STRING,
       },
-      base_prompt: {
-        type: DataTypes.TEXT,
-        // allowNull: false,
-      },
-      provider:{
+      redirectin_url: {
         type: DataTypes.STRING,
-      }
+      },
+      provider: {
+        type: DataTypes.STRING,
+      },
     },
     {
       timestamps: true,
     }
   );
-  return ChatBotConfig;
+  return paymentConfig;
 };

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
-  const ChatBotConfig = sequelize.define(
-    "ChatBotConfig",
+  const smsConfig = sequelize.define(
+    "smsConfig",
     {
       id: {
         type: DataTypes.UUID,
@@ -9,29 +9,29 @@ module.exports = (sequelize, DataTypes) => {
       },
       name: {
         type: DataTypes.STRING,
-        // allowNull: false,
-      },
-      api_key: {
-        type: DataTypes.TEXT,
         allowNull: false,
       },
-      otherDetails:{
-        type:DataTypes.JSON
+      account_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
       },
-      json_file:{
+      api_key: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      otherDetails: {
+        type: DataTypes.JSON,
+      },
+      base_url: {
         type: DataTypes.STRING,
       },
-      base_prompt: {
-        type: DataTypes.TEXT,
-        // allowNull: false,
-      },
-      provider:{
+      provider: {
         type: DataTypes.STRING,
-      }
+      },
     },
     {
       timestamps: true,
     }
   );
-  return ChatBotConfig;
+  return smsConfig;
 };

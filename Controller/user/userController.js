@@ -1,30 +1,30 @@
-const db = require("../dbConfig/dbConfig.js");
+const db = require("../../dbConfig/dbConfig.js");
 const User = db.users;
 const QRSession = db.qrSessions;
 const Campaign = db.campaigns;
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
 const sequelize = db.sequelize;
-const sendEmail = require("../utils/sendEmail.js");
-const { phoneValidation } = require("../utils/phoneValidation.js");
-const { validateFiles } = require("../validators/campaignValidations.js");
-const { deleteQRSession } = require("../utils/qrService.js");
+const sendEmail = require("../../utils/sendEmail.js");
+const { phoneValidation } = require("../../utils/phoneValidation.js");
+const { validateFiles } = require("../../validators/campaignValidations.js");
+const { deleteQRSession } = require("../../utils/qrService.js");
 const shortId = require("shortid");
 const {
   isValidEmail,
   isValidPassword,
   isValidLength,
-} = require("../validators/validation.js");
+} = require("../../validators/validation.js");
 const {
   generateToken,
   generateOtp,
   hashPassword,
   createOrUpdateUser,
-  validateAppleToken
-} = require("../validators/userValidation.js");
-const { uploadFile } = require("../utils/cdnImplementation.js");
-const ErrorHandler = require("../utils/ErrorHandler.js");
-const asyncHandler = require("../utils/asyncHandler.js");
+  validateAppleToken,
+} = require("../../validators/userValidation.js");
+const { uploadFile } = require("../../utils/cdnImplementation.js");
+const ErrorHandler = require("../../utils/ErrorHandler.js");
+const asyncHandler = require("../../utils/asyncHandler.js");
 const axios = require("axios");
 require("dotenv").config();
 const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =
@@ -32,7 +32,7 @@ const { CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID } =
 const { OAuth2Client } = require("google-auth-library");
 
 const googleClient = new OAuth2Client({
-  clientId: CLIENT_ID || ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID
+  clientId: CLIENT_ID || ANDROID_ENDUSER_CLIENT_ID || WEB_ENDUSER_CLIENT_ID,
 });
 const {
   KALEYRA_BASE_URL,
@@ -571,7 +571,11 @@ const emailVerification = asyncHandler(async (req, res, next) => {
 
     const obj = {
       type: "USER",
-      obj: user,
+      obj: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
     };
     const accessToken = generateToken(obj);
 
@@ -1250,44 +1254,81 @@ const updateUser = asyncHandler(async (req, res, next) => {
       // Stringify the JSON object to ensure it's stored correctly
       updateData.profileLayoutJSon = JSON.stringify(bodyData.profileLayoutJson);
     }
+    if (bodyData.chatBot_key) {
+      // If user is passing the entire chatBot_key object
+      updateData.chatBot_key = bodyData.chatBot_key;
+    } else {
+      // Handle individual key updates
+      let chatBotKeys = {};
 
+      // If user already has chatBot_key, get the existing data
+      if (currentUser.chatBot_key) {
+        chatBotKeys =
+          typeof currentUser.chatBot_key === "string"
+            ? JSON.parse(currentUser.chatBot_key)
+            : currentUser.chatBot_key;
+      }
+
+      // Update individual keys if provided
+      if (bodyData.predibase_key) {
+        chatBotKeys.predibase = bodyData.predibase_key;
+        updateData.chatBot_key = chatBotKeys;
+      }
+      if (bodyData.gemini_key) {
+        chatBotKeys.gemini = bodyData.gemini_key;
+        updateData.chatBot_key = chatBotKeys;
+      }
+      // Add any other chatbot keys as needed
+    }
+    if (bodyData.kaleyra_key) {
+      updateData.kaleyra_key = bodyData.kaleyra_key;
+    }
+    if (bodyData.whatsapp_key) {
+      updateData.whatsapp_key = bodyData.whatsapp_key;
+    }
+    if (bodyData.twilio_key) {
+      updateData.twilio_key = bodyData.twilio_key;
+    }
+    if (bodyData.payment_key) {
+      updateData.payment_key = bodyData.payment_key;
+    }
     console.log(updateData);
     // Define a custom character set without special characters
-    const customChars =
-      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$#";
-    shortId.characters(customChars);
-    // Handle shortCode and shortUrl generation
-    let shortCode = currentUser.shortCode;
-    let shortUrl = currentUser.shortUrl;
+    // const customChars =
+    //   "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$#";
+    // shortId.characters(customChars);
+    // // Handle shortCode and shortUrl generation
+    // let shortCode = currentUser.shortCode;
+    // let shortUrl = currentUser.shortUrl;
 
-    // If shortCode or shortUrl doesn't exist, generate new ones
-    if (!shortCode || !shortUrl) {
-      // Generate a new unique shortCode
-      const generateUniqueShortCode = async () => {
-        let newShortCode = shortId.generate().toLowerCase();
-        const existingUser = await User.findOne({
-          where: {
-            [Op.or]: [
-              { shortCode: newShortCode },
-              { shortUrl: `https://xplr.live/profile/${newShortCode}` },
-            ],
-          },
-        });
+    // // If shortCode or shortUrl doesn't exist, generate new ones
+    // if (!shortCode || !shortUrl) {
+    //   // Generate a new unique shortCode
+    //   const generateUniqueShortCode = async () => {
+    //     let newShortCode = shortId.generate().toLowerCase();
+    //     const existingUser = await User.findOne({
+    //       where: {
+    //         [Op.or]: [
+    //           { shortCode: newShortCode },
+    //           { shortUrl: `https://xplr.live/profile/${newShortCode}` },
+    //         ],
+    //       },
+    //     });
 
-        // If shortCode or shortUrl already exists, regenerate
-        if (existingUser) {
-          return generateUniqueShortCode();
-        }
+    //     // If shortCode or shortUrl already exists, regenerate
+    //     if (existingUser) {
+    //       return generateUniqueShortCode();
+    //     }
 
-        return newShortCode;
-      };
+    //     return newShortCode;
+    //   };
 
-      shortCode = await generateUniqueShortCode();
-      shortUrl = `https://xplr.live/profile/${shortCode}`;
+    //   shortCode = await generateUniqueShortCode();
+    //   shortUrl = `https://xplr.live/profile/${shortCode}`;
 
-      updateData.shortCode = shortCode;
-      updateData.shortUrl = shortUrl;
-    }
+    //   updateData.shortCode = shortCode;
+    //   updateData.shortUrl = shortUrl;
+    // }
 
     // Update user in database
     const [num, [updatedUser]] = await User.update(updateData, {
@@ -1314,12 +1355,12 @@ const updateUser = asyncHandler(async (req, res, next) => {
         companyImages: updatedUser.companyImages,
         address: updatedUser.address,
         userWebsites: updatedUser.userWebsites,
+        kaleyra_key: updatedUser.kaleyra_key,
+        chatBot_key: updatedUser.chatBot_key,
+        payment_key: updatedUser.payment_key,
+        whatsapp_key: updatedUser.whatsapp_key,
+        twilio_key: updatedUser.twilio_key,
         companyWebsite: updatedUser.companyWebsite,
-        profileLayoutJSon: updatedUser.profileLayoutJSon
-          ? JSON.parse(updatedUser.profileLayoutJSon)
-          : null,
-        shortCode: shortCode,
-        shortUrl: shortUrl,
         createdAt: updatedUser.createdAt,
         updatedAt: updatedUser.updatedAt,
       },
@@ -1670,30 +1711,26 @@ const getUserShortUrl = asyncHandler(async (req, res, next) => {
   }
 });
 
-const verifyGoogleLogin= async(idToken)=> {
+const verifyGoogleLogin = async (idToken) => {
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: idToken,
-      audience: [
-        CLIENT_ID, 
-        ANDROID_ENDUSER_CLIENT_ID, 
-        WEB_ENDUSER_CLIENT_ID
-      ]
+      audience: [CLIENT_ID, ANDROID_ENDUSER_CLIENT_ID, WEB_ENDUSER_CLIENT_ID],
     });
-    
+
     const payload = ticket.getPayload();
     console.log("Full token payload:", JSON.stringify(payload, null, 2));
     console.log("Token audience:", payload.aud);
-    
+
     return payload;
   } catch (error) {
     console.error("Detailed error verifying Google token:", {
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     return null;
   }
-}
+};
 
 // ---------------apple signin---------------------------------
 const appleLogin = asyncHandler(async (req, res, next) => {
@@ -1725,18 +1762,18 @@ const appleLogin = asyncHandler(async (req, res, next) => {
         message: userResponse.message,
       });
     }
-      
+
     const user = userResponse.data;
     console.log("appleUserId", decodedToken.sub);
     const obj = {
       type: "USER",
-      obj:{
+      obj: {
         id: user.id,
         email: user.email,
         name: user.name,
       },
     };
-  
+
     const accessToken = generateToken(obj);
     console.log("user after createOrUpdateUser function", user);
 
@@ -1754,9 +1791,9 @@ const appleLogin = asyncHandler(async (req, res, next) => {
         name: user.name,
         appleUserId: user.appleUserId,
       },
-      token:accessToken
+      token: accessToken,
     });
-  }catch (error) {
+  } catch (error) {
     console.error("Apple login error:", error);
     await transaction.rollback(); // Rollback the transaction on error
     return next(new ErrorHandler(error.message, 500));
@@ -1774,11 +1811,11 @@ const googleLogin = asyncHandler(async (req, res, next) => {
     const idToken = authHeader?.startsWith("Bearer ")
       ? authHeader.substring(7)
       : authHeader;
-  
+
     if (!idToken || idToken === "null") {
-     return next(new ErrorHandler("No authentication token provided", 401));
+      return next(new ErrorHandler("No authentication token provided", 401));
     }
-     
+
     // Verify Google token
     let googlePayload;
     try {
@@ -1802,47 +1839,57 @@ const googleLogin = asyncHandler(async (req, res, next) => {
     }
 
     // Try to find user by Google ID or email
-    let user = await User.findOne({ 
+    let user = await User.findOne({
       where: {
         [db.Sequelize.Op.or]: [
           { googleUserId: googlePayload.sub },
-          { email: googlePayload.email }
-        ]
+          { email: googlePayload.email },
+        ],
       },
-      transaction // Pass transaction to findOne
+      transaction, // Pass transaction to findOne
     });
 
     if (!user) {
       // Validate email if present
       if (googlePayload.email && !isValidEmail(googlePayload.email)) {
         await transaction.rollback();
-        return next(new ErrorHandler("Invalid email format from Google account", 400));
+        return next(
+          new ErrorHandler("Invalid email format from Google account", 400)
+        );
       }
-      
+
       try {
         // Create new user within transaction
-        user = await User.create({
-          email: googlePayload.email,
-          name: googlePayload.name,
-          googleUserId: googlePayload.sub,
-          isEmailVerified: true,
-          authProvider: "google",
-          IsActive: true
-        }, { transaction }); // Pass transaction to create
+        user = await User.create(
+          {
+            email: googlePayload.email,
+            name: googlePayload.name,
+            googleUserId: googlePayload.sub,
+            isEmailVerified: true,
+            authProvider: "google",
+            IsActive: true,
+          },
+          { transaction }
+        ); // Pass transaction to create
       } catch (error) {
         await transaction.rollback();
         console.error("Error creating user:", error);
-        if (error.name === 'SequelizeUniqueConstraintError') {
-          return next(new ErrorHandler("Account already exists with this email", 409));
+        if (error.name === "SequelizeUniqueConstraintError") {
+          return next(
+            new ErrorHandler("Account already exists with this email", 409)
+          );
         }
         throw error;
       }
     } else {
       // Update existing user's Google information within transaction
-      await user.update({
-        googleUserId: googlePayload.sub,
-        name: user.name || googlePayload.name
-      }, { transaction });
+      await user.update(
+        {
+          googleUserId: googlePayload.sub,
+          name: user.name || googlePayload.name,
+        },
+        { transaction }
+      );
     }
 
     if (!user.IsActive) {
@@ -1861,9 +1908,9 @@ const googleLogin = asyncHandler(async (req, res, next) => {
         name: user.name,
       },
     };
-    
+
     const accessToken = generateToken(obj);
-    
+
     // Return response
     return res.status(200).json({
       status: true,
@@ -1874,17 +1921,23 @@ const googleLogin = asyncHandler(async (req, res, next) => {
         name: user.name,
         picture: user.picture,
         isEmailVerified: user.isEmailVerified,
-        phone: user.phone
+        phone: user.phone,
       },
       token: accessToken,
     });
   } catch (error) {
     // Ensure transaction is rolled back in case of any unexpected error
     await transaction.rollback();
-    
+
     // Log and handle errors
     console.error("Google login error:", error);
-    return next(new ErrorHandler(error.message || "An error occurred during login. Please try again later.", 500));
+    return next(
+      new ErrorHandler(
+        error.message ||
+          "An error occurred during login. Please try again later.",
+        500
+      )
+    );
   }
 });
 
@@ -1909,5 +1962,5 @@ module.exports = {
   saveVisitorAndCampaign,
   getUserShortUrl,
   appleLogin,
-  googleLogin
+  googleLogin,
 };

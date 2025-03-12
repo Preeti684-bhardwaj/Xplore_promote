@@ -64,8 +64,8 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: false,
     },
     authProvider: {
-      type: DataTypes.ENUM("local", "apple", "google"),
-      defaultValue: "local",
+      type: DataTypes.ENUM("sms","whatsapp", "apple", "google","other"),
+      defaultValue: "other",
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
