@@ -76,7 +76,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     // Sanitize name: trim and reduce multiple spaces to a single space
     name.trim().replace(/\s+/g, " ");
     // Convert the email to lowercase for case-insensitive comparison
-    const lowercaseEmail = email.toLowerCase();
+    const lowercaseEmail = email.trim().toLowerCase();
 
     // Validate name
     const nameError = isValidLength(name);
