@@ -14,6 +14,18 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
     const userId = req.user?.id;
     let { name, layoutJSON, designation } = req.body;
 
+    // Parse JSON data if it's a string
+    let parsedData =
+      typeof req.body.data === "string"
+        ? JSON.parse(req.body.data)
+        : req.body.data;
+
+    if (parsedData) {
+      name = parsedData.name || name;
+      layoutJSON = parsedData.layoutJSON || layoutJSON;
+      designation = parsedData.designation || designation;
+    }
+
     // Validate required fields
     if (!name || !layoutJSON) {
       await transaction.rollback();
@@ -83,86 +95,85 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
       );
     }
 
- // Handle userImage upload if provided
- let userImageData = null;
- if (req.files?.userImage) {
-   try {
-     const userImageFile = Array.isArray(req.files.userImage) 
-       ? req.files.userImage[0]  // Take the first image if multiple are provided
-       : req.files.userImage;
-       
-     // Validate file
-     const fileError = validateFiles([userImageFile], "user image");
-     if (fileError) {
-       await transaction.rollback();
-       return next(new ErrorHandler(fileError, 400));
-     }
-     
-     // Upload the image to CDN
-     const uploadResult = await uploadFile(userImageFile);
-     
-     userImageData = {
-       fileName: uploadResult.filename,
-       originalName: userImageFile.originalname,
-       fileType: userImageFile.mimetype,
-       fileSize: userImageFile.size,
-       cdnUrl: uploadResult.url,
-       uploadedAt: new Date().toISOString(),
-     };
-   } catch (uploadError) {
-     await transaction.rollback();
-     return next(
-       new ErrorHandler(
-         `Failed to upload user image: ${uploadError.message}`,
-         500
-       )
-     );
-   }
- }
+    // Handle userImage upload if provided
+    let userImageData = null;
+    if (req.files?.userImage) {
+      try {
+        const userImageFile = Array.isArray(req.files.userImage)
+          ? req.files.userImage[0] // Take the first image if multiple are provided
+          : req.files.userImage;
 
- // Prepare layout data
- const layoutData = {
-   name: name,
-   shortCode: shortCode,
-   shortUrl: shortUrl,
-   layoutJSON: layoutJSON,
-   userId: userId,
-   designation: designation || null,
-   userImage: userImageData,
-   cdnDetails: {
-     cdnUrl: layoutFileUpload.url,
-     fileName: layoutFileUpload.filename,
-     originalName: layoutFileUpload.originalName,
-     fileType: layoutFileUpload.mimetype,
-     fileSize: layoutFileUpload.size,
-     uploadedAt: new Date().toISOString(),
-   },
- };
+        // Validate file
+        const fileError = validateFiles([userImageFile], "user image");
+        if (fileError) {
+          await transaction.rollback();
+          return next(new ErrorHandler(fileError, 400));
+        }
 
- // Create layout within the transaction
- const layout = await ProfileLayout.create(layoutData, { transaction });
+        // Upload the image to CDN
+        const uploadResult = await uploadFile(userImageFile);
 
- // Commit the transaction
- await transaction.commit();
+        userImageData = {
+          fileName: uploadResult.filename,
+          originalName: userImageFile.originalname,
+          fileType: userImageFile.mimetype,
+          fileSize: userImageFile.size,
+          cdnUrl: uploadResult.url,
+          uploadedAt: new Date().toISOString(),
+        };
+      } catch (uploadError) {
+        await transaction.rollback();
+        return next(
+          new ErrorHandler(
+            `Failed to upload user image: ${uploadError.message}`,
+            500
+          )
+        );
+      }
+    }
 
- return res.status(201).json({
-   success: true,
-   message: "Layout created successfully",
-   data: {
-     ...layout.toJSON(),
-   },
- });
-} catch (error) {
- // Rollback the transaction in case of any error
- if (transaction) await transaction.rollback();
+    // Prepare layout data
+    const layoutData = {
+      name: name,
+      shortCode: shortCode,
+      shortUrl: shortUrl,
+      layoutJSON: layoutJSON,
+      userId: userId,
+      designation: designation || null,
+      userImage: userImageData,
+      cdnDetails: {
+        cdnUrl: layoutFileUpload.url,
+        fileName: layoutFileUpload.filename,
+        originalName: layoutFileUpload.originalName,
+        fileType: layoutFileUpload.mimetype,
+        fileSize: layoutFileUpload.size,
+        uploadedAt: new Date().toISOString(),
+      },
+    };
 
- console.error("Error creating layout:", error);
- return next(
-   new ErrorHandler(error.message || "Failed to create layout", 500)
- );
-}
+    // Create layout within the transaction
+    const layout = await ProfileLayout.create(layoutData, { transaction });
+
+    // Commit the transaction
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Layout created successfully",
+      data: {
+        ...layout.toJSON(),
+      },
+    });
+  } catch (error) {
+    // Rollback the transaction in case of any error
+    if (transaction) await transaction.rollback();
+
+    console.error("Error creating layout:", error);
+    return next(
+      new ErrorHandler(error.message || "Failed to create layout", 500)
+    );
+  }
 });
-
 
 //--------------Get all layouts with pagination---------------------------------
 const getAllProfileLayout = asyncHandler(async (req, res, next) => {
@@ -275,7 +286,12 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Layout not found", 404));
     }
     const userId = layout.userId;
-
+    // Parse JSON data if it's a string
+    let bodyData = req.body.data
+      ? typeof req.body.data === "string"
+        ? JSON.parse(req.body.data)
+        : req.body.data
+      : req.body;
     // First check if the campaign exists
     const user = await User.findOne({ where: { id: userId } }, transaction);
     if (!user) {
@@ -334,20 +350,20 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
         );
       }
     }
-     // Handle userImage upload if provided
-     if (req.files?.userImage) {
+    // Handle userImage upload if provided
+    if (req.files?.userImage) {
       try {
-        const userImageFile = Array.isArray(req.files.userImage) 
-          ? req.files.userImage[0]  // Take the first image if multiple are provided
+        const userImageFile = Array.isArray(req.files.userImage)
+          ? req.files.userImage[0] // Take the first image if multiple are provided
           : req.files.userImage;
-          
+
         // Validate file
         const fileError = validateFiles([userImageFile], "user image");
         if (fileError) {
           await transaction.rollback();
           return next(new ErrorHandler(fileError, 400));
         }
-        
+
         // Delete existing user image from CDN if it exists
         if (layout.userImage && layout.userImage.fileName) {
           try {
@@ -356,10 +372,10 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
             console.warn("Could not delete old user image:", deleteError);
           }
         }
-        
+
         // Upload the new image to CDN
         const uploadResult = await uploadFile(userImageFile);
-        
+
         updatedLayoutData.userImage = {
           fileName: uploadResult.filename,
           originalName: userImageFile.originalname,
@@ -458,7 +474,6 @@ const deleteProfileLayout = asyncHandler(async (req, res, next) => {
         // Continue with database deletion even if CDN deletion fails
       }
     }
-
 
     // Destroy the layout from database
     const deleted = await ProfileLayout.destroy({
