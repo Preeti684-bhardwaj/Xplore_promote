@@ -113,7 +113,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     }
 
     // Validate email format
-    if (!isValidEmail(email)) {
+    if (!isValidEmail(lowercaseEmail)) {
       return next(new ErrorHandler("Invalid email", 400));
     }
 
