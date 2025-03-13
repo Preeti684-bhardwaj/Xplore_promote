@@ -571,7 +571,7 @@ const getAllChatbotConfig = asyncHandler(async (req, res, next) => {
         'api_key', 
         'base_prompt', 
         'json_file', 
-        'model_provider',
+        'provider',
         'otherDetails',
         'createdAt',
         'updatedAt'
