@@ -28,7 +28,7 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
       designation = parsedData.designation || designation;
     }
 
-    // Validate required fields
+    // Validate required fields - remove layoutJSON from required validation
     if (!name || !designation) {
       await transaction.rollback();
       return next(new ErrorHandler("Missing required fields.", 400));
@@ -85,24 +85,26 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler(`User with ID ${userId} not found`, 404));
     }
 
-    // Upload layout JSON to CDN
-    let layoutFileUpload;
-    try {
-      const layoutFile = {
-        buffer: Buffer.from(JSON.stringify(layoutJSON), "utf-8"),
-        originalname: `${shortCode}_layout.json`,
-        mimetype: "application/json",
-      };
+    // Upload layout JSON to CDN only if layoutJSON is provided
+    let layoutFileUpload = null;
+    if (layoutJSON) {
+      try {
+        const layoutFile = {
+          buffer: Buffer.from(JSON.stringify(layoutJSON), "utf-8"),
+          originalname: `${shortCode}_layout.json`,
+          mimetype: "application/json",
+        };
 
-      layoutFileUpload = await uploadFile(layoutFile);
-    } catch (uploadError) {
-      await transaction.rollback();
-      return next(
-        new ErrorHandler(
-          `Failed to upload layout to CDN: ${uploadError.message}`,
-          500
-        )
-      );
+        layoutFileUpload = await uploadFile(layoutFile);
+      } catch (uploadError) {
+        await transaction.rollback();
+        return next(
+          new ErrorHandler(
+            `Failed to upload layout to CDN: ${uploadError.message}`,
+            500
+          )
+        );
+      }
     }
 
     // Handle userImage upload if provided
@@ -143,23 +145,23 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
       }
     }
 
-    // Prepare layout data
+    // Prepare layout data - make cdnDetails conditional
     const layoutData = {
       name: name,
       shortCode: shortCode,
       shortUrl: shortUrl,
-      layoutJSON: layoutJSON,
+      layoutJSON: layoutJSON || null, // Store null if layoutJSON is not provided
       userId: userId,
       designation: designation || null,
       userImage: userImageData,
-      cdnDetails: {
+      cdnDetails: layoutFileUpload ? {
         cdnUrl: layoutFileUpload.url,
         fileName: layoutFileUpload.filename,
         originalName: layoutFileUpload.originalName,
         fileType: layoutFileUpload.mimetype,
         fileSize: layoutFileUpload.size,
         uploadedAt: new Date().toISOString(),
-      },
+      } : null, // Store null if no layoutJSON was uploaded
     };
 
     // Create layout within the transaction
@@ -522,53 +524,11 @@ const deleteProfileLayout = asyncHandler(async (req, res, next) => {
   }
 });
 
-//----------------get all layout by shor code--------------------------
-// const getAllProfileLayoutByShortCode = asyncHandler(async (req, res, next) => {
-//   // const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
-//   // const { limit, offset } = getPagination(page, size);
-
-//   // Get the campaignID from request parameters
-//   const layoutShortCode = req.params?.shortCode;
-//   if (!layoutShortCode) {
-//     return next(new ErrorHandler("Missing layout Code", 400));
-//   }
-//   const profileLayout = await ProfileLayout.findOne({
-//     where: { shortCode: layoutShortCode },
-//   });
-//   if (!profileLayout) {
-//     return next(new ErrorHandler("Layout not found.", 404));
-//   }
-//   const userId = profileLayout.userId;
-//   // Create a condition to filter by campaignID and optionally by name
-//   const condition = {
-//     id: userId, // Include campaignID in the condition
-//   };
-
-//   try {
-//     const data = await ProfileLayout.findAndCountAll({
-//       where: condition,
-//       include: [{ model: User, as: "users", attributes: ["id"] }],
-//       order: [["createdAt", "ASC"]],
-//     });
-//     console.log(data.rows);
-
-//     return res.status(200).json({
-//       success: true,
-//       totalItems: data.count,
-//       layouts: data.rows,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching layouts:", error);
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
-
 module.exports = {
   createProfileLayout,
   getAllProfileLayout,
   getOneProfileLayout,
   getAllProfileLayoutName,
   updateProfileLayout,
-  deleteProfileLayout,
-  // getAllProfileLayoutByShortCode,
+  deleteProfileLayout
 };
