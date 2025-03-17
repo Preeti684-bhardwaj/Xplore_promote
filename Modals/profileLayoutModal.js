@@ -17,7 +17,6 @@ module.exports = (sequelize, DataTypes) => {
       },
       layoutJSON: {
         type: DataTypes.JSON,
-        allowNull: false,
       },
       cdnDetails:{
         type: DataTypes.JSON,
