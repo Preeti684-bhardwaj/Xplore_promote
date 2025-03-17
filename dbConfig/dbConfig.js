@@ -219,17 +219,19 @@ db.paymentConfig.belongsTo(db.users, {
   as: "user",
   onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
 });
-// chatbotconfig - campaign relationship
-db.campaigns.hasOne(db.paymentConfig, {
-  foreignKey: "campaignId",
+// relationship between paymentConfig and Campaign
+db.campaigns.belongsToMany(db.paymentConfig, {
+  through: "campaignPayment", // Sequelize automatically manages this table
+  foreignKey: "campaignID",
+  otherKey: "payConfigId",
   as: "payment",
-  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
 });
 
-db.paymentConfig.belongsTo(db.campaigns, {
-  foreignKey: "campaignId",
+db.paymentConfig.belongsToMany(db.campaigns, {
+  through: "campaignPayment",
+  foreignKey: "payConfigId",
+  otherKey: "campaignID",
   as: "campaigns",
-  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
 });
 
 // relationship between productImages and Campaign

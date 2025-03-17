@@ -24,7 +24,6 @@ const createConfig = asyncHandler(async (req, res, next) => {
       !secret_key ||
       !api_key ||
       !webhook_url ||
-      !redirection_url ||
       !provider
     ) {
       await transaction.rollback();
@@ -87,7 +86,6 @@ const updateConfig = asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
-      name,
       webhook_url,
       redirection_url,
     } = req.body;
@@ -108,7 +106,6 @@ const updateConfig = asyncHandler(async (req, res, next) => {
 
     // Initialize update data with standard fields
     const updateData = {
-      name: name !== undefined ? name : existingConfig.name,
       webhook_url: webhook_url !== undefined ? webhook_url : existingConfig.webhook_url,
       redirection_url:
       redirection_url !== undefined

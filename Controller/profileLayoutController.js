@@ -3,7 +3,7 @@ const ProfileLayout = db.profileLayout;
 const User = db.users;
 const { Op } = require("sequelize");
 const {isValidLength,} = require("../validators/validation.js");
-const { validateFiles } = require("../validators/campaignValidations.js");
+const { validateFiles,getPagination } = require("../validators/campaignValidations.js");
 const { uploadFile, deleteFile } = require("../utils/cdnImplementation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
@@ -188,23 +188,26 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
 
 //--------------Get all layouts with pagination---------------------------------
 const getAllProfileLayout = asyncHandler(async (req, res, next) => {
-  // const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
-  // const { limit, offset } = getPagination(page, size);
+  const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
+  const { limit, offset } = getPagination(page, size);
 
-  // Get the campaignID from request parameters
+  // Get the user ID from request
   const userId = req.user?.id;
   if (!userId) {
     return next(new ErrorHandler("Missing User Id", 400));
   }
+  
   const user = await User.findOne({
     where: { id: userId },
   });
+  
   if (!user) {
     return next(new ErrorHandler("User not found", 404));
   }
-  // Create a condition to filter by campaignID and optionally by name
+  
+  // Create a condition to filter by userId
   const condition = {
-    userId: user.id, // Include campaignID in the condition
+    userId: user.id,
   };
 
   try {
@@ -212,20 +215,27 @@ const getAllProfileLayout = asyncHandler(async (req, res, next) => {
       where: condition,
       include: [{ model: User, as: "users", attributes: ["id"] }],
       order: [["createdAt", "ASC"]],
+      limit,
+      offset,
     });
-    console.log(data.rows);
+
+    // Calculate pagination info
+    const totalItems = data.count;
+    const currentPage = page ? +page : 0;
+    const totalPages = Math.ceil(totalItems / limit);
 
     return res.status(200).json({
       success: true,
-      totalItems: data.count,
+      totalItems,
       layouts: data.rows,
+      currentPage,
+      totalPages,
     });
   } catch (error) {
     console.error("Error fetching layouts:", error);
     return next(new ErrorHandler(error.message, 500));
   }
 });
-
 //---------------Get a single layout by ID-------------------------------------
 const getOneProfileLayout = asyncHandler(async (req, res, next) => {
   try {
@@ -297,12 +307,12 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Layout not found", 404));
     }
     const userId = layout.userId;
-    // Parse JSON data if it's a string
-    let bodyData = req.body.data
-      ? typeof req.body.data === "string"
-        ? JSON.parse(req.body.data)
-        : req.body.data
-      : req.body;
+   // Parse JSON data if it's a string
+   let bodyData = req.body.data
+   ? typeof req.body.data === "string"
+     ? JSON.parse(req.body.data)
+     : req.body.data
+   : req.body;
     // First check if the campaign exists
     const user = await User.findOne({ where: { id: userId } }, transaction);
     if (!user) {
@@ -312,13 +322,13 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Prepare updated layout data
-    const updatedLayoutData = {
-      ...req.body,
-    };
+   // Prepare updated layout data - preserve original data structure
+   const updatedLayoutData = { ...layout.dataValues, ...bodyData };
 
-    // If layoutJSON is being updated, upload to CDN
-    if (updatedLayoutData.layoutJSON) {
+
+   if (bodyData.layoutJSON) {
+    // Ensure layoutJSON is stored as an actual JSON object, not a string
+    updatedLayoutData.layoutJSON = bodyData.layoutJSON;
       try {
         // Create a file-like object for MinIO upload
         const layoutFile = {
@@ -362,11 +372,11 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
       }
     }
     // Handle userImage upload if provided
-    if (req.files?.userImage) {
+    if (req.files) {
       try {
-        const userImageFile = Array.isArray(req.files.userImage)
-          ? req.files.userImage[0] // Take the first image if multiple are provided
-          : req.files.userImage;
+        const userImageFile = Array.isArray(req.files)
+          ? req.files[0] // Take the first image if multiple are provided
+          : req.files;
 
         // Validate file
         const fileError = validateFiles([userImageFile], "user image");
