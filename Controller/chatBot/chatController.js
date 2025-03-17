@@ -70,20 +70,16 @@ async function handleGeminiRequest(config, question, res, next) {
 
     let accumulatedResponse = "";
     const stream = await openai.chat.completions.create({
-      model: "gemini-1.5-flash-001", // Use the appropriate Gemini model
+      model: "gemini-1.5-flash-001",
       messages: [
-        {
-          role: "system",
-          content:BASE_PROMPT,
-        },
-        {
-          role: "user",
-          content: `${question}${SUMMARY}${previousSummary}`,
-        },
+        { role: "system", content: BASE_PROMPT },
+        { role: "user", content: `${question}${SUMMARY}${previousSummary}` },
       ],
       temperature: 0.2,
       top_p: 0.1,
       stream: true,
+      // Add this line to use the cached content
+      // cached_content: cacheName
     });
 
     for await (const chunk of stream) {
