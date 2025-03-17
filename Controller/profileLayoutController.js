@@ -372,7 +372,7 @@ const updateProfileLayout = asyncHandler(async (req, res, next) => {
       }
     }
     // Handle userImage upload if provided
-    if (req.files) {
+    if (req.files && req.files.length > 0) {
       try {
         const userImageFile = Array.isArray(req.files)
           ? req.files[0] // Take the first image if multiple are provided
