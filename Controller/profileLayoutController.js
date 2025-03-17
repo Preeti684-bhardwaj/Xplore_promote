@@ -2,6 +2,8 @@ const db = require("../dbConfig/dbConfig.js");
 const ProfileLayout = db.profileLayout;
 const User = db.users;
 const { Op } = require("sequelize");
+const {isValidLength,} = require("../validators/validation.js");
+const { validateFiles } = require("../validators/campaignValidations.js");
 const { uploadFile, deleteFile } = require("../utils/cdnImplementation.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
@@ -27,7 +29,7 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
     }
 
     // Validate required fields
-    if (!name || !layoutJSON) {
+    if (!name || !designation) {
       await transaction.rollback();
       return next(new ErrorHandler("Missing required fields.", 400));
     }
@@ -42,6 +44,14 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
       return next(
         new ErrorHandler("Invalid data types for required fields.", 400)
       );
+    }
+    // Sanitize name: trim and reduce multiple spaces to a single space
+    name.trim().replace(/\s+/g, " ");
+
+    // Validate name
+    const nameError = isValidLength(name);
+    if (nameError) {
+      return next(new ErrorHandler(nameError, 400));
     }
 
     // Check if the name already exists in ProfileLayout table
@@ -97,11 +107,11 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
 
     // Handle userImage upload if provided
     let userImageData = null;
-    if (req.files?.userImage) {
+    if (req.files) {
       try {
-        const userImageFile = Array.isArray(req.files.userImage)
-          ? req.files.userImage[0] // Take the first image if multiple are provided
-          : req.files.userImage;
+        const userImageFile = Array.isArray(req.files)
+          ? req.files[0] // Take the first image if multiple are provided
+          : req.files;
 
         // Validate file
         const fileError = validateFiles([userImageFile], "user image");
@@ -112,6 +122,7 @@ const createProfileLayout = asyncHandler(async (req, res, next) => {
 
         // Upload the image to CDN
         const uploadResult = await uploadFile(userImageFile);
+        console.log(uploadResult);
 
         userImageData = {
           fileName: uploadResult.filename,

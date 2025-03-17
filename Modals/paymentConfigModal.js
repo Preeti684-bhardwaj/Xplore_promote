@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
       webhook_url: {
         type: DataTypes.STRING,
       },
-      redirectin_url: {
+      redirection_url: {
         type: DataTypes.STRING,
       },
       provider: {
