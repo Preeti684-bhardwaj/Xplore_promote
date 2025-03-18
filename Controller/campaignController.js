@@ -242,7 +242,8 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
       offset,
       order: [["createdDate", "DESC"]],
       distinct: true, 
-      subQuery: false 
+      subQuery: false, 
+      logging: console.log
     });
     // Update status for each campaign based on current time
     const updatedCampaigns = await Promise.all(
