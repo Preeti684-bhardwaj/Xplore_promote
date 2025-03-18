@@ -80,7 +80,7 @@ const createConfig = asyncHandler(async (req, res, next) => {
   }
 });
 
-// update config data for proxy whatsapp api
+// update config data for payment api
 const updateConfig = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -179,7 +179,7 @@ const getAllConfig = asyncHandler(async (req, res, next) => {
   }
 });
 
-// assign whatsapp configuration to campaign
+// assign payment configuration to campaign
 const assignConfigToCampaign = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -211,8 +211,9 @@ const assignConfigToCampaign = asyncHandler(async (req, res, next) => {
       await transaction.rollback();
       return next(new ErrorHandler("Unauthorized access", 403));
     }
-    // Check if the whatsapp config exists and belongs to the user
-    const config = await WhatsappConfig.findOne({
+    
+    // Check if the payment config exists and belongs to the user
+    const config = await PaymentConfig.findOne({
       where: {
         id: configId,
         userId: userId,
@@ -230,49 +231,13 @@ const assignConfigToCampaign = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Check if another campaign is already using this whatsapp config
-    const existingAssignment = await WhatsappConfig.findOne({
-      where: {
-        id: configId,
-        campaignId: {
-          [db.Sequelize.Op.ne]: null,
-          [db.Sequelize.Op.ne]: campaignId,
-        },
-      },
-      transaction,
-    });
-
-    if (existingAssignment) {
-      await transaction.rollback();
-      return next(
-        new ErrorHandler(
-          "This whatsapp configuration is already assigned to another campaign",
-          409
-        )
-      );
-    }
-
-    // Check if campaign already has a different whatsapp configuration
-    const existingConfig = await WhatsappConfig.findOne({
-      where: {
-        campaignId: campaignId,
-        id: { [db.Sequelize.Op.ne]: configId },
-      },
-      transaction,
-    });
-
-    if (existingConfig) {
-      // If updating from one config to another, unassign the old one
-      await existingConfig.update({ campaignId: null }, { transaction });
-    }
-
-    // Assign the whatsapp to the campaign
-    await config.update({ campaignId: campaignId }, { transaction });
+    // Add the payment config to the campaign
+    await campaign.addPayment(config, { transaction });
 
     await transaction.commit();
     return res.status(200).json({
       success: true,
-      message: "Whatsapp configuration successfully assigned to campaign",
+      message: "Payment configuration successfully assigned to campaign",
       data: {
         campaignId: campaignId,
         configId: configId,

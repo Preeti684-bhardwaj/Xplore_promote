@@ -25,8 +25,6 @@ const { phoneValidation } = require("../../../utils/phoneValidation.js");
 //----------------send OTP via WhatsApp----------------------------------
 const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-
-  try {
     const { countryCode, phone, campaignId } = req.body;
     
     if (!phone || !countryCode) {
@@ -48,14 +46,13 @@ const sendWhatsAppOTP = asyncHandler(async (req, res, next) => {
       await transaction.rollback();
       return next(new ErrorHandler("Invalid campaign id", 400));
     }
-    
     // Validate WhatsApp configuration for this campaign
     const whatsappConfig = await getWhatsAppConfig(campaignId);
     if (!whatsappConfig) {
       await transaction.rollback();
       return next(new ErrorHandler("WhatsApp not configured for this campaign", 400));
     }
-
+    try {
     const phoneValidationResult = phoneValidation.validatePhone(
       countryCode,
       phone

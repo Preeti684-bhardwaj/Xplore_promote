@@ -198,6 +198,44 @@ router.delete(
   verifySession,
   deleteProfileLayout
 );
+
+// payment configuration api
+router.post(
+  "/payment/create",
+  verifyJWt,
+  authorize(["USER"]),
+  verifySession,
+  createConfig
+);
+router.get(
+  "/payment/getAllConfig",
+  verifyJWt,
+  authorize(["ADMIN", "USER"]),
+  verifySession,
+  getAllConfig
+);
+router.put(
+  "/payment/update/:id",
+  verifyJWt,
+  authorize(["ADMIN", "USER"]),
+  verifySession,
+  updateConfig
+);
+router.post(
+  "/payment/assign-to-campaign",
+  verifyJWt,
+  authorize(["ADMIN", "USER"]),
+  verifySession,
+  assignConfigToCampaign
+);
+router.post(
+  "/payment/remove-from-campaign",
+  verifyJWt,
+  authorize(["ADMIN", "USER"]),
+  verifySession,
+  removeConfigFromCampaign
+);
+
 // router.get("/profile/getLayout/:shortCode",getAllProfileLayoutByShortCode);
 
 // registration main app api
