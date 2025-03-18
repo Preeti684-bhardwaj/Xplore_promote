@@ -206,17 +206,21 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
     const { limit, offset } = getPagination(page, size);
     const userID = req.user.id;
     // Build filter conditions
-    // const condition = {
-    //   createdBy: req.user.id
-    //   // ...(name && { name: { [Op.iLike]: `%${name}%` } }),
-    //   // ...(status && { status }),
-    //   // ...(startDate && endDate && {
-    //   //   createdDate: {
-    //   //     [Op.between]: [new Date(startDate), new Date(endDate)]
-    //   //   }
-    //   // })
-    // };
+    const condition = {
+      createdBy: req.user.id,
+      // ...(name && { name: { [Op.iLike]: `%${name}%` } }),
+      // ...(status && { status }),
+      // ...(startDate && endDate && {
+      //   createdDate: {
+      //     [Op.between]: [new Date(startDate), new Date(endDate)]
+      //   }
+      // })
+    };
+
     const campaigns = await Campaign.findAndCountAll({
+      where: condition,
+      limit,
+      offset,
       include: [
         {
           model: Layout,
@@ -224,26 +228,12 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
           order: [["createdAt", "ASC"]],
         },
         {
-          model: db.users,
+          model: User,
           as: "users",
-          attributes: [], // We don't need the user data, just using for the join
-          through: {
-            attributes: [] // Don't need the junction table data either
-          }
-        }
+          through: { where: { userID } },
+        },
       ],
-      where: {
-        [Op.or]: [
-          { createdBy: userID }, 
-          { '$users.id$': userID } 
-        ]
-      },
-      limit,
-      offset,
       order: [["createdDate", "DESC"]],
-      distinct: true, 
-      subQuery: false, 
-      logging: console.log
     });
     // Update status for each campaign based on current time
     const updatedCampaigns = await Promise.all(
@@ -277,6 +267,7 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
 
 //-------------------Get a single campaign by ID---------------------------------------
 const getOneCampaign = asyncHandler(async (req, res, next) => {
