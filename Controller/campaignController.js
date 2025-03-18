@@ -1,14 +1,28 @@
-const db = require("..//dbConfig/dbConfig.js");
+const db = require("../dbConfig/dbConfig.js");
 const Campaign = db.campaigns;
 const Layout = db.layouts;
 const { Op } = require("sequelize");
 const User = db.users;
+const CampaignEndUser = db.sequelize.model("CampaignEndUser");
 const { uploadFiles, deleteFile } = require("../utils/cdnImplementation.js");
 const {validateFiles,getPagination} = require("../validators/campaignValidations.js");
 const {getCampaignStatus,validateTiming} = require("../utils/campaignStatusManager.js");
 const ErrorHandler = require("../utils/ErrorHandler.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const shortId = require("shortid");
+const jwt = require('jsonwebtoken');
+
+const checkCampaignAccess = async (campaignId, userId) => {
+  // Check if the user has an association with the campaign
+  const association = await CampaignEndUser.findOne({
+    where: {
+      campaignID: campaignId,
+      userID: userId
+    }
+  });
+
+  return !!association;
+};
 
 //--------------------Campaign operations----------------------------------
 const createCampaign = asyncHandler(async (req, res, next) => {
@@ -192,21 +206,17 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
     const { limit, offset } = getPagination(page, size);
     const userID = req.user.id;
     // Build filter conditions
-    const condition = {
-      createdBy: req.user.id,
-      // ...(name && { name: { [Op.iLike]: `%${name}%` } }),
-      // ...(status && { status }),
-      // ...(startDate && endDate && {
-      //   createdDate: {
-      //     [Op.between]: [new Date(startDate), new Date(endDate)]
-      //   }
-      // })
-    };
-
+    // const condition = {
+    //   createdBy: req.user.id
+    //   // ...(name && { name: { [Op.iLike]: `%${name}%` } }),
+    //   // ...(status && { status }),
+    //   // ...(startDate && endDate && {
+    //   //   createdDate: {
+    //   //     [Op.between]: [new Date(startDate), new Date(endDate)]
+    //   //   }
+    //   // })
+    // };
     const campaigns = await Campaign.findAndCountAll({
-      where: condition,
-      limit,
-      offset,
       include: [
         {
           model: Layout,
@@ -214,12 +224,25 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
           order: [["createdAt", "ASC"]],
         },
         {
-          model: User,
+          model: db.users,
           as: "users",
-          through: { where: { userID } },
-        },
+          attributes: [], // We don't need the user data, just using for the join
+          through: {
+            attributes: [] // Don't need the junction table data either
+          }
+        }
       ],
+      where: {
+        [Op.or]: [
+          { createdBy: userID }, 
+          { '$users.id$': userID } 
+        ]
+      },
+      limit,
+      offset,
       order: [["createdDate", "DESC"]],
+      distinct: true, 
+      subQuery: false 
     });
     // Update status for each campaign based on current time
     const updatedCampaigns = await Promise.all(
@@ -260,32 +283,43 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
     if (!req.params?.id) {
       return next(new ErrorHandler("Missing Campaign Id", 400));
     }
+    
     const userID = req.user?.id;
+    const campaignID = req.params?.id;
+    
+    // Check if user has access to the campaign
+    const hasAccess = await checkCampaignAccess(campaignID, userID);
+    
+    if (!hasAccess) {
+      return next(new ErrorHandler(`Campaign not found or you don't have access`, 404));
+    }
+
     const campaign = await Campaign.findOne({
       where: {
-        campaignID: req.params?.id,
-        createdBy: req.user?.id,
+        campaignID: campaignID
       },
       include: [
         {
-          model: Layout,
+          model: db.layouts,
           as: "layouts",
-          order: [["createdAt", "ASC"]], // Order layouts by createdAt in ascending order
+          order: [["createdAt", "ASC"]]
         },
         {
           model: User,
           as: "users",
-          through: { where: { userID } },
-        },
+          through: { where: { userID } }
+        }
       ],
-      order: [[{ model: Layout, as: "layouts" }, "createdAt", "ASC"]],
+      order: [[{ model: db.layouts, as: "layouts" }, "createdAt", "ASC"]]
     });
 
     if (!campaign) {
-      return next(
-        new ErrorHandler(`Campaign not found for user ${req.user.id}`, 404)
-      );
+      return next(new ErrorHandler(`Campaign not found`, 404));
     }
+    
+    // Add an isOwner flag to indicate if the user is the creator
+    const isOwner = campaign.createdBy === userID;
+    
     // Update campaign status based on current time
     const currentStatus = getCampaignStatus(
       campaign.timing.startDate,
@@ -300,9 +334,14 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
       );
       campaign.campaignStatus = currentStatus;
     }
+    
+    // Include isOwner flag in the response
     return res.status(200).json({
       success: true,
-      data: campaign,
+      data: {
+        ...campaign.toJSON(),
+        isOwner
+      }
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
@@ -328,8 +367,8 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Campaign not found", 404));
     }
 
-    if (campaign.createdBy !== req.user.id) {
-      return next(new ErrorHandler("Unauthorized access", 403));
+    if (campaign.createdBy !== userID) {
+      return next(new ErrorHandler("Unauthorized - Only the campaign creator can update it", 403));
     }
 
     let updateData = {
@@ -517,7 +556,6 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
 });
 
 //----------------Delete a campaign---------------------------------------------
-
 const deleteCampaign = asyncHandler(async (req, res, next) => {
   try {
     if (!req.params?.id) {
@@ -528,6 +566,9 @@ const deleteCampaign = asyncHandler(async (req, res, next) => {
     if (!campaign) {
       return next(new ErrorHandler("Campaign not found", 404));
     }
+    if (campaign.createdBy !== req.user.id) {
+      return next(new ErrorHandler("Unauthorized - Only the campaign creator can delete it", 403));
+    }
     // Delete associated files first
      if (campaign.images?.length > 0) {
       await Promise.all(
@@ -536,28 +577,34 @@ const deleteCampaign = asyncHandler(async (req, res, next) => {
     }
 
     
-    // Delete campaign with transaction
-    await db.sequelize.transaction(async (t) => {
-      // First delete all associated ContactUs records
-      await db.contacts.destroy({
-        where: { campaignId: req.params.id },
-        transaction: t
-      });
-      
-      // Then delete the campaign
-      await Campaign.destroy({
-        where: { campaignID: req.params.id },
-        transaction: t,
-      });
+   // Delete campaign with transaction
+   await db.sequelize.transaction(async (t) => {
+    // First delete all associated ContactUs records
+    await db.contacts.destroy({
+      where: { campaignId: req.params.id },
+      transaction: t
     });
+    
+    // Delete all sharing relationships in CampaignEndUser
+    await CampaignEndUser.destroy({
+      where: { campaignID: req.params.id },
+      transaction: t
+    });
+    
+    // Then delete the campaign
+    await Campaign.destroy({
+      where: { campaignID: req.params.id },
+      transaction: t,
+    });
+  });
 
-    return res.status(200).json({
-      success: true,
-      message: "Campaign deleted successfully",
-    });
-  } catch (error) {
-    return next(new ErrorHandler(error.message, 500));
-  }
+  return res.status(200).json({
+    success: true,
+    message: "Campaign deleted successfully",
+  });
+} catch (error) {
+  return next(new ErrorHandler(error.message, 500));
+}
 });
 
 //------------get all metadata of campaign-------------------------------------
@@ -598,11 +645,191 @@ const getAllCampaignMetadata = asyncHandler(async (req, res, next) => {
   }
 });
 
+//-----------share campaign with other user--------------------------------------------
+const shareCampaign = asyncHandler(async (req, res, next) => {
+  try {
+    const { campaignId } = req.body;
+    const currentUserId = req.user.id;
+    
+    // Get recipient access token from a custom header
+    const recipientAccessToken = req.headers['recipient-auth'];
+    
+    // Validate request
+    if (!campaignId) {
+      return next(new ErrorHandler("Campaign ID is required", 400));
+    }
+    
+    if (!recipientAccessToken) {
+      return next(new ErrorHandler("Recipient access token is required in the 'recipient-auth' header", 400));
+    }
+
+    // Check if campaign exists and belongs to current user
+    const campaign = await Campaign.findOne({
+      where: {
+        campaignID: campaignId,
+        createdBy: currentUserId
+      }
+    });
+
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found or you don't have permission to share it", 404));
+    }
+
+    // Decode the recipient's token to get their user ID
+    let recipientUserId;
+    try {
+      // Remove 'Bearer ' prefix if it exists
+      const token = recipientAccessToken.startsWith('Bearer ')
+        ? recipientAccessToken.slice(7)
+        : recipientAccessToken;
+        
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      recipientUserId =  decoded.obj.obj.id;
+    } catch (error) {
+      return next(new ErrorHandler("Invalid recipient access token", 400));
+    }
+
+    // Check if target user exists
+    const targetUser = await User.findByPk(recipientUserId);
+    if (!targetUser) {
+      return next(new ErrorHandler("Target user not found", 404));
+    }
+
+    // Check if campaign is already shared with this user
+    const existingShare = await CampaignEndUser.findOne({
+      where: {
+        campaignID: campaignId,
+        userID: recipientUserId
+      }
+    });
+
+    if (existingShare) {
+      return next(new ErrorHandler("Campaign is already shared with this user", 400));
+    }
+
+    // Associate campaign with the target user
+    await CampaignEndUser.create({
+      campaignID: campaignId,
+      userID: recipientUserId
+    });
+
+    // Also ensure the owner is associated with the campaign in CampaignEndUser
+    const ownerAssociation = await CampaignEndUser.findOne({
+      where: {
+        campaignID: campaignId,
+        userID: currentUserId
+      }
+    });
+
+    if (!ownerAssociation) {
+      await CampaignEndUser.create({
+        campaignID: campaignId,
+        userID: currentUserId
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Campaign successfully shared with user ${recipientUserId}`
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+//---------Get all users with whom a campaign is shared-------------------------------
+const getSharedUsers = asyncHandler(async (req, res, next) => {
+  try {
+    const { campaignId } = req.params;
+    const currentUserId = req.user.id;
+
+    // Check if campaign exists and belongs to current user
+    const campaign = await Campaign.findOne({
+      where: {
+        campaignID: campaignId,
+        createdBy: currentUserId
+      }
+    });
+
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found or you don't have permission to view shared users", 404));
+    }
+
+    // Get all users with whom the campaign is shared
+    const sharedUsers = await User.findAll({
+      include: [{
+        model: Campaign,
+        as: "campaigns",
+        where: { campaignID: campaignId },
+        attributes: []
+      }],
+      where: {
+        id: { [db.Sequelize.Op.ne]: currentUserId } // Exclude the current user
+      },
+      attributes: ['id', 'name', 'email'] // Include only necessary user information
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: sharedUsers
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+//-----------remove the access from campaign---------------------------------------------
+const removeSharedAccess = asyncHandler(async (req, res, next) => {
+  try {
+    const { campaignId, userId } = req.body;
+    const currentUserId = req.user.id;
+
+    // Validate request
+    if (!campaignId || !userId) {
+      return next(new ErrorHandler("Campaign ID and User ID are required", 400));
+    }
+
+    // Check if campaign exists and belongs to current user
+    const campaign = await Campaign.findOne({
+      where: {
+        campaignID: campaignId,
+        createdBy: currentUserId
+      }
+    });
+
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found or you don't have permission to manage sharing", 404));
+    }
+
+    // Remove the association
+    const deleted = await CampaignEndUser.destroy({
+      where: {
+        campaignID: campaignId,
+        userID: userId
+      }
+    });
+
+    if (!deleted) {
+      return next(new ErrorHandler("Campaign is not shared with this user", 404));
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Shared access removed for user ${userId}`
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
 module.exports = {
   createCampaign,
   getAllCampaign,
   getOneCampaign,
   updateCampaign,
   deleteCampaign,
-  getAllCampaignMetadata
+  getAllCampaignMetadata,
+  shareCampaign,
+  removeSharedAccess,
+  getSharedUsers
 };

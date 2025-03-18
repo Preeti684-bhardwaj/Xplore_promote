@@ -7,7 +7,10 @@ const {
     getOneCampaign,
     updateCampaign,
     deleteCampaign,
-    getAllCampaignMetadata
+    getAllCampaignMetadata,
+    shareCampaign,
+    removeSharedAccess,
+    getSharedUsers
 } = require("../Controller/campaignController");
 const { verifyJWt,authorize, verifySession } = require("../middleware/auth");
 
@@ -18,6 +21,11 @@ router.get("/getOne/:id", verifyJWt,authorize(["USER"]),verifySession,getOneCamp
 router.put("/update/:id", verifyJWt,authorize(["USER"]),verifySession, upload.array('files'), updateCampaign);
 router.delete("/delete/:id", verifyJWt, authorize(["USER"]), verifySession,deleteCampaign);
 router.get('/getAllCampaignMetadata',getAllCampaignMetadata)
+
+// New sharing routes
+router.post("/share", verifyJWt, authorize(["USER"]), verifySession, shareCampaign);
+router.post("/removeAccess", verifyJWt, authorize(["USER"]), verifySession, removeSharedAccess);
+router.get("/sharedUsers/:campaignId", verifyJWt, authorize(["USER"]), verifySession, getSharedUsers);
 
 
 module.exports = router;
