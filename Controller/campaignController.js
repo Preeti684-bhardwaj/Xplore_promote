@@ -201,37 +201,24 @@ const createCampaign = asyncHandler(async (req, res, next) => {
 //-------------------Get all campaigns with pagination---------------------------
 const getAllCampaign = asyncHandler(async (req, res, next) => {
   try {
-    const { page = 0, size = 10 } = req.query;
+    // const { page, size, name, startDate, endDate, status } = req.query;
+    const { page = 0, size = 10 } = req.query; // Default values: page 0, size 10
     const { limit, offset } = getPagination(page, size);
     const userID = req.user.id;
+    // Build filter conditions
+    const condition = {
+      createdBy: req.user.id,
+      // ...(name && { name: { [Op.iLike]: `%${name}%` } }),
+      // ...(status && { status }),
+      // ...(startDate && endDate && {
+      //   createdDate: {
+      //     [Op.between]: [new Date(startDate), new Date(endDate)]
+      //   }
+      // })
+    };
 
-    // Find all campaign IDs associated with this user
-    // (both created by and shared with)
-    const userCampaignAssociations = await CampaignEndUser.findAll({
-      where: { userID },
-      attributes: ['campaignID']
-    });
-
-    const campaignIDs = userCampaignAssociations.map(assoc => assoc.campaignID);
-
-    // If no campaigns are associated, return empty result
-    if (campaignIDs.length === 0) {
-      return res.status(200).json({
-        success: true,
-        totalItems: 0,
-        campaigns: [],
-        currentPage: page ? +page : 0,
-        totalPages: 0,
-      });
-    }
-
-    // Get all campaigns the user has access to
     const campaigns = await Campaign.findAndCountAll({
-      where: {
-        campaignID: {
-          [Op.in]: campaignIDs
-        }
-      },
+      where: condition,
       limit,
       offset,
       include: [
@@ -243,12 +230,11 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
         {
           model: User,
           as: "users",
-          attributes: ['id', 'name', 'email']
+          through: { where: { userID } },
         },
       ],
       order: [["createdDate", "DESC"]],
     });
-
     // Update status for each campaign based on current time
     const updatedCampaigns = await Promise.all(
       campaigns.rows.map(async (campaign) => {
@@ -267,13 +253,9 @@ const getAllCampaign = asyncHandler(async (req, res, next) => {
           campaign.campaignStatus = currentStatus;
         }
 
-        // Add isOwner flag
-        campaign.dataValues.isOwner = campaign.createdBy === userID;
-
         return campaign;
       })
     );
-
     return res.status(200).json({
       success: true,
       totalItems: campaigns.count,
