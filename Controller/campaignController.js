@@ -18,15 +18,26 @@ const asyncHandler = require("../utils/asyncHandler.js");
 const shortId = require("shortid");
 const jwt = require("jsonwebtoken");
 
+
 const checkCampaignAccess = async (campaignId, userId) => {
+  // Check if the user created the campaign
+  const ownedCampaign = await Campaign.findOne({
+    where: {
+      campaignID: campaignId,
+      createdBy: userId
+    }
+  });
+  
+  if (ownedCampaign) return true;
+  
   // Check if the user has an association with the campaign
   const association = await CampaignEndUser.findOne({
     where: {
       campaignID: campaignId,
-      userID: userId,
-    },
+      userID: userId
+    }
   });
-
+  
   return !!association;
 };
 
@@ -319,8 +330,9 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
         {
           model: User,
           as: "users",
-          through: { where: { userID } },
-        },
+          attributes: ["id", "name", "email"],
+          through: { attributes: [] }, // Don't include junction table attrs
+        }
       ],
       order: [[{ model: db.layouts, as: "layouts" }, "createdAt", "ASC"]],
     });
@@ -359,7 +371,6 @@ const getOneCampaign = asyncHandler(async (req, res, next) => {
     return next(new ErrorHandler(error.message, 500));
   }
 });
-
 //------------------Update a campaign------------------------------------------------
 const updateCampaign = asyncHandler(async (req, res, next) => {
   try {

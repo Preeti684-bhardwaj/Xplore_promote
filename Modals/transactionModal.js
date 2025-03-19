@@ -20,6 +20,10 @@ module.exports = (sequelize, DataTypes) => {
       status:{
         type: DataTypes.STRING
       },
+      productDetails:{
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
       paymentDetails: {
         type: DataTypes.JSON
       },
