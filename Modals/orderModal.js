@@ -23,9 +23,6 @@ module.exports = (sequelize, DataTypes) => {
       },
       paymentDetails: {
         type: DataTypes.JSON
-      },
-      campaignId:{
-        type: DataTypes.UUID,
       }
     },
     {

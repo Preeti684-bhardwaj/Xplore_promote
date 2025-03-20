@@ -49,7 +49,9 @@ db.profileLayout = require("../Modals/profileLayoutModal.js")(sequelize, Sequeli
 db.FontWeight = require("../Modals/fontWeightModal.js")(sequelize, Sequelize);
 db.whatsappConfig=require("../Modals/whatsappConfigModal.js")(sequelize, Sequelize);
 db.smsConfig=require("../Modals/smsConfigModal.js")(sequelize, Sequelize);
-db.paymentConfig=require("../Modals/paymentConfigModal.js")(sequelize, Sequelize);
+db.cashfreeConfig=require("../Modals/cashfreeConfigModal.js")(sequelize, Sequelize);
+db.order=require("../Modals/orderModal.js")(sequelize, Sequelize);
+db.transaction=require("../Modals/transactionModal.js")(sequelize, Sequelize);
 
 // Define relationships
 db.campaigns.hasMany(db.layouts, {
@@ -207,29 +209,29 @@ db.smsConfig.belongsTo(db.campaigns, {
   as: "campaigns",
   onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
 });
-// relationship between paymentConfig and User
-db.users.hasMany(db.paymentConfig, {
+// relationship between cashfreeConfig and User
+db.users.hasMany(db.cashfreeConfig, {
   foreignKey: "userId",
   as: "payment",
   onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
 });
 
-db.paymentConfig.belongsTo(db.users, {
+db.cashfreeConfig.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
   onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
 });
-// relationship between paymentConfig and Campaign
-db.campaigns.belongsToMany(db.paymentConfig, {
-  through: "campaignPayment", // Sequelize automatically manages this table
+// relationship between cashfreeConfig and Campaign
+db.campaigns.belongsToMany(db.cashfreeConfig, {
+  through: "cashfreePayment", // Sequelize automatically manages this table
   foreignKey: "campaignID",
-  otherKey: "payConfigId",
+  otherKey: "cashfreeConfigId",
   as: "payment",
 });
 
-db.paymentConfig.belongsToMany(db.campaigns, {
-  through: "campaignPayment",
-  foreignKey: "payConfigId",
+db.cashfreeConfig.belongsToMany(db.campaigns, {
+  through: "cashfreePayment",
+  foreignKey: "cashfreeConfigId",
   otherKey: "campaignID",
   as: "campaigns",
 });
@@ -286,6 +288,7 @@ db.qrSessions.belongsTo(db.users, {
   onDelete: "CASCADE", // Optional: deletes the QR session when the associated user is deleted
 });
 
+// relationship between profileLayout and User
 db.users.hasMany(db.profileLayout, {
   foreignKey: "userId",
   as: "layouts",
@@ -293,6 +296,19 @@ db.users.hasMany(db.profileLayout, {
 });
 
 db.profileLayout.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "users",
+  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
+});
+
+// relationship between order and User
+db.users.hasMany(db.order, {
+  foreignKey: "userId",
+  as: "orders",
+  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
+});
+
+db.order.belongsTo(db.users, {
   foreignKey: "userId",
   as: "users",
   onDelete: "CASCADE", // Optional: deletes layout when user is deleted

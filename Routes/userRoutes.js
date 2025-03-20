@@ -44,6 +44,9 @@ const {
   removeChatbotFromCampaign,
 } = require("../Controller/chatBot/chatBotConfigController");
 const {
+  createCashfreeConfig,updateCashfreeConfig,getAllCashfreeConfig,assignCashfreeConfigToCampaign,removeCashfreeConfigFromCampaign
+} = require("../Controller/payment/cashfree/configController")
+const {
   createConfig,updateConfig,getAllConfig,assignConfigToCampaign,removeConfigFromCampaign
 } = require("../Controller/user/whatsapp/whatsappConfigController");
 const {createSmsConfig,
@@ -201,39 +204,39 @@ router.delete(
 
 // payment configuration api
 router.post(
-  "/payment/create",
+  "/cashfree/create",
   verifyJWt,
   authorize(["USER"]),
   verifySession,
-  createConfig
+  createCashfreeConfig
 );
 router.get(
-  "/payment/getAllConfig",
+  "/cashfree/getAllConfig",
   verifyJWt,
   authorize(["ADMIN", "USER"]),
   verifySession,
-  getAllConfig
+  getAllCashfreeConfig
 );
 router.put(
-  "/payment/update/:id",
+  "/cashfree/update/:id",
   verifyJWt,
   authorize(["ADMIN", "USER"]),
   verifySession,
-  updateConfig
+  updateCashfreeConfig
 );
 router.post(
-  "/payment/assign-to-campaign",
+  "/cashfree/assign-to-campaign",
   verifyJWt,
   authorize(["ADMIN", "USER"]),
   verifySession,
-  assignConfigToCampaign
+  assignCashfreeConfigToCampaign
 );
 router.post(
-  "/payment/remove-from-campaign",
+  "/cashfree/remove-from-campaign",
   verifyJWt,
   authorize(["ADMIN", "USER"]),
   verifySession,
-  removeConfigFromCampaign
+  removeCashfreeConfigFromCampaign
 );
 
 // router.get("/profile/getLayout/:shortCode",getAllProfileLayoutByShortCode);

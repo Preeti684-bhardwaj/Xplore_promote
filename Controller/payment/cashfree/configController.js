@@ -1,18 +1,17 @@
-const db = require("../../dbConfig/dbConfig.js");
-const PaymentConfig = db.paymentConfig;
+const db = require("../../../dbConfig/dbConfig.js");
+const CashfreeConfig = db.cashfreeConfig;
 const Campaign = db.campaigns;
-const ErrorHandler = require("../../utils/ErrorHandler.js");
+const ErrorHandler = require("../../../utils/ErrorHandler.js");
 const asyncHandler = require("../../../utils/asyncHandler.js");
 
 // create configuration
-const createConfig = asyncHandler(async (req, res, next) => {
+const createCashfreeConfig = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
     const {
       name,
-      secret_key,
-      api_key,
-      webhook_url,
+      XClientId,
+      XClientSecret,
       redirection_url,
       provider,
     } = req.body;
@@ -21,21 +20,20 @@ const createConfig = asyncHandler(async (req, res, next) => {
     // Validate required parameters
     if (
       !name ||
-      !secret_key ||
-      !api_key ||
-      !webhook_url ||
+      !XClientId ||
+      !XClientSecret ||
       !provider
     ) {
       await transaction.rollback();
       return next(new ErrorHandler("missing required field", 400));
     }
     // Check if configuration already exists
-    const existingConfig = await PaymentConfig.findOne(
+    const existingConfig = await CashfreeConfig.findOne(
       {
         where: {
           name,
-          secret_key,
-          api_key,
+          XClientId,
+          XClientSecret,
           provider,
           userId,
         },
@@ -49,12 +47,11 @@ const createConfig = asyncHandler(async (req, res, next) => {
     }
 
     // Create the new configuration
-    const newConfig = await PaymentConfig.create(
+    const newConfig = await CashfreeConfig.create(
       {
         name,
-        secret_key,
-        api_key,
-        webhook_url,
+        XClientId,
+        XClientSecret,
         redirection_url,
         provider,
         userId,
@@ -65,7 +62,7 @@ const createConfig = asyncHandler(async (req, res, next) => {
     await transaction.commit();
     return res.status(201).json({
       success: true,
-      message: `Payment configuration created successfully`,
+      message: `Cashfree configuration created successfully`,
       config: {
         id: newConfig.id,
         name: newConfig.name,
@@ -80,19 +77,18 @@ const createConfig = asyncHandler(async (req, res, next) => {
   }
 });
 
-// update config data for payment api
-const updateConfig = asyncHandler(async (req, res, next) => {
+// update config data for cashfree api
+const updateCashfreeConfig = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
     const { id } = req.params;
     const {
-      webhook_url,
       redirection_url,
     } = req.body;
     const userId = req.user.id;
 
     // Find existing configuration for the user
-    const existingConfig = await PaymentConfig.findOne(
+    const existingConfig = await CashfreeConfig.findOne(
       {
         where: { id, userId },
       },
@@ -106,7 +102,6 @@ const updateConfig = asyncHandler(async (req, res, next) => {
 
     // Initialize update data with standard fields
     const updateData = {
-      webhook_url: webhook_url !== undefined ? webhook_url : existingConfig.webhook_url,
       redirection_url:
       redirection_url !== undefined
           ? redirection_url
@@ -128,7 +123,6 @@ const updateConfig = asyncHandler(async (req, res, next) => {
         name: updatedConfig.name,
         secret_key: updatedConfig.secret_key,
         api_key: updatedConfig.api_key,
-        webhook_url: updatedConfig.webhook_url,
         provider: updatedConfig.provider,
         redirection_url: updatedConfig.redirection_url,
         updatedAt: updatedConfig.updatedAt,
@@ -141,20 +135,20 @@ const updateConfig = asyncHandler(async (req, res, next) => {
 });
 
 // get all configuration of user
-const getAllConfig = asyncHandler(async (req, res, next) => {
+const getAllCashfreeConfig = asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user.id;
 
     // Find all whatsapp configurations for the user
-    const userConfigurations = await PaymentConfig.findAll({
+    const userConfigurations = await CashfreeConfig.findAll({
       where: { userId },
       attributes: [
         "id",
         "name",
-        "secret_key",
-        "api_key",
-        "webhook_url",
+        "XClientId",
+        "XClientSecret",
         "redirection_url",
+        "provider",
         "createdAt",
         "updatedAt",
       ],
@@ -179,8 +173,8 @@ const getAllConfig = asyncHandler(async (req, res, next) => {
   }
 });
 
-// assign payment configuration to campaign
-const assignConfigToCampaign = asyncHandler(async (req, res, next) => {
+// assign cashfree configuration to campaign
+const assignCashfreeConfigToCampaign = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
     const { configId, campaignId } = req.query;
@@ -212,8 +206,8 @@ const assignConfigToCampaign = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Unauthorized access", 403));
     }
     
-    // Check if the payment config exists and belongs to the user
-    const config = await PaymentConfig.findOne({
+    // Check if the cashfree config exists and belongs to the user
+    const config = await CashfreeConfig.findOne({
       where: {
         id: configId,
         userId: userId,
@@ -231,13 +225,13 @@ const assignConfigToCampaign = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Add the payment config to the campaign
+    // Add the cashfree config to the campaign
     await campaign.addPayment(config, { transaction });
 
     await transaction.commit();
     return res.status(200).json({
       success: true,
-      message: "Payment configuration successfully assigned to campaign",
+      message: "Cashfree configuration successfully assigned to campaign",
       data: {
         campaignId: campaignId,
         configId: configId,
@@ -251,7 +245,7 @@ const assignConfigToCampaign = asyncHandler(async (req, res, next) => {
 });
 
 // remove whatsapp configuration to campaign
-const removeConfigFromCampaign = asyncHandler(async (req, res, next) => {
+const removeCashfreeConfigFromCampaign = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
     const { campaignId } = req.query;
@@ -282,32 +276,31 @@ const removeConfigFromCampaign = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // Find the whatsapp assigned to this campaign
-    const config = await WhatsappConfig.findOne({
+    // Find configurations associated with this campaign through the junction table
+    const configs = await campaign.getPayment({
       where: {
-        campaignId: campaignId,
-        userId: userId,
+        userId: userId
       },
-      transaction,
+      transaction
     });
 
-    if (!config) {
+    if (!configs || configs.length === 0) {
       await transaction.rollback();
       return next(
         new ErrorHandler("No configuration is assigned to this campaign", 404)
       );
     }
 
-    // Remove the campaign association from the whatsapp
-    await config.update({ campaignId: null }, { transaction });
+    // Remove the association between campaign and cashfree config
+    await campaign.removePayment(configs, { transaction });
 
     await transaction.commit();
     return res.status(200).json({
       success: true,
-      message: "configuration successfully removed from campaign",
+      message: "Configuration successfully removed from campaign",
       data: {
         campaignId: campaignId,
-        configId: config.id,
+        configIds: configs.map(config => config.id)
       },
     });
   } catch (error) {
@@ -316,10 +309,11 @@ const removeConfigFromCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
+
 module.exports = {
-  updateConfig,
-  createConfig,
-  getAllConfig,
-  assignConfigToCampaign,
-  removeConfigFromCampaign,
+  updateCashfreeConfig,
+  createCashfreeConfig,
+  getAllCashfreeConfig,
+  assignCashfreeConfigToCampaign,
+  removeCashfreeConfigFromCampaign,
 };

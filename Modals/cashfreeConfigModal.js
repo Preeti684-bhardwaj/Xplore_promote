@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
-  const paymentConfig = sequelize.define(
-    "paymentConfig",
+  const cashfreeConfig = sequelize.define(
+    "cashfreeConfig",
     {
       id: {
         type: DataTypes.UUID,
@@ -11,16 +11,13 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      secret_key: {
+      XClientId: {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      api_key: {
+      XClientSecret: {
         type: DataTypes.STRING,
         allowNull: false,
-      },
-      webhook_url: {
-        type: DataTypes.STRING,
       },
       redirection_url: {
         type: DataTypes.STRING,
@@ -33,5 +30,5 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: true,
     }
   );
-  return paymentConfig;
+  return cashfreeConfig;
 };
