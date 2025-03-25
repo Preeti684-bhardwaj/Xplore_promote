@@ -177,13 +177,13 @@ const verifyEndUser = async (req, res, next) => {
     req.decodedToken = decodedToken;
 
     // Get user ID from token
-    const userId = decodedToken.obj.obj.id;
-
+    const userId = decodedToken.obj.id;
+    console.log(userId);
     // find end user
-    const endUser = await User.findOne({
+    const endUser = await db.endUsers.findOne({
       where: { id: userId },
     });
-    console.log(endUser);
+    console.log("in middleware",endUser);
 
     if (!endUser) {
       return next(new ErrorHandler("Invalid token or enduser not found", 401));
@@ -193,6 +193,9 @@ const verifyEndUser = async (req, res, next) => {
 
     next();
   } catch (error) {
+    if(error.message == "jwt expired"){
+      return next(new ErrorHandler("Token expired", 401));
+    }
     return next(new ErrorHandler(error.message, 500));
   }
 };

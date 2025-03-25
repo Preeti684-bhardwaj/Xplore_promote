@@ -57,18 +57,18 @@ db.transaction=require("../Modals/transactionModal.js")(sequelize, Sequelize);
 db.campaigns.hasMany(db.layouts, {
   foreignKey: "campaignID",
   as: "layouts",
-  onDelete: "CASCADE", // Optional: deletes advertisement when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.layouts.belongsTo(db.campaigns, {
   foreignKey: "campaignID",
   as: "campaign",
-  onDelete: "CASCADE", // Optional: deletes advertisement when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 // Establish relationship between Campaign and user
 db.campaigns.belongsToMany(db.users, {
-  through: "CampaignEndUser", // Sequelize automatically manages this table
+  through: "CampaignEndUser", 
   foreignKey: "campaignID",
   otherKey: "userID",
   as: "users",
@@ -83,7 +83,7 @@ db.users.belongsToMany(db.campaigns, {
 
 // Establish relationship between Campaign and enduser
 db.campaigns.belongsToMany(db.endUsers, {
-  through: "CampaignUser", // Sequelize automatically manages this table
+  through: "CampaignUser",
   foreignKey: "campaignID",
   otherKey: "enduserID",
   as: "endusers",
@@ -97,133 +97,133 @@ db.endUsers.belongsToMany(db.campaigns, {
 });
 //  // relationship between customFonts and fontWeight
 db.customFonts.hasMany(db.FontWeight, {
-  foreignKey: 'customFontId', // Foreign key in FontWeight table
-  as: 'fontWeights', // Alias for the related data
+  foreignKey: 'customFontId', 
+  as: 'fontWeights', 
 });
 
 // FontWeight belongs to one customFont
 db.FontWeight.belongsTo(db.customFonts, {
-  foreignKey: 'customFontId', // Foreign key in FontWeight table
-  as: 'customFont', // Alias for the related data
+  foreignKey: 'customFontId', 
+  as: 'customFont', 
 });
 
 // relationship between customFonts and Campaign
 db.campaigns.hasMany(db.customFonts, {
   foreignKey: "campaignID",
   as: "customFonts",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.customFonts.belongsTo(db.campaigns, {
   foreignKey: "campaignID",
   as: "campaign",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 // relationship between customFonts and User
 db.users.hasMany(db.customFonts, {
   foreignKey: "userId",
   as: "customFonts",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.customFonts.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE",
 });
 // chatbotconfig - campaign relationship
 db.campaigns.hasOne(db.chatBotConfig, {
   foreignKey: "campaignId",
   as: "chatbot",
-  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+  onDelete: "CASCADE",
 });
 
 db.chatBotConfig.belongsTo(db.campaigns, {
   foreignKey: "campaignId",
   as: "campaigns",
-  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 // relationship between chatbot and User
 db.users.hasMany(db.chatBotConfig, {
   foreignKey: "userId",
   as: "chatbot",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.chatBotConfig.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 // relationship between whatsapp and User
 db.users.hasMany(db.whatsappConfig, {
   foreignKey: "userId",
   as: "whatsapp",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.whatsappConfig.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 // chatbotconfig - campaign relationship
 db.campaigns.hasOne(db.whatsappConfig, {
   foreignKey: "campaignId",
   as: "whatsapp",
-  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+  onDelete: "CASCADE",
 });
 
 db.whatsappConfig.belongsTo(db.campaigns, {
   foreignKey: "campaignId",
   as: "campaigns",
-  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+  onDelete: "CASCADE",
 });
 
 // relationship between smsConfig and User
 db.users.hasMany(db.smsConfig, {
   foreignKey: "userId",
   as: "sms",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.smsConfig.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 // chatbotconfig - campaign relationship
 db.campaigns.hasOne(db.smsConfig, {
   foreignKey: "campaignId",
   as: "sms",
-  onDelete: "CASCADE", // Optional: deletes predibase when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.smsConfig.belongsTo(db.campaigns, {
   foreignKey: "campaignId",
   as: "campaigns",
-  onDelete: "CASCADE", // Optional: deletes predibase config when campaign is deleted
+  onDelete: "CASCADE", 
 });
 // relationship between cashfreeConfig and User
 db.users.hasMany(db.cashfreeConfig, {
   foreignKey: "userId",
   as: "payment",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 db.cashfreeConfig.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 // relationship between cashfreeConfig and Campaign
 db.campaigns.belongsToMany(db.cashfreeConfig, {
-  through: "cashfreePayment", // Sequelize automatically manages this table
+  through: "cashfreePayment", 
   foreignKey: "campaignID",
   otherKey: "cashfreeConfigId",
   as: "payment",
@@ -240,78 +240,103 @@ db.cashfreeConfig.belongsToMany(db.campaigns, {
 db.campaigns.hasMany(db.productImages, {
   foreignKey: "campaignID",
   as: "productImages",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE",
 });
 
 db.productImages.belongsTo(db.campaigns, {
   foreignKey: "campaignID",
   as: "campaign",
-  onDelete: "CASCADE", // Optional: deletes customFont when campaign is deleted
+  onDelete: "CASCADE", 
 });
 
 // contact-Campaign relationship
 db.campaigns.hasMany(db.analytics, {
   foreignKey: "campaignID",
   as: 'analytics',
-  onDelete: 'CASCADE' // Optional: deletes campaign when user is deleted
+  onDelete: 'CASCADE' 
 });
 
 db.analytics.belongsTo(db.campaigns, {
   foreignKey: 'campaignID',
   as: 'campaigns',
-  onDelete: 'CASCADE' // Optional: deletes campaign when user is deleted
+  onDelete: 'CASCADE' 
 });
 
 // User-AssetStore relationship
 db.users.hasOne(db.assets, {
   foreignKey: "userId",
   as: "asset",
-  onDelete: "CASCADE", // Optional: deletes asset when user is deleted
+  onDelete: "CASCADE", 
 });
 
 db.assets.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
-  onDelete: "CASCADE", // Optional: deletes asset when user is deleted
+  onDelete: "CASCADE",
 });
 
 // User-QRSession relationship
 db.users.hasMany(db.qrSessions, {
   foreignKey: "userId",
   as: "qrSessions",
-  onDelete: "CASCADE", // Optional: deletes all QR sessions when the user is deleted
+  onDelete: "CASCADE",
 });
 
 db.qrSessions.belongsTo(db.users, {
   foreignKey: "userId",
   as: "user",
-  onDelete: "CASCADE", // Optional: deletes the QR session when the associated user is deleted
+  onDelete: "CASCADE",
 });
 
 // relationship between profileLayout and User
 db.users.hasMany(db.profileLayout, {
   foreignKey: "userId",
   as: "layouts",
-  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
+  onDelete: "CASCADE", 
 });
 
 db.profileLayout.belongsTo(db.users, {
   foreignKey: "userId",
   as: "users",
-  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
+  onDelete: "CASCADE", 
 });
 
 // relationship between order and User
-db.users.hasMany(db.order, {
+db.endUsers.hasMany(db.order, {
   foreignKey: "userId",
   as: "orders",
-  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
+  onDelete: "CASCADE", 
 });
 
-db.order.belongsTo(db.users, {
+db.order.belongsTo(db.endUsers, {
   foreignKey: "userId",
   as: "users",
-  onDelete: "CASCADE", // Optional: deletes layout when user is deleted
+  onDelete: "CASCADE", 
+});
+
+// relationship between order and User
+db.campaigns.hasMany(db.order, {
+  foreignKey: "campaignId",
+    as: "orders",
+});
+
+db.order.belongsTo(db.campaigns, {
+  foreignKey: "campaignId",
+  as: "campaign",
+  onDelete: "CASCADE",
+});
+
+// relationship order - transaction
+db.order.hasOne(db.transaction, {
+  foreignKey: "orderId",
+  as: "transaction",          
+  onDelete: "CASCADE",
+});
+
+db.transaction.belongsTo(db.order, {
+  foreignKey: "orderId",
+  as: "order",              
+  onDelete: "CASCADE",
 });
 
 module.exports = db;

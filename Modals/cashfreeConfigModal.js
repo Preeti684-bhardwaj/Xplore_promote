@@ -19,9 +19,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      redirection_url: {
-        type: DataTypes.STRING,
-      },
       provider: {
         type: DataTypes.STRING,
       },

@@ -12,7 +12,6 @@ const createCashfreeConfig = asyncHandler(async (req, res, next) => {
       name,
       XClientId,
       XClientSecret,
-      redirection_url,
       provider,
     } = req.body;
     const userId = req.user.id;
@@ -52,7 +51,6 @@ const createCashfreeConfig = asyncHandler(async (req, res, next) => {
         name,
         XClientId,
         XClientSecret,
-        redirection_url,
         provider,
         userId,
       },
@@ -78,61 +76,61 @@ const createCashfreeConfig = asyncHandler(async (req, res, next) => {
 });
 
 // update config data for cashfree api
-const updateCashfreeConfig = asyncHandler(async (req, res, next) => {
-  const transaction = await db.sequelize.transaction();
-  try {
-    const { id } = req.params;
-    const {
-      redirection_url,
-    } = req.body;
-    const userId = req.user.id;
+// const updateCashfreeConfig = asyncHandler(async (req, res, next) => {
+//   const transaction = await db.sequelize.transaction();
+//   try {
+//     const { id } = req.params;
+//     const {
+//       redirection_url,
+//     } = req.body;
+//     const userId = req.user.id;
 
-    // Find existing configuration for the user
-    const existingConfig = await CashfreeConfig.findOne(
-      {
-        where: { id, userId },
-      },
-      { transaction }
-    );
+//     // Find existing configuration for the user
+//     const existingConfig = await CashfreeConfig.findOne(
+//       {
+//         where: { id, userId },
+//       },
+//       { transaction }
+//     );
 
-    if (!existingConfig) {
-      await transaction.rollback();
-      return next(new ErrorHandler("No configuration found", 404));
-    }
+//     if (!existingConfig) {
+//       await transaction.rollback();
+//       return next(new ErrorHandler("No configuration found", 404));
+//     }
 
-    // Initialize update data with standard fields
-    const updateData = {
-      redirection_url:
-      redirection_url !== undefined
-          ? redirection_url
-          : existingConfig.redirection_url,
-    };
+//     // Initialize update data with standard fields
+//     const updateData = {
+//       redirection_url:
+//       redirection_url !== undefined
+//           ? redirection_url
+//           : existingConfig.redirection_url,
+//     };
 
-    // Update the configuration
-    const updatedConfig = await existingConfig.update(updateData, {
-      transaction,
-    });
+//     // Update the configuration
+//     const updatedConfig = await existingConfig.update(updateData, {
+//       transaction,
+//     });
 
-    await transaction.commit();
+//     await transaction.commit();
 
-    return res.status(200).json({
-      success: true,
-      message: "Configuration updated successfully",
-      config: {
-        id: updatedConfig.id,
-        name: updatedConfig.name,
-        secret_key: updatedConfig.secret_key,
-        api_key: updatedConfig.api_key,
-        provider: updatedConfig.provider,
-        redirection_url: updatedConfig.redirection_url,
-        updatedAt: updatedConfig.updatedAt,
-      },
-    });
-  } catch (error) {
-    await transaction.rollback();
-    return next(new ErrorHandler(error.message, 500));
-  }
-});
+//     return res.status(200).json({
+//       success: true,
+//       message: "Configuration updated successfully",
+//       config: {
+//         id: updatedConfig.id,
+//         name: updatedConfig.name,
+//         secret_key: updatedConfig.secret_key,
+//         api_key: updatedConfig.api_key,
+//         provider: updatedConfig.provider,
+//         redirection_url: updatedConfig.redirection_url,
+//         updatedAt: updatedConfig.updatedAt,
+//       },
+//     });
+//   } catch (error) {
+//     await transaction.rollback();
+//     return next(new ErrorHandler(error.message, 500));
+//   }
+// });
 
 // get all configuration of user
 const getAllCashfreeConfig = asyncHandler(async (req, res, next) => {
@@ -147,7 +145,6 @@ const getAllCashfreeConfig = asyncHandler(async (req, res, next) => {
         "name",
         "XClientId",
         "XClientSecret",
-        "redirection_url",
         "provider",
         "createdAt",
         "updatedAt",
@@ -309,9 +306,8 @@ const removeCashfreeConfigFromCampaign = asyncHandler(async (req, res, next) => 
   }
 });
 
-
 module.exports = {
-  updateCashfreeConfig,
+  // updateCashfreeConfig,
   createCashfreeConfig,
   getAllCashfreeConfig,
   assignCashfreeConfigToCampaign,

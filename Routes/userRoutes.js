@@ -44,7 +44,7 @@ const {
   removeChatbotFromCampaign,
 } = require("../Controller/chatBot/chatBotConfigController");
 const {
-  createCashfreeConfig,updateCashfreeConfig,getAllCashfreeConfig,assignCashfreeConfigToCampaign,removeCashfreeConfigFromCampaign
+  createCashfreeConfig,getAllCashfreeConfig,assignCashfreeConfigToCampaign,removeCashfreeConfigFromCampaign
 } = require("../Controller/payment/cashfree/configController")
 const {
   createConfig,updateConfig,getAllConfig,assignConfigToCampaign,removeConfigFromCampaign
@@ -217,13 +217,13 @@ router.get(
   verifySession,
   getAllCashfreeConfig
 );
-router.put(
-  "/cashfree/update/:id",
-  verifyJWt,
-  authorize(["ADMIN", "USER"]),
-  verifySession,
-  updateCashfreeConfig
-);
+// router.put(
+//   "/cashfree/update/:id",
+//   verifyJWt,
+//   authorize(["ADMIN", "USER"]),
+//   verifySession,
+//   updateCashfreeConfig
+// );
 router.post(
   "/cashfree/assign-to-campaign",
   verifyJWt,

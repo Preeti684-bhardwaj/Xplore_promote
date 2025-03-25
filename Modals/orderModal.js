@@ -1,5 +1,7 @@
 module.exports = (sequelize, DataTypes) => {
-    const Order = sequelize.define("Order", {
+  const Order = sequelize.define(
+    "Order",
+    {
       id: {
         type: DataTypes.UUID,
         primaryKey: true,
@@ -13,21 +15,25 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: false,
       },
-      invoiceNumber:{
-        type: DataTypes.STRING,
-        allowNull: false,
+      invoiceNumber: {
+        type: DataTypes.STRING
       },
-      productDetails:{
+      status: {
+        type: DataTypes.ENUM("pending", "paid", "failed"),
+        defaultValue: "pending",
+      },
+      productDetails: {
         type: DataTypes.STRING,
         allowNull: false,
       },
       paymentDetails: {
-        type: DataTypes.JSON
+        type: DataTypes.JSON,
       }
     },
     {
       timestamps: true,
-    });
-  
-    return Order;
-  };
+    }
+  );
+
+  return Order;
+};
