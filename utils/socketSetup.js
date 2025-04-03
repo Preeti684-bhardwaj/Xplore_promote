@@ -10,6 +10,7 @@ const allowedOrigins = [
   "http://localhost:5173",
 ];
 
+// -----------Setup socket.io server-----------------------------------
 const setupSocket = (server) => {
   const io = socketIO(server, {
     cors: {

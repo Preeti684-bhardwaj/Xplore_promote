@@ -1,6 +1,6 @@
-// Campaign status management utility functions
 const moment = require('moment-timezone');
 
+// -------------Validate campaign timing information-------------------------------------------
 const validateTiming = (timing) => {
   const errors = [];
 
@@ -61,6 +61,7 @@ const validateTiming = (timing) => {
   return errors;
 };
 
+// -------------Get campaign status-------------------------------------------
 const getCampaignStatus = (startDate, endDate, timeZone = 'UTC') => {
   try {
     if (!startDate || !endDate) {

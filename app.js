@@ -3,9 +3,8 @@ require("dotenv").config();
 const app = express();
 const cors = require("cors");
 const errorMiddleware = require("./middleware/Error");
-const metaTagMiddleware = require("./middleware/metaInjection.js");
 
-// Define the allowed origins
+// allowed origins
 const allowedOrigins = [
   "https://xplore-instant.vercel.app",
   "https://pre.xplore.xircular.io",
@@ -30,11 +29,11 @@ app.use(
     },
   })
 );
+
 // Serve static files from the 'public' directory
 app.use(express.static("public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(metaTagMiddleware());
 
 // Routes Imports
 const authRouter = require("./Routes/authRoutes");

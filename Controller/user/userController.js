@@ -1015,27 +1015,6 @@ const getUserByToken = asyncHandler(async (req, res, next) => {
   }
 });
 
-//------------get insta verify-------------------------------------
-const getInsta = asyncHandler(async (req, res, next) => {
-  try {
-    const userAgent = req.headers["user-agent"];
-    console.log("User-Agent:", userAgent);
-
-    if (userAgent && userAgent.includes("Instagram")) {
-      console.log("Redirecting to Instagram link...");
-      return res.redirect(302, "https://xplore-instant.vercel.app/");
-    } else {
-      console.log("Sending normal link...");
-      return res
-        .status(200)
-        .send('<a href="https://xplore-instant.vercel.app/">Click Here</a>');
-    }
-  } catch (error) {
-    console.error("Error occurred:", error);
-    return next(new ErrorHandler(error.message, 500));
-  }
-});
-
 //--------------------Update user-----------------------------
 const updateUser = asyncHandler(async (req, res, next) => {
   try {
@@ -1955,7 +1934,6 @@ module.exports = {
   getUserById,
   updateUser,
   deleteUser,
-  getInsta,
   logout,
   logoutAll,
   getUserProfile,

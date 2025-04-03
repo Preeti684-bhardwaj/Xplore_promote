@@ -5,7 +5,7 @@ const User = db.users;
 const { isValidEmail } = require("./validation.js");
 require("dotenv").config();
 
-// Helper function to generate JWT
+// ----------------generate JWT-------------------------------------------
 const generateToken = (user) => {
   try {
     if (!user || !process.env.JWT_SECRET) {
@@ -27,7 +27,7 @@ const generateToken = (user) => {
     };
   }
 };
-// Helper function to generate
+// ----------------generate OTP-------------------------------------------
 const generateOtp = () => {
   try {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -49,11 +49,12 @@ const generateOtp = () => {
   }
 };
 
+// --------------generate hash password-----------------------------------
 const hashPassword = async (password) => {
   return bcrypt.hash(password, 10);
 };
 
-// Helper function to validate Apple ID token
+// ----------------validate Apple ID token-----------------------------------
 const validateAppleToken = (idToken) => {
   if (!idToken || idToken === "null") {
     return {
@@ -85,7 +86,7 @@ const validateAppleToken = (idToken) => {
   }
 };
 
-// Update Existing User with Apple ID
+// ---------------Update Existing User with Apple ID--------------------------------
 async function updateExistingUserWithAppleId(
   user,
   { deviceId, visitorId },
@@ -111,7 +112,7 @@ async function updateExistingUserWithAppleId(
   return user;
 }
 
-// Update User with Apple Details
+// -----------------Update User with Apple Details--------------------------------------  
 async function updateUserWithAppleDetails(
   user,
   { appleUserId, email, name, deviceId, visitorId },
@@ -141,7 +142,7 @@ async function updateUserWithAppleDetails(
   return user;
 }
 
-// Create New User
+// -------------------Create New User--------------------------------------------
 async function createNewUser(
   { appleUserId, email, name, deviceId, visitorId },
   campaignID,
@@ -164,6 +165,7 @@ async function createNewUser(
   return user;
 }
 
+// -------------------Create or Update User--------------------------------------------
 const createOrUpdateUser = async (
     email,
     name,

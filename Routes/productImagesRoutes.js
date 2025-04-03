@@ -9,17 +9,9 @@ const {
 const { verifyJWt, verifySession, authorize } = require("../middleware/auth");
 const upload = require("../middleware/multer");
 
-router.post(
-  "/create/:campaignID",
-  verifyJWt,
-  authorize(["USER"]),
-  verifySession,
-  uploadProductImages
-);
+router.post("/create/:campaignID",verifyJWt,authorize(["USER"]),verifySession,uploadProductImages);
 router.get("/getAll/:campaignID", getProductImagesByCampaign);
 router.get("/getOne/:id", getProductImageById);
-router.put("/update/:id",verifyJWt,
-   authorize(["USER"]),
-   verifySession,updateProductImages)
+router.put("/update/:id",verifyJWt,authorize(["USER"]),verifySession,updateProductImages)
 
 module.exports = router;

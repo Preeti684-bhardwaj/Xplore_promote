@@ -1,9 +1,11 @@
 const validator = require("validator");
 
+// ------------------validate email-------------------------------------
 const isValidEmail = email => validator.isEmail(email);
 
 // const isValidPhone = (phone) => validator.isMobilePhone(phone, "en-IN");
 
+// ------------------validate password-------------------------------------
 const isValidPassword = (password) => {
   if (password.length < 8) {
     return "Password must be at least 8 characters long";
@@ -32,6 +34,8 @@ const isValidPassword = (password) => {
   // If all checks pass, the password is valid
   return null;
 };
+
+// ------------------validate name-------------------------------------
 const isValidLength = (name) => {
   // const nameRegex = /^(?=.{4,40}$)[A-Za-z](?:\s?[A-Za-z]+)*[A-Za-z]$/;
   if (!name) {
@@ -61,6 +65,7 @@ const isValidLength = (name) => {
   return null;  // No errors
 };
 
+// ------------------validate phone-------------------------------------
 const isPhoneValid = (phone) => {
   if (!phone) {
     return "Phone number is required";
@@ -80,11 +85,7 @@ const isPhoneValid = (phone) => {
   return null;  // No errors
 };
 
-const getFileNameFromUrl = (url) => {
-  const urlParts = url.split('/');
-  return urlParts[urlParts.length - 1];
-};
-
+// ------------------get platform-------------------------------------
 const getPlatform = (userAgent) => {
   if (!userAgent) return 'unknown';
   
@@ -93,6 +94,7 @@ const getPlatform = (userAgent) => {
   return isMobile ? 'mobile' : 'web';
 };
 
+// ------------------detect OS-------------------------------------
 const detectOS = (userAgent) => {
   if (!userAgent) return 'Unknown';
   
@@ -116,7 +118,6 @@ module.exports = {
   isPhoneValid,
   isValidPassword,
   isValidLength,
-  getFileNameFromUrl,
   getPlatform,
   detectOS
 };
