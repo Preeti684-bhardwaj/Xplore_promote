@@ -411,11 +411,11 @@ const updateCampaign = asyncHandler(async (req, res, next) => {
       }
       try {
         // Delete existing images first
-        if (campaign.images && campaign.images.length > 0) {
-          await Promise.all(
-            campaign.images.map((image) => deleteFile(image.filename))
-          );
-        }
+//        if (campaign.images && campaign.images.length > 0) {
+  //        await Promise.all(
+    //        campaign.images.map((image) => deleteFile(image.filename))
+      //    );
+       // }
 
         // Upload new images and directly assign to updateData
         uploadedUrls.push(...(await uploadFiles(req.files)));
