@@ -54,12 +54,18 @@ function extractJson(str) {
     return null;
   }
 }
+
 // Gemini-specific handler
 async function handleGeminiRequest(config, question, res, next) {
   try {
-    const openai = new OpenAI({
-      apiKey: config.api_key,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    // Use the GoogleGenerativeAI library instead of OpenAI
+    const genAI = new GoogleGenerativeAI(config.api_key);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash-001",
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.1,
+      }
     });
 
     const BASE_PROMPT = config.base_prompt;
@@ -68,22 +74,46 @@ async function handleGeminiRequest(config, question, res, next) {
 
     res.write(`data: ${JSON.stringify({ type: "start", question })}\n\n`);
 
-    let accumulatedResponse = "";
-    const stream = await openai.chat.completions.create({
-      model: "gemini-1.5-flash-001",
-      messages: [
-        { role: "system", content: BASE_PROMPT },
-        { role: "user", content: `${question}${SUMMARY}${previousSummary}` },
-      ],
-      temperature: 0.2,
-      top_p: 0.1,
-      stream: true,
-      // Add this line to use the cached content
-      // cached_content: cacheName
+    // Handle greeting specially (without using system instructions)
+    if (isGreeting(question)) {
+      const response = {
+        answer: "Hello! Welcome to Hyundai. How can I assist you with the IONIQ 5 today?",
+        questions: [
+          "What are the available trim levels for the IONIQ 5?",
+          "What is the starting price of the IONIQ 5?"
+        ],
+        summary: previousSummary,
+      };
+
+      res.write(
+        `data: ${JSON.stringify({
+          type: "stream",
+          content: response.answer,
+        })}\n\n`
+      );
+      
+      updateSummary(response);
+      res.write('data: {"type": "end"}\n\n');
+      return res.end();
+    }
+
+    // For non-greeting messages, use a standard chat without system instructions
+    const chat = model.startChat({
+      history: []
+      // Remove systemInstruction and include it in the message instead
     });
 
-    for await (const chunk of stream) {
-      const token = chunk.choices[0]?.delta?.content || "";
+    let accumulatedResponse = "";
+    
+    // Construct a message that includes both the base prompt and the question
+    const completePrompt = `${BASE_PROMPT}\n\nUser question: ${question}${SUMMARY}${previousSummary}`;
+    
+    // Use Gemini's streaming API
+    const result = await chat.sendMessageStream(completePrompt);
+    
+    // Process the streaming response
+    for await (const chunk of result.stream) {
+      const token = chunk.text();
       accumulatedResponse += token;
       res.write(
         `data: ${JSON.stringify({
@@ -104,12 +134,12 @@ async function handleGeminiRequest(config, question, res, next) {
       summary: previousSummary,
     };
 
-    updateSummary(parsedResponse);
+    // Store this conversation for context caching
+    if (cacheName) {
+      // Cache implementation placeholder
+    }
 
-    // res.write(`data: ${JSON.stringify({
-    //   type: "complete",
-    //   response: parsedResponse
-    // })}\n\n`);
+    updateSummary(parsedResponse);
 
     res.write('data: {"type": "end"}\n\n');
     res.end();
