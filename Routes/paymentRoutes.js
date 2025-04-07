@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { verifyJWt,verifyAdmin,verifyEndUser,verifySession,authorize } = require("../middleware/auth");
+const { getCampaignCashfreeConfig } = require("../Controller/payment/cashfree/configController.js");
 const { 
   createOrder, 
   getOrderById, 
@@ -44,6 +45,7 @@ router.post("/cashfree/checkout", verifyEndUser, createCashfreeCheckout);
 router.get("/cashfree/status/:orderId", verifyEndUser, getPaymentStatus);
 router.get("/cashfree/order-status", getOrderStatus); // Public route for redirect after payment
 router.post("/cashfree/cancel", verifyEndUser, cancelPayment);
+router.get("/cashfree/config/:campaignId", verifyEndUser, getCampaignCashfreeConfig);
 
 // --------------Cashfree webhook route (no authentication as it's called by Cashfree)--------------------
 router.post("/cashfree/webhook", cashfreeWebhook);

@@ -270,6 +270,7 @@ const otpVerification = asyncHandler(async (req, res, next) => {
     user.metaOtp = null;
     user.metaOtpExpire = null;
     user.otpAttempts = 0;
+    user.authState = null;
     await user.save({ transaction });
 
     // Generate token

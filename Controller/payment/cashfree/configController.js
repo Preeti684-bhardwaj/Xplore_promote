@@ -170,6 +170,56 @@ const getAllCashfreeConfig = asyncHandler(async (req, res, next) => {
   }
 });
 
+// get cashfree configuration for a specific campaign
+const getCampaignCashfreeConfig = asyncHandler(async (req, res, next) => {
+  try {
+    const campaignId = req.query.campaignId;
+
+    // Validate required parameter
+    if (!campaignId) {
+      return next(new ErrorHandler("Campaign ID is required", 400));
+    }
+
+    // Find the campaign
+    const campaign = await Campaign.findOne({
+      where: { campaignID: campaignId },
+    });
+
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    // Get the cashfree configurations associated with this campaign
+    const cashfreeConfigurations = await campaign.getPayment({
+      attributes: [
+        "id",
+        "name",
+        "XClientId",
+        "XClientSecret",
+        "provider",
+        "createdAt",
+        "updatedAt",
+      ],
+    });
+
+    if (!cashfreeConfigurations || cashfreeConfigurations.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No Cashfree configuration found for this campaign",
+        configurations: [],
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: cashfreeConfigurations.length,
+      configurations: cashfreeConfigurations,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
 // assign cashfree configuration to campaign
 const assignCashfreeConfigToCampaign = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
@@ -312,4 +362,5 @@ module.exports = {
   getAllCashfreeConfig,
   assignCashfreeConfigToCampaign,
   removeCashfreeConfigFromCampaign,
+  getCampaignCashfreeConfig
 };
