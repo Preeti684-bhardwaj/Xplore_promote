@@ -173,7 +173,7 @@ const getAllCashfreeConfig = asyncHandler(async (req, res, next) => {
 // get cashfree configuration for a specific campaign
 const getCampaignCashfreeConfig = asyncHandler(async (req, res, next) => {
   try {
-    const campaignId = req.param.campaignId;
+    const campaignId = req.params.campaignId;
 
     // Validate required parameter
     if (!campaignId) {
