@@ -9,6 +9,8 @@ const crypto = require("crypto");
 const cashfreeWebhook = asyncHandler(async (req, res, next) => {
   try {
     const webhookData = req.body;
+
+    console.log("Received webhook data:", webhookData);
     // const signature = req.headers["x-webhook-signature"];
 
     // // Verify webhook signature
