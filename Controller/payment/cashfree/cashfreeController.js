@@ -133,7 +133,7 @@ const createCashfreeCheckout = asyncHandler(async (req, res, next) => {
     // Prepare notification URL
     const notifyUrl =
       process.env.NOTIFICATION_URL ||
-      "http://localhost:9190/api/v1/payment/cashfree/webhook";
+      "https://xplr.live/api/v1/payment/cashfree/webhook";
 
     // Prepare return URL
     const redirectUrl =

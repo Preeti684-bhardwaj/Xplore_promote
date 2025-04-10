@@ -53,6 +53,8 @@ const chatBotRouter = require("./Routes/chatRoutes");
 const {getLayoutByShortCode} = require("./Controller/getShortId");
 const {handleWebhook,webhookEvent} = require("./Controller/user/whatsapp/whatsappWebhook.js");
 const paymentRouter=require("./Routes/paymentRoutes.js");
+const collectionRouter = require("./Routes/collectionRoutes.js");
+const productRouter=require("./Routes/productRoutes.js");
 
 // Routes declaration
 app.use("/v1/auth", authRouter);
@@ -69,10 +71,12 @@ app.use("/v1/client", clientRouter);
 app.use("/v1/viewLayout/:shortCode", getLayoutByShortCode);
 app.use("/v1/font", customFontRouter);
 app.use("/v1/analytics", analyticsRouter);
-app.use("/v1/product", productImageRouter);
+app.use("/v1/product_image", productImageRouter);
 app.get("/v1/webhook", handleWebhook);
 app.post("/v1/webhook", webhookEvent);
 app.use("/v1/payment",paymentRouter);
+app.use("/v1/collection", collectionRouter);
+app.use("/v1/product",productRouter)
 
 // Middleware for error
 app.use(errorMiddleware);
