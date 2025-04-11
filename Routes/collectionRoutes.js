@@ -10,7 +10,7 @@ const { verifyEncryption } = require("../middleware/encryption");
 router.post("/", verifyJWt, authorize(["USER"]), verifySession, upload.single("image"), collectionController.createCollection);
 
 // Get all collections for authenticated user
-router.get("/", verifyEncryption, collectionController.getAllCollections);
+router.get("/", verifyEncryption, verifyJWt , collectionController.getAllCollections);
 
 // Get a specific collection by ID
 router.get("/:id", verifyJWt, authorize(["USER"]), verifySession,collectionController.getOneCollection);

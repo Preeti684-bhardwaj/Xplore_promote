@@ -60,6 +60,7 @@ exports.createCollection = async (req, res) => {
 // Get all collections
 exports.getAllCollections = async (req, res) => {
   try {
+    console.log("Fetching all collections for user:", req.user);
     const collections = await Collection.findAll({
       where: { user_id: req.user.id}, // Filter by user
       include: [{
