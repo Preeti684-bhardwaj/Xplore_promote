@@ -242,11 +242,6 @@ const cashfreeWebhook = asyncHandler(async (req, res, next) => {
 
     console.log("webhook data" , webhookData)
 
-    // Verify webhook signature
-    if (!verifyWebhookSignature(webhookData, signature , timestamp)) {
-      return next(new ErrorHandler("Invalid webhook signature", 401));
-    }
-
     // Get the order from database
     const order = await Order.findOne({
       where: { id: webhookData?.data?.order?.order_id },
@@ -257,16 +252,38 @@ const cashfreeWebhook = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Order not found", 404));
     }
 
+    const campaign = await Campaign.findOne({
+      where: { campaignID: order.campaignId },
+      include: [
+        {
+          model: CashfreeConfig,
+          as: "payment",
+          attributes: ["id", "XClientId", "XClientSecret"],
+        },
+      ],
+    });
+
+    if (!campaign) {
+      throw new Error("Campaign not found");
+    }
+
+    const cashfreeConfig = campaign.payment[0];
+
+    // Verify webhook signature
+    if (!verifyWebhookSignature(webhookData, signature , timestamp , cashfreeConfig )) {
+      return next(new ErrorHandler("Invalid webhook signature", 401));
+    }
+
     // Handle different webhook events
     switch (webhookData.type) {
       case "PAYMENT_SUCCESS_WEBHOOK":
-        await handleOrderPaid(order, webhookData.data);
+        await handleOrderPaid(order, webhookData.data , cashfreeConfig);
         break;
       case "PAYMENT_FAILED_WEBHOOK":
-        await handlePaymentFailed(order, webhookData.data);
+        await handlePaymentFailed(order, webhookData.data , cashfreeConfig);
         break;
       case "PAYMENT_USER_DROPPED_WEBHOOK":
-        await handlePaymentDropped(order, webhookData.data);
+        await handlePaymentDropped(order, webhookData.data , cashfreeConfig);
         break;
       default:
         console.log(`Unhandled event type: ${webhookData.event_type}`);
@@ -283,9 +300,9 @@ const cashfreeWebhook = asyncHandler(async (req, res, next) => {
 /**
  * Verify webhook signature
  */
-const verifyWebhookSignature = (webhookData, signature , timestamp) => {
+const verifyWebhookSignature = (webhookData, signature , timestamp ,cashfreeConfig) => {
   try {
-    const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET;
+    const webhookSecret = cashfreeConfig.XClientSecret;
     if (!webhookSecret || !signature) {
       return false;
     }
