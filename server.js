@@ -55,7 +55,7 @@ async function startServer() {
     }
 
     // Sync database
-    await db.sequelize.sync({ alter: true });
+    await db.sequelize.sync({ force: false });
     console.log("Database synchronized successfully");
 
     // Start HTTP server

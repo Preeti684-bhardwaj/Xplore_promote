@@ -80,7 +80,8 @@ db.InventoryLocation = require("../Modals/inventoryLocationModal.js")(
   sequelize,
   Sequelize
 );
-
+db.ShippingDetail = require("../Modals/shippingDetailsModal.js")(sequelize , Sequelize)
+db.FailedRefunds = require("../Modals/failedRefundModel.js")(sequelize , Sequelize)
 
 
 // Define relationships
@@ -406,6 +407,37 @@ db.Product.belongsToMany(db.Tag, {
   otherKey: "tag_id",
 });
 
+db.Product.hasMany(db.order , { foreignKey: 'productId' } )
+db.order.belongsTo(db.Product , { foreignKey: "productId"} )
+db.ProductVariant.hasMany(db.order , { foreignKey: "variantId"})
+db.order.belongsTo(db.ProductVariant , { foreignKey: "variantId"})
+db.order.hasOne(db.ShippingDetail, { foreignKey: 'orderId' });
+db.ShippingDetail.belongsTo(db.order, { foreignKey: 'orderId' });
+
+// Coupon relationships
+// db.Coupon.hasMany(db.CouponUsage, { foreignKey: 'couponId', as: 'usages' });
+// db.Coupon.hasMany(db.CouponProduct, { foreignKey: 'couponId', as: 'applicableProducts' });
+// db.Coupon.hasMany(db.CouponCategory, { foreignKey: 'couponId', as: 'applicableCategories' });
+// db.Coupon.belongsTo(db.users, { foreignKey: 'userId', as: 'creator' });
+// db.Coupon.hasMany(db.order, { foreignKey: 'couponId', as: 'orders' });
+
+// db.CouponUsage.belongsTo(db.Coupon, { foreignKey: 'couponId', as: 'coupon' });
+// db.CouponUsage.belongsTo(db.users, { foreignKey: 'userId', as: 'user' });
+
+// db.CouponProduct.belongsTo(db.Coupon, { foreignKey: 'couponId', as: 'coupon' });
+// db.CouponProduct.belongsTo(db.Product, { foreignKey: 'productId', as: 'product' });
+
+// db.CouponCategory.belongsTo(db.Coupon, { foreignKey: 'couponId', as: 'coupon' });
+// db.CouponCategory.belongsTo(db.Collection, { foreignKey: 'categoryId', as: 'category' });
+
+// // Order relationships
+// // db.order.belongsTo(db.Coupon, { foreignKey: 'couponId', as: 'coupon', onDelete: 'SET NULL' });
+
+// // User as coupon creator
+// db.users.hasMany(db.Coupon, { foreignKey: 'userId', as: 'coupons' });
+
+
+
 // A variant belongs to a product
 db.ProductVariant.belongsTo(db.Product, { foreignKey: "product_id" });
 
@@ -439,6 +471,17 @@ db.Attribute.belongsToMany(db.ProductVariant, {
   otherKey: "variant_id",
 });
 
+db.order.belongsTo(db.Inventory, { foreignKey: 'inventoryId' });
+
 // A location can have many inventories
 db.InventoryLocation.hasMany(db.Inventory, { foreignKey: "location_id" });
+
+db.order.hasOne(db.FailedRefunds, { foreignKey: 'orderId', as: 'failedRefund'});
+db.FailedRefunds.belongsTo(db.order, { foreignKey: 'orderId', as: 'order'});
+
 module.exports = db;
+
+
+
+
+

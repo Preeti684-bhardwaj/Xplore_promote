@@ -10,11 +10,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       currency: {
-        type: DataTypes.DATE,
+        type: DataTypes.STRING,
         allowNull: false,
       },
       method:{
-        type: DataTypes.STRING,
+        type: DataTypes.JSON,
         allowNull: false,
       },
       status:{
@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       productDetails:{
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       paymentDetails: {
         type: DataTypes.JSON
