@@ -80,8 +80,13 @@ db.InventoryLocation = require("../Modals/inventoryLocationModal.js")(
   sequelize,
   Sequelize
 );
-db.ShippingDetail = require("../Modals/shippingDetailsModal.js")(sequelize , Sequelize)
-db.FailedRefunds = require("../Modals/failedRefundModel.js")(sequelize , Sequelize)
+db.ShippingDetail = require("../Modals/shippingDetailsModal.js")(sequelize, Sequelize)
+db.FailedRefunds = require("../Modals/failedRefundModel.js")(sequelize, Sequelize)
+db.saasPlan = require("../Modals/saasPlanModal.js")(sequelize, Sequelize)
+db.subscriptionPlan = require("../Modals/saasSubscriptionModal.js")(sequelize, Sequelize)
+db.userSubscription = require("../Modals/userSubscriptionModal.js")(sequelize, Sequelize)
+db.saasOrder = require("../Modals/saasOrderModal.js")(sequelize, Sequelize)
+db.saasTransaction = require("../Modals/saasTransactionModal.js")(sequelize, Sequelize)
 
 
 // Define relationships
@@ -380,7 +385,7 @@ db.users.hasMany(db.Collection, {
 
 // A collection belongs to a user
 db.Collection.belongsTo(db.users, {
-  foreignKey: "user_id", 
+  foreignKey: "user_id",
   as: "user"
 });
 // Many-to-many relationship with products
@@ -407,10 +412,10 @@ db.Product.belongsToMany(db.Tag, {
   otherKey: "tag_id",
 });
 
-db.Product.hasMany(db.order , { foreignKey: 'productId' } )
-db.order.belongsTo(db.Product , { foreignKey: "productId"} )
-db.ProductVariant.hasMany(db.order , { foreignKey: "variantId"})
-db.order.belongsTo(db.ProductVariant , { foreignKey: "variantId"})
+db.Product.hasMany(db.order, { foreignKey: 'productId' })
+db.order.belongsTo(db.Product, { foreignKey: "productId" })
+db.ProductVariant.hasMany(db.order, { foreignKey: "variantId" })
+db.order.belongsTo(db.ProductVariant, { foreignKey: "variantId" })
 db.order.hasOne(db.ShippingDetail, { foreignKey: 'orderId' });
 db.ShippingDetail.belongsTo(db.order, { foreignKey: 'orderId' });
 
@@ -476,9 +481,41 @@ db.order.belongsTo(db.Inventory, { foreignKey: 'inventoryId' });
 // A location can have many inventories
 db.InventoryLocation.hasMany(db.Inventory, { foreignKey: "location_id" });
 
-db.order.hasOne(db.FailedRefunds, { foreignKey: 'orderId', as: 'failedRefund'});
-db.FailedRefunds.belongsTo(db.order, { foreignKey: 'orderId', as: 'order'});
+db.order.hasOne(db.FailedRefunds, { foreignKey: 'orderId', as: 'failedRefund' });
+db.FailedRefunds.belongsTo(db.order, { foreignKey: 'orderId', as: 'order' });
 
+db.saasPlan.hasMany(db.subscriptionPlan, { as: "subscriptionPlans" });
+db.subscriptionPlan.belongsTo(db.saasPlan, {
+  foreignKey: "saasPlanId",
+  as: "saasPlan",
+});
+
+db.users.hasMany(db.userSubscription, {
+  foreignKey: "userId",
+  as: "subscriptions"
+});
+
+db.userSubscription.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "user",
+});
+
+db.users.hasMany(db.saasOrder, {
+  foreignKey: "userId", as: "saasorders"
+});
+db.saasOrder.belongsTo(db.users, {
+  foreignKey: "userId",
+  as: "user",
+});
+
+db.saasOrder.hasMany(db.saasTransaction, {
+  foreignKey: "saasorderId",
+  as: "saastransactions",
+});
+db.saasTransaction.belongsTo(db.saasOrder, {
+  foreignKey: "saasorderId",
+  as: "saasorder",
+});
 module.exports = db;
 
 

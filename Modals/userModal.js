@@ -80,6 +80,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM("local", "apple", "google"),
       defaultValue: "local",
     },
+     isSubscribed: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+  },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   });

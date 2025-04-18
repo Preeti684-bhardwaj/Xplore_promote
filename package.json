@@ -11,7 +11,7 @@
   "dependencies": {
     "@fingerprintjs/fingerprintjs-pro-server-api": "^5.2.0",
     "@google/generative-ai": "^0.22.0",
-    "axios": "^1.7.7",
+    "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
     "cashfree-pg": "^4.3.10",
     "cors": "^2.8.5",
