@@ -6,7 +6,7 @@ const Collection = db.Collection;
 const Tag = db.Tag;
 const Inventory = db.Inventory;
 const InventoryLocation = db.InventoryLocation;
-const upload = require("../../middleware/multer");
+
 
 // Create a single product (manual creation)
 exports.createProduct = async (req, res) => {

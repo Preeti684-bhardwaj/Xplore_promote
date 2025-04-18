@@ -1,12 +1,11 @@
-const db = require("../dbConfig/db.js");
+const db = require("../../dbConfig/dbConfig");
 const Inventory = db.Inventory;
 const InventoryLocation = db.InventoryLocation;
 const ProductVariant = db.ProductVariant;
 
-// ----- Inventory Location APIs -----
 
 // Create a new inventory location
-exports.createLocation = async (req, res) => {
+const createLocation = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   
   try {
@@ -48,7 +47,7 @@ exports.createLocation = async (req, res) => {
 };
 
 // Get all inventory locations
-exports.getAllLocations = async (req, res) => {
+const getAllLocations = async (req, res) => {
   try {
     const locations = await InventoryLocation.findAll({
       order: [['name', 'ASC']]
@@ -71,7 +70,7 @@ exports.getAllLocations = async (req, res) => {
 };
 
 // Get a single inventory location
-exports.getOneLocation = async (req, res) => {
+const getOneLocation = async (req, res) => {
   try {
     const locationId = req.params.id;
     
@@ -113,7 +112,7 @@ exports.getOneLocation = async (req, res) => {
 };
 
 // Update an inventory location
-exports.updateLocation = async (req, res) => {
+const updateLocation = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   
   try {
@@ -158,7 +157,7 @@ exports.updateLocation = async (req, res) => {
 };
 
 // Delete an inventory location
-exports.deleteLocation = async (req, res) => {
+const deleteLocation = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   
   try {
@@ -212,7 +211,7 @@ exports.deleteLocation = async (req, res) => {
 // ----- Inventory APIs -----
 
 // Create inventory record
-exports.createInventory = async (req, res) => {
+const createInventory = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   
   try {
@@ -298,7 +297,7 @@ exports.createInventory = async (req, res) => {
 };
 
 // Get all inventory records
-exports.getAllInventory = async (req, res) => {
+const getAllInventory = async (req, res) => {
   try {
     // Extract query parameters
     const { variant_id, location_id, low_stock } = req.query;
@@ -349,7 +348,7 @@ exports.getAllInventory = async (req, res) => {
 };
 
 // Get a single inventory record
-exports.getOneInventory = async (req, res) => {
+const getOneInventory = async (req, res) => {
   try {
     const inventoryId = req.params.id;
     
@@ -387,7 +386,7 @@ exports.getOneInventory = async (req, res) => {
 };
 
 // Update an inventory record
-exports.updateInventory = async (req, res) => {
+const updateInventory = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   
   try {
@@ -437,7 +436,7 @@ exports.updateInventory = async (req, res) => {
   }
 };
 
-exports.deleteInventory = async (req, res) => {
+const deleteInventory = async (req, res) => {
     const transaction = await db.sequelize.transaction();
     
     try {
@@ -474,3 +473,16 @@ exports.deleteInventory = async (req, res) => {
         });
       }
     };
+
+module.exports = {
+  createLocation,
+  getAllLocations,
+  getOneLocation,
+  updateLocation,
+  deleteLocation,
+  createInventory,
+  getAllInventory,
+  getOneInventory,
+  updateInventory,
+  deleteInventory
+};

@@ -55,7 +55,7 @@ const {handleWebhook,webhookEvent} = require("./Controller/user/whatsapp/whatsap
 const paymentRouter=require("./Routes/paymentRoutes.js");
 const collectionRouter = require("./Routes/collectionRoutes.js");
 const productRouter=require("./Routes/productRoutes.js");
-
+const inventoryRouter=require("./Routes/inventoryRoutes.js");
 // Routes declaration
 app.use("/v1/auth", authRouter);
 app.use("/v1/user", userRouter);
@@ -76,7 +76,8 @@ app.get("/v1/webhook", handleWebhook);
 app.post("/v1/webhook", webhookEvent);
 app.use("/v1/payment",paymentRouter);
 app.use("/v1/collection", collectionRouter);
-app.use("/v1/product",productRouter)
+app.use("/v1/product",productRouter);
+app.use("/v1/inventory", inventoryRouter);
 
 // Middleware for error
 app.use(errorMiddleware);

@@ -35,8 +35,8 @@ const createCashfreeCheckout = asyncHandler(async (req, res, next) => {
     }
     // return console.log(order);
     const productDetails = JSON.parse(order.productDetails);
-    const campaignId=order.campaignId
-    console.log("line 38",productDetails);
+    const campaignId = order.campaignId;
+    console.log("line 38", productDetails);
     // Validate product details
     if (!productDetails.price || !productDetails.name) {
       await transaction.rollback();
@@ -136,13 +136,12 @@ const createCashfreeCheckout = asyncHandler(async (req, res, next) => {
       "https://xplr.live/api/v1/payment/cashfree/webhook";
 
     // Prepare return URL
-    const redirectUrl =
-    returnUrl || "https://xplr.live/payment/status";
+    const redirectUrl = returnUrl || "https://xplr.live/payment/status";
 
     // Create Cashfree payment session
     const apiUrl =
       process.env.CASHFREE_API_URL || "https://sandbox.cashfree.com/pg/orders";
-    const apiVersion = process.env.CASHFREE_API_VERSION || "2022-09-01";
+    const apiVersion = process.env.ICASHFREE_API_VERSON || "2022-09-01";
 
     const paymentData = {
       order_id: orderId,
@@ -321,7 +320,7 @@ const getPaymentStatus = asyncHandler(async (req, res, next) => {
       data: {
         order_id: orderId,
         order_status: response.data.order_status,
-        order_token:response.data.order_token,
+        order_token: response.data.order_token,
         order_amount: response.data.order_amount,
         payment_details: response.data.payments || [],
       },
@@ -360,6 +359,7 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
     if (!order) {
       return next(new ErrorHandler("Order not found", 404));
     }
+console.log();
 
     // Verify order token if provided
     if (
