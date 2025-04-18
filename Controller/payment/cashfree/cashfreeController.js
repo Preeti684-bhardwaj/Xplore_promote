@@ -351,16 +351,30 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Order ID is required", 400));
     }
 
-    // Find the order
+    // Find the order with associated data
     const order = await Order.findOne({
       where: { id: order_id },
+      include: [
+        {
+          model: db.Product,
+          attributes: ['id', 'name', 'description', 'images', 'type', 'vendor', 'status'],
+        },
+        {
+          model: db.ProductVariant,
+          attributes: ['id', 'images', 'barcode', 'price', 'compare_at_price', 'weight', 'weight_unit'],
+        },
+        {
+          model: db.ShippingDetail,
+          attributes: ['id', 'name', 'address', 'city', 'pincode', 'contry', 'phone', 'pickupPincode'],
+        }
+      ]
     });
 
     if (!order) {
       return next(new ErrorHandler("Order not found", 404));
     }
 
-    console.log("i am coming from line 362",order);
+    console.log("i am coming from line 362", order);
 
     // Verify order token if provided
     if (
@@ -382,8 +396,11 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
       data: {
         order_id: order.id,
         order_status: order.status,
-        payment_status:order.paymentDetails.order_status,
+        payment_status: order.paymentDetails?.order_status,
         payment_details: order.paymentDetails,
+        product: order.Product || null,
+        variant: order.ProductVariant || null,
+        shipping_details: order.ShippingDetail || null,
         transaction: transaction
           ? {
               status: transaction.status,
