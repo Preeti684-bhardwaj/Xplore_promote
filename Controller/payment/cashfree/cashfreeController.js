@@ -359,7 +359,7 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
     if (!order) {
       return next(new ErrorHandler("Order not found", 404));
     }
-console.log(order);
+    console.log("i am coming from line 362",order);
 
     // Verify order token if provided
     if (
