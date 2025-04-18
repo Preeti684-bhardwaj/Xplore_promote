@@ -351,7 +351,7 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Order ID is required", 400));
     }
 
-    // Find the order with associated data
+    // Find the order with associated data, including transaction
     const order = await Order.findOne({
       where: { id: order_id },
       include: [
@@ -366,6 +366,13 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
         {
           model: db.ShippingDetail,
           attributes: ['id', 'name', 'address', 'city', 'pincode', 'contry', 'phone', 'pickupPincode'],
+        },
+        {
+          model: db.transaction,
+          as: 'transaction',
+          attributes: ['status', 'amount', 'method', 'createdAt'],
+          limit: 1,
+          order: [['createdAt', 'DESC']]
         }
       ]
     });
@@ -374,7 +381,7 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("Order not found", 404));
     }
 
-    console.log("i am coming from line 362", order);
+    // console.log("i am coming from line 362", order);
 
     // Verify order token if provided
     if (
@@ -384,12 +391,6 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
     ) {
       return next(new ErrorHandler("Invalid order token", 401));
     }
-
-    // Get the latest transaction for this order
-    const transaction = await db.transaction.findOne({
-      where: { orderId: order_id },
-      order: [["createdAt", "DESC"]],
-    });
 
     return res.status(200).json({
       success: true,
@@ -401,14 +402,7 @@ const getOrderStatus = asyncHandler(async (req, res, next) => {
         product: order.Product || null,
         variant: order.ProductVariant || null,
         shipping_details: order.ShippingDetail || null,
-        transaction: transaction
-          ? {
-              status: transaction.status,
-              amount: transaction.amount,
-              method: transaction.method,
-              date: transaction.createdAt,
-            }
-          : null,
+        transaction: order.transaction || null,
       },
     });
   } catch (error) {
