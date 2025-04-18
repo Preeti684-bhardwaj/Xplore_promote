@@ -157,6 +157,7 @@ exports.createProduct = async (req, res) => {
               {
                 name: invData.location.name,
                 address: invData.location.address,
+                pincode: invData.location.pincode,
                 is_active:
                   invData.location.is_active !== undefined
                     ? invData.location.is_active

@@ -58,6 +58,8 @@ const registerUser = asyncHandler(async (req, res, next) => {
       return next(new ErrorHandler("All required fields must be filled", 400));
     }
 
+    console.log("Riched 1")
+
     // Validate input fields
     if (!name) {
       return next(new ErrorHandler("Name is missing", 400));
@@ -173,6 +175,8 @@ const registerUser = asyncHandler(async (req, res, next) => {
     const userData = await User.findByPk(user.id, {
       attributes: ["id", "name", "email", "isEmailVerified"],
     });
+
+    console.log("Riched 2")
 
     return res.status(201).json({
       success: true,

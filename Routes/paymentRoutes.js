@@ -3,6 +3,8 @@ const router = express.Router();
 const { verifyJWt,verifyAdmin,verifyEndUser,verifySession,authorize } = require("../middleware/auth");
 const { getCampaignCashfreeConfig } = require("../Controller/payment/cashfree/configController.js");
 const { 
+  buyNow,
+  orderSummery,
   createOrder, 
   getOrderById, 
   getUserOrders 
@@ -30,8 +32,19 @@ const {
   cashfreeWebhook 
 } = require("../Controller/payment/cashfree/cashfreeWebookHandler.js");
 
+const {
+  validateBuyNow,
+  validateCreateOrder,
+  validateOrderSummery
+} = require("../validators/orderPaymentValidator.js")
+
+
+//-------------------Pre-Checkout----------------------------
+router.post("/buy-now" , verifyEndUser , validateBuyNow ,  buyNow)
+router.post("/order-summery" , verifyEndUser , validateOrderSummery, orderSummery)
+
 // ---------------------Order routes--------------------------------
-router.post("/order", verifyEndUser,createOrder);
+router.post("/order", verifyEndUser, validateCreateOrder , createOrder);
 router.get("/order/:id", verifyEndUser, getOrderById);
 router.get("/orders", verifyEndUser, getUserOrders);
 
