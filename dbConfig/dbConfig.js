@@ -481,6 +481,17 @@ db.order.belongsTo(db.Inventory, { foreignKey: 'inventoryId' });
 // A location can have many inventories
 db.InventoryLocation.hasMany(db.Inventory, { foreignKey: "location_id" });
 
+db.users.hasMany(db.InventoryLocation, {
+  foreignKey: "user_id",
+  as: "users"
+});
+
+// A collection belongs to a user
+db.InventoryLocation.belongsTo(db.users, {
+  foreignKey: "user_id",
+  as: "user"
+});
+
 db.order.hasOne(db.FailedRefunds, { foreignKey: 'orderId', as: 'failedRefund' });
 db.FailedRefunds.belongsTo(db.order, { foreignKey: 'orderId', as: 'order' });
 

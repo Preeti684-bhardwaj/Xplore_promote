@@ -56,6 +56,7 @@ const paymentRouter=require("./Routes/paymentRoutes.js");
 const collectionRouter = require("./Routes/collectionRoutes.js");
 const productRouter=require("./Routes/productRoutes.js");
 const inventoryRouter=require("./Routes/inventoryRoutes.js");
+const tagsRouter=require("./Routes/tagRoutes.js")
 const subscriptionRouter = require("./Routes/subscriptionRoutes.js");
 
 // Routes declaration
@@ -80,6 +81,7 @@ app.use("/v1/payment",paymentRouter);
 app.use("/v1/collection", collectionRouter);
 app.use("/v1/product",productRouter);
 app.use("/v1/inventory", inventoryRouter);
+app.use("/v1/tags", tagsRouter);
 app.use("/v1/subscription", subscriptionRouter);
 // Middleware for error
 app.use(errorMiddleware);

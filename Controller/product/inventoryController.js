@@ -1,3 +1,4 @@
+const { where } = require("sequelize");
 const db = require("../../dbConfig/dbConfig");
 const Inventory = db.Inventory;
 const InventoryLocation = db.InventoryLocation;
@@ -9,8 +10,8 @@ const createLocation = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   
   try {
-    const { name, address, is_active } = req.body;
-    
+    const { name, address, is_active ,pincode , city, state,phone} = req.body;
+    const userId = req.user.id;
     // Validate required fields
     if (!name) {
       await transaction.rollback();
@@ -19,12 +20,31 @@ const createLocation = async (req, res) => {
         message: "Location name is required"
       });
     }
+
+    // Check for duplicate location name
+    const existingLocation = await InventoryLocation.findOne({
+      where: { pincode: pincode.trim() },
+      transaction
+    });
+    
+    if (existingLocation) {
+      await transaction.rollback();
+      return res.status(409).json({
+        success: false,
+        message: 'Location with this pincode already exists'
+      });
+    }
     
     // Create location record
     const newLocation = await InventoryLocation.create({
       name,
       address,
-      is_active: is_active !== undefined ? is_active : true
+      is_active: is_active !== undefined ? is_active : true,
+      pincode,
+      city,
+      state,
+      phone,
+      user_id: userId
     }, { transaction });
     
     await transaction.commit();
@@ -49,7 +69,11 @@ const createLocation = async (req, res) => {
 // Get all inventory locations
 const getAllLocations = async (req, res) => {
   try {
+    const userId = req.user.id;
     const locations = await InventoryLocation.findAll({
+      where: {
+        user_id: userId
+      },
       order: [['name', 'ASC']]
     });
     
@@ -73,7 +97,7 @@ const getAllLocations = async (req, res) => {
 const getOneLocation = async (req, res) => {
   try {
     const locationId = req.params.id;
-    
+    const userId = req.user.id;
     const location = await InventoryLocation.findByPk(locationId, {
       include: [
         { 
@@ -87,7 +111,12 @@ const getOneLocation = async (req, res) => {
         }
       ]
     });
-    
+    if(location.user_id !== req.user.id){
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access this location"
+      });
+    }
     if (!location) {
       return res.status(404).json({
         success: false,
@@ -117,7 +146,7 @@ const updateLocation = async (req, res) => {
   
   try {
     const locationId = req.params.id;
-    const { name, address, is_active } = req.body;
+    const {  name, address, is_active ,pincode , city, state,phone} = req.body;
     
     // Find location to update
     const location = await InventoryLocation.findByPk(locationId);
@@ -134,7 +163,11 @@ const updateLocation = async (req, res) => {
     await location.update({
       name: name || location.name,
       address: address !== undefined ? address : location.address,
-      is_active: is_active !== undefined ? is_active : location.is_active
+      is_active: is_active !== undefined ? is_active : location.is_active,
+      pincode: pincode !== undefined ? pincode : location.pincode,
+      city: city !== undefined ? city : location.city,
+      state: state !== undefined ? state : location.state,
+      phone: phone !== undefined ? phone : location.phone
     }, { transaction });
     
     await transaction.commit();
@@ -215,7 +248,7 @@ const createInventory = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   
   try {
-    const { variant_id, location_id, quantity } = req.body;
+    const { variant_id, location_id, reservedQuantity ,quantity } = req.body;
     
     // Validate required fields
     if (!variant_id || !location_id) {
@@ -266,7 +299,8 @@ const createInventory = async (req, res) => {
     const newInventory = await Inventory.create({
       variant_id,
       location_id,
-      quantity: quantity || 0
+      quantity: quantity || 0,
+      reservedQuantity: reservedQuantity || 0 
     }, { transaction });
     
     await transaction.commit();

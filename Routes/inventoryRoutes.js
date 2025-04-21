@@ -7,16 +7,16 @@ const { verifyEncryption } = require("../middleware/encryption");
 
 
 // Create a single product
-router.post('/location/',verifyJWt, authorize(["USER"]), verifySession , inventoryController.createLocation);
+router.post('/location',verifyJWt, authorize(["USER"]), verifySession , inventoryController.createLocation);
 
 // Bulk create products
 // router.post('/bulk', verifyJWt, authorize(["USER"]), verifySession ,productController.bulkCreateProducts);
 
 // Get all products with filtering options
-router.get('/location/', verifyEncryption,  inventoryController.getAllLocations);
+router.get('/location', verifyJWt, authorize(["USER"]), verifySession, inventoryController.getAllLocations);
 
 // Get a single product by ID
-router.get('/location/:id', verifyEncryption, inventoryController.updateLocation);
+router.get('/location/:id', verifyJWt, authorize(["USER"]), verifySession, inventoryController.updateLocation);
 
 // Update a product
 router.put('/location/:id', verifyJWt, authorize(["USER"]), verifySession,inventoryController.updateLocation);
@@ -33,7 +33,7 @@ router.post('/',verifyJWt, authorize(["USER"]), verifySession , inventoryControl
 
 // Get all products with filtering options
 router.get('/', verifyJWt, authorize(["USER"]), verifySession,  inventoryController.getAllInventory);
-
+ 
 // Get a single product by ID
 router.get('/:id', verifyJWt, authorize(["USER"]), verifySession,  inventoryController.getOneInventory);
 

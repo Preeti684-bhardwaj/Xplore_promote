@@ -6,6 +6,7 @@ const Collection = db.Collection;
 const Tag = db.Tag;
 const Inventory = db.Inventory;
 const InventoryLocation = db.InventoryLocation;
+const { Op } = require("sequelize");
 
 
 // Create a single product (manual creation)
@@ -13,7 +14,7 @@ exports.createProduct = async (req, res) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    // Extract basic product info
+    // Extract basic product info from individual form fields
     const {
       name,
       description,
@@ -22,29 +23,61 @@ exports.createProduct = async (req, res) => {
       status,
       seo_title,
       seo_description,
+      // Arrays will come as comma-separated strings in form data
       collections,
       tags,
-      variants,
+      // Parse variants JSON string
+      variants
     } = req.body;
+
+    // Parse the variants array if it exists
+    let variantsArray = [];
+    try {
+      variantsArray = variants ? JSON.parse(variants) : [];
+    } catch (error) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid variants data format. Expected valid JSON array."
+      });
+    }
 
     // Validate required fields
     if (!name) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: "Product name is required",
+        message: "Product name is required"
       });
     }
 
-    // Upload images if present (using multer middleware)
+    // Validate collections - parse from comma-separated string to array
+    const collectionIds = collections ? collections.split(',').map(id => id.trim()) : [];
+    if (!collectionIds.length) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "At least one collection ID must be provided"
+      });
+    }
+
+    // Process main product images
     let productImages = [];
-    if (req.files && req.files.length > 0) {
-      const uploadedImages = await uploadFiles(req.files);
-      productImages = uploadedImages;
+    if (req.files && req.files.images) {
+      try {
+        productImages = await uploadFiles(req.files.images);
+      } catch (uploadError) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Failed to upload product images",
+          error: uploadError.message
+        });
+      }
     }
 
     // Create product record
-    const newProduct = await Product.create(
+    const newProduct = await db.Product.create(
       {
         name,
         description,
@@ -54,159 +87,320 @@ exports.createProduct = async (req, res) => {
         seo_title,
         seo_description,
         images: productImages,
+        user_id: req.user.id // Associate product with current user
       },
       { transaction }
     );
 
-    // Process collections if provided
-    if (!collections || collections.length === 0) {
+    // Process collections by checking they exist and belong to the user
+    const foundCollections = await db.Collection.findAll({
+      where: {
+        id: { [Op.in]: collectionIds },
+        user_id: req.user.id,
+      },
+      transaction
+    });
+
+    const validIds = foundCollections.map(col => col.id);
+    const invalidIds = collectionIds.filter(id => !validIds.includes(id));
+
+    if (invalidIds.length > 0) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: "At least one collection ID must be provided",
+        message: `Some collection IDs are invalid or don't belong to you: ${invalidIds.join(', ')}`,
       });
     }
-
-    const collectionsArray =
-      typeof collections === "string" ? JSON.parse(collections) : collections;
-
-    const foundCollections = await Collection.findAll({
-      where: {
-        id: collectionsArray,
-        user_id: req.user.id,
-      },
-    });
 
     if (foundCollections.length === 0) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: "No valid collections found for the provided IDs",
+        message: "No valid collections found for the provided IDs"
       });
     }
 
-    await newProduct.addCollections(foundCollections, { transaction });
+    await newProduct.setCollections(foundCollections, { transaction });
 
-    // Process tags if provided
-    if (tags && tags.length > 0) {
-      // Parse tags if they came as a string
-      const tagsArray = typeof tags === "string" ? JSON.parse(tags) : tags;
-
-      // For each tag, find or create
-      for (const tagName of tagsArray) {
-        const [tag] = await Tag.findOrCreate({
-          where: { name: tagName },
-          transaction,
+    // Process tags if provided - using existing tag IDs
+    if (tags) {
+      const tagIds = tags.split(',').map(id => id.trim());
+      if (tagIds.length > 0) {
+        const foundTags = await db.Tag.findAll({
+          where: {
+            id: { [Op.in]: tagIds },
+          },
+          transaction
         });
 
-        await newProduct.addTag(tag, { transaction });
-      }
-    }
-
-    // Process variants if provided
-    if (variants && variants.length > 0) {
-      // Parse variants if they came as a string
-      const variantsArray =
-        typeof variants === "string" ? JSON.parse(variants) : variants;
-
-      // Create each variant
-      for (const variantData of variantsArray) {
-        // Validate required variant fields
-        if (!variantData.price) {
+        // Validate that all provided tag IDs are found
+        const foundTagIds = foundTags.map(tag => tag.id);
+        const invalidTagIds = tagIds.filter(id => !foundTagIds.includes(id));
+        
+        if (invalidTagIds.length > 0) {
           await transaction.rollback();
           return res.status(400).json({
             success: false,
-            message: "Price is required for all variants",
+            message: `Some tag IDs are invalid: ${invalidTagIds.join(', ')}`
           });
         }
 
-        const newVariant = await ProductVariant.create(
+        await newProduct.setTags(foundTags, { transaction });
+      }
+    }
+
+    // Validate variants
+    if (!variantsArray.length) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "At least one product variant must be provided"
+      });
+    }
+
+    // Process each variant
+    for (let i = 0; i < variantsArray.length; i++) {
+      const variantData = variantsArray[i];
+      
+      // Validate required variant fields
+      if (!variantData.price && variantData.price !== 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Price is required for variant ${i + 1}`
+        });
+      }
+
+      if (isNaN(parseFloat(variantData.price)) || parseFloat(variantData.price) < 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Price must be a valid positive number for variant ${i + 1}`
+        });
+      }
+
+      if (variantData.compare_at_price && 
+          (isNaN(parseFloat(variantData.compare_at_price)) || 
+           parseFloat(variantData.compare_at_price) < 0)) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Compare at price must be a valid positive number for variant ${i + 1}`
+        });
+      }
+
+      // Process variant images if any
+      let variantImages = [];
+      if (req.files && req.files[`variant_images_${i}`]) {
+        try {
+          variantImages = await uploadFiles(req.files[`variant_images_${i}`]);
+        } catch (uploadError) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Failed to upload images for variant ${i + 1}`,
+            error: uploadError.message
+          });
+        }
+      }
+
+      // Create the variant
+      const newVariant = await db.ProductVariant.create(
+        {
+          product_id: newProduct.id,
+          price: variantData.price,
+          compare_at_price: variantData.compare_at_price,
+          barcode: variantData.barcode,
+          weight: variantData.weight,
+          weight_unit: variantData.weight_unit || "g",
+          requires_shipping: variantData.requires_shipping !== undefined ? 
+                            variantData.requires_shipping : true,
+          is_taxable: variantData.is_taxable !== undefined ? 
+                      variantData.is_taxable : true,
+          is_active: variantData.is_active !== undefined ? 
+                    variantData.is_active : true,
+          images: variantImages
+        },
+        { transaction }
+      );
+
+      // Process variant attributes if provided - CREATE NEW ATTRIBUTES
+      if (variantData.attributes && Array.isArray(variantData.attributes) && 
+          variantData.attributes.length > 0) {
+        
+        const createdAttributes = [];
+        
+        // Process each attribute
+        for (const attrData of variantData.attributes) {
+          // Validate the attribute data
+          if (!attrData.name) {
+            await transaction.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `Attribute name is required for variant ${i + 1}`
+            });
+          }
+          
+          if (!attrData.display_name) {
+            await transaction.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `Attribute display_name is required for variant ${i + 1}`
+            });
+          }
+          
+          // Check if attribute with the same name already exists to avoid duplicates
+          let attribute = await db.Attribute.findOne({
+            where: { name: attrData.name },
+            transaction
+          });
+          
+          // If attribute doesn't exist, create it
+          if (!attribute) {
+            attribute = await db.Attribute.create({
+              name: attrData.name,
+              display_name: attrData.display_name,
+              type: attrData.type || "string"
+            }, { transaction });
+          }
+          
+          createdAttributes.push(attribute);
+        }
+        
+        // Associate attributes with the variant
+        await newVariant.setAttributes(createdAttributes, { transaction });
+      }
+
+      // Process inventory for this variant
+      if (!variantData.inventory || !Array.isArray(variantData.inventory) || 
+          variantData.inventory.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Inventory data is required for variant ${i + 1}`
+        });
+      }
+      
+      // Process each inventory entry
+      for (const invData of variantData.inventory) {
+        // Check if required inventory data is provided
+        if (!invData.location_id) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Location ID is required for inventory in variant ${i + 1}`
+          });
+        }
+
+        if (invData.quantity === undefined || invData.quantity === null) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Quantity is required for inventory in variant ${i + 1}`
+          });
+        }
+
+        if (isNaN(parseInt(invData.quantity)) || parseInt(invData.quantity) < 0) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Quantity must be a valid non-negative integer for variant ${i + 1}`
+          });
+        }
+
+        // Verify location exists and belongs to current user
+        const location = await db.InventoryLocation.findOne({
+          where: {
+            id: invData.location_id,
+            user_id: req.user.id
+          },
+          transaction
+        });
+
+        if (!location) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Inventory location with ID ${invData.location_id} not found or doesn't belong to you`
+          });
+        }
+
+        // Create inventory record
+        await db.Inventory.create(
           {
-            product_id: newProduct.id,
-            price: variantData.price,
-            compare_at_price: variantData.compare_at_price,
-            barcode: variantData.barcode,
-            weight: variantData.weight,
-            weight_unit: variantData.weight_unit,
-            requires_shipping: variantData.requires_shipping,
-            is_taxable: variantData.is_taxable,
-            is_active:
-              variantData.is_active !== undefined
-                ? variantData.is_active
-                : true,
-            images: variantData.images || [],
+            variant_id: newVariant.id,
+            location_id: invData.location_id,
+            quantity: parseInt(invData.quantity)
           },
           { transaction }
         );
-
-        // If inventory is provided for this variant
-        if (variantData.inventory && variantData.inventory.length > 0) {
-          for (const invData of variantData.inventory) {
-            // Check if location exists
-            // Expect invData.location to be { name, address, is_active }
-            if (!invData.location || !invData.location.name) {
-              await transaction.rollback();
-              return res.status(400).json({
-                success: false,
-                message: "Location name is required in inventory data",
-              });
-            }
-
-            // Create new location record
-            const location = await InventoryLocation.create(
-              {
-                name: invData.location.name,
-                address: invData.location.address,
-                pincode: invData.location.pincode,
-                is_active:
-                  invData.location.is_active !== undefined
-                    ? invData.location.is_active
-                    : true,
-              },
-              { transaction }
-            );
-
-            // Create inventory record
-            await Inventory.create(
-                {
-                  variant_id: newVariant.id,
-                  location_id: location.id,
-                  quantity: invData.quantity || 0,
-                },
-                { transaction }
-              );
-          }
-        }
       }
     }
 
     await transaction.commit();
 
     // Fetch the complete product with all associations for the response
-    const completeProduct = await Product.findByPk(newProduct.id, {
+    const completeProduct = await db.Product.findByPk(newProduct.id, {
       include: [
-        { model: Collection, attributes: ["id", "name"], through: { attributes: [] }, },
-        { model: Tag, through: { attributes: [] } },
-        {
-          model: ProductVariant,
-          include: [{ model: Inventory, include: [InventoryLocation] }],
+        { 
+          model: db.Collection, 
+          attributes: ["id", "name"], 
+          through: { attributes: [] } 
         },
-      ],
+        { 
+          model: db.Tag, 
+          attributes: ["id", "name"], 
+          through: { attributes: [] } 
+        },
+        {
+          model: db.ProductVariant,
+          include: [
+            { 
+              model: db.Inventory, 
+              include: [db.InventoryLocation] 
+            },
+            {
+              model: db.Attribute,
+              through: { attributes: [] }
+            }
+          ]
+        }
+      ]
     });
 
     return res.status(201).json({
       success: true,
       message: "Product created successfully",
-      data: completeProduct,
+      data: completeProduct
     });
   } catch (error) {
-    await transaction.rollback();
+    // Make sure to rollback if error occurs
+    if (transaction) {
+      await transaction.rollback();
+    }
     console.error("Error creating product:", error);
+
+    // Send appropriate error response based on error type
+    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: error.errors.map(e => ({ field: e.path, message: e.message }))
+      });
+    }
+
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid relationship reference",
+        error: error.message
+      });
+    }
 
     return res.status(500).json({
       success: false,
       message: "Failed to create product",
-      error: error.message,
+      error: error.message
     });
   }
 };
