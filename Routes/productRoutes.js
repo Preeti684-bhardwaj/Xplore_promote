@@ -15,10 +15,10 @@ router.post('/',verifyJWt, authorize(["USER"]), verifySession ,upload.array('ima
 router.post('/bulk', verifyJWt, authorize(["USER"]), verifySession ,productController.bulkCreateProducts);
 
 // Get all products with filtering options
-router.get('/', verifyEncryption,  productController.getAllProducts);
+router.get('/', productController.getAllProducts);
 
 // Get a single product by ID
-router.get('/:id', verifyEncryption, productController.getOneProduct);
+router.get('/:id', productController.getOneProduct);
 
 // Update a product
 router.put('/:id', verifyJWt, authorize(["USER"]), verifySession,  upload.array('images'), productController.updateProduct);
