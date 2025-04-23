@@ -597,6 +597,58 @@ const getAllChatbotConfig = asyncHandler(async (req, res, next) => {
   }
 });
 
+// get chatbot configuration for a specific campaign
+const getCampaignChatbotConfig = asyncHandler(async (req, res, next) => {
+  try {
+    const campaignId = req.params.campaignId;
+
+    // Validate required parameter
+    if (!campaignId) {
+      return next(new ErrorHandler("Campaign ID is required", 400));
+    }
+
+    // Find the campaign
+    const campaign = await Campaign.findOne({
+      where: { campaignID: campaignId },
+    });
+
+    if (!campaign) {
+      return next(new ErrorHandler("Campaign not found", 404));
+    }
+
+    // Get the chatbot configurations associated with this campaign
+    const chatbotConfiguration = await ChatBotConfig.findOne({
+      where: { campaignId: campaignId },
+      attributes: [
+        "id",
+        "name",
+        "provider",
+        "base_prompt",
+        "api_key",
+        "otherDetails",
+        "json_file",
+        "createdAt",
+        "updatedAt",
+      ],
+    });
+
+    if (!chatbotConfiguration) {
+      return res.status(200).json({
+        success: true,
+        message: "No chatbot configuration found for this campaign",
+        configuration: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      configuration: chatbotConfiguration,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
 // assign chatbot configuration to campaign
 const assignChatbotToCampaign = asyncHandler(async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
@@ -748,6 +800,8 @@ const removeChatbotFromCampaign = asyncHandler(async (req, res, next) => {
   }
 });
 
+
+
 module.exports = {
   // getCsvFile,
   getJsonQuestion,
@@ -755,5 +809,6 @@ module.exports = {
   createChatbotConfig,
   getAllChatbotConfig,
   assignChatbotToCampaign,
-  removeChatbotFromCampaign
+  removeChatbotFromCampaign,
+  getCampaignChatbotConfig
 };
