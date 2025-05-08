@@ -48,6 +48,9 @@ passport.use("jwt", strategy);
 // Server initialization
 async function startServer() {
   try {
+    app.get("/health", (req, res) => {
+      res.status(200).send("OK");
+    });
     // Test database connection
     const isConnected = await testConnection(db.sequelize);
     if (!isConnected) {
