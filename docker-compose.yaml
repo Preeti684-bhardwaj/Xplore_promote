@@ -20,7 +20,7 @@ services:
       POSTGRES_PASSWORD: ${PASSWORD}
       POSTGRES_DB: ${DATABASE}
     ports:
-      - "5436:5432"
+      - "25060:25060"
     networks:
       - app-network
     volumes:

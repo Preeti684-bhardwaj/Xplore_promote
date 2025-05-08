@@ -1,6 +1,5 @@
 require("dotenv").config();
 
-
 const env = {
   database: process.env.DATABASE,
   username: process.env.DB_USERNAME ,
@@ -23,10 +22,10 @@ const env = {
     statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT, 10) || 30000,
     idle_in_transaction_session_timeout: parseInt(process.env.DB_IDLE_TRANSACTION_TIMEOUT, 10) || 30000,
     connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT, 10) || 30000,
-    ssl: process.env.DB_SSL === 'true' ? {
-      require: true,
-      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
-    } : false
+    ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
   },
   
   // Retry configuration
@@ -47,7 +46,7 @@ const env = {
   },
   
   // Additional options
-  port: parseInt(process.env.DB_PORT, 10) || 5432,
+  port: parseInt(process.env.DB_PORT, 10) || 25060,
   logging: (msg) => {
     if (process.env.NODE_ENV !== 'production' || process.env.DB_LOGGING === 'true') {
       console.log(`[Sequelize ${new Date().toISOString()}] ${msg}`);
@@ -82,8 +81,7 @@ const testConnection = async (sequelize) => {
       return true;
     } catch (error) {
       retries++;
-      console.error(`❌ Database connection attempt ${retries}/${maxRetries} failed:`, error.message);
-      
+      console.error(`❌ Database connection attempt ${retries}/${maxRetries} failed:`, error);
       if (retries === maxRetries) {
         console.error('❌ Maximum connection retries reached. Giving up.');
         return false;
