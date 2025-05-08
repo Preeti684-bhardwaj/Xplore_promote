@@ -48,6 +48,9 @@ passport.use("jwt", strategy);
 // Server initialization
 async function startServer() {
   try {
+    app.get("/health", (req, res) => {
+      res.status(200).send("OK");
+    });
     // Test database connection
     const isConnected = await testConnection(db.sequelize);
     if (!isConnected) {
@@ -59,8 +62,8 @@ async function startServer() {
     console.log("Database synchronized successfully");
 
     // Start HTTP server
-    const server = app.listen(process.env.PORT || 9191, () => {
-      console.log(`⚙️ Server is running at port: ${process.env.PORT || 9191}`);
+    const server = app.listen(process.env.PORT || 9190, '0.0.0.0', () => {
+      console.log(`⚙️ Server is running at port: ${process.env.PORT || 9190}`);
     });
 
     // Setup WebSocket
