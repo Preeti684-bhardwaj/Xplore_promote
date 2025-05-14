@@ -5,7 +5,7 @@ const Sequelize = require("sequelize");
 
 // Create Sequelize instance with error handling
 let sequelize;
-console.log("env data", env);
+// console.log("env data", env);
 
 try {
   sequelize = new Sequelize(env.database, env.username, env.password, {

@@ -1,40 +1,67 @@
-const Minio = require('minio');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 const path = require('path');
+require('dotenv').config();
 
-// -----------------MinIO client instance-----------------------------------
-const minioClient = new Minio.Client({
-  endPoint: process.env.ENDPOINT,
-  port: parseInt(process.env.MINIO_PORT),
-  useSSL: true,
-  accessKey: process.env.ACCESS_KEY,
-  secretKey: process.env.SECRET_KEY,
-  region: process.env.REGION
-});
+// DigitalOcean Spaces client configuration
+const createS3Client = () => {
+  // Debug log to verify environment variables
+  console.log('DigitalOcean Spaces Configuration:');
+  console.log('Endpoint:', process.env.DO_SPACES_ENDPOINT);
+  console.log('Region:', process.env.DO_SPACES_REGION);
+  console.log('Bucket Name:', process.env.DO_SPACES_BUCKET_NAME);
+  console.log('Access Key:', process.env.DO_SPACES_ACCESS_KEY ? '***configured***' : 'NOT SET');
+  console.log('Secret Key:', process.env.DO_SPACES_SECRET_KEY ? '***configured***' : 'NOT SET');
+  
+  return new S3Client({
+    endpoint: process.env.DO_SPACES_ENDPOINT, // e.g., "https://nyc3.digitaloceanspaces.com"
+    forcePathStyle: false,
+    region: process.env.DO_SPACES_REGION || "us-east-1", // Use "us-east-1" for newer spaces
+    credentials: {
+      accessKeyId: process.env.DO_SPACES_ACCESS_KEY,
+      secretAccessKey: process.env.DO_SPACES_SECRET_KEY
+    }
+  });
+};
 
-const bucketName = process.env.BUCKET_NAME;
+const s3Client = createS3Client();
+const bucketName = process.env.DO_SPACES_BUCKET_NAME;
 
-//---------------CDN configuration-----------------------------------------
+// CDN configuration
 const cdnConfig = {
-  domain: process.env.CDN_DOMAIN || process.env.ENDPOINT, // Fallback to endpoint if no CDN domain
+  domain: process.env.CDN_DOMAIN || `${bucketName}.${process.env.DO_SPACES_REGION || 'nyc3'}.digitaloceanspaces.com`,
   enabled: process.env.CDN_ENABLED === 'true' || false
 };
 
-// -----------Verify MinIO connection and bucket---------------------------
-const verifyMinioConnection = async () => {
+// Verify connection to DigitalOcean Spaces
+const verifyConnection = async () => {
   try {
-    const exists = await minioClient.bucketExists(bucketName);
-    if (!exists) {
-      throw new Error(`Bucket '${bucketName}' does not exist`);
+    // First check if bucket name is configured
+    if (!bucketName) {
+      throw new Error('Bucket name is not configured in environment variables');
     }
+    
+    const command = new ListObjectsV2Command({
+      Bucket: bucketName,
+      MaxKeys: 1
+    });
+    await s3Client.send(command);
     return true;
   } catch (error) {
-    console.error('MinIO Connection Error:', error);
-    throw new Error(`MinIO Connection Failed: ${error.message}`);
+    console.error('DigitalOcean Spaces Connection Error:', error);
+    
+    // Provide more specific error messages
+    if (error.Code === 'NoSuchBucket' || error.name === 'NoSuchBucket') {
+      throw new Error(`Bucket '${bucketName}' does not exist. Please create it in your DigitalOcean Spaces dashboard or check the bucket name in your environment variables.`);
+    } else if (error.Code === 'AccessDenied' || error.name === 'AccessDenied') {
+      throw new Error(`Access denied to bucket '${bucketName}'. Please check your credentials and permissions.`);
+    } else {
+      throw new Error(`DigitalOcean Spaces Connection Failed: ${error.message || error.Code || 'Unknown error'}`);
+    }
   }
 };
 
-// -------------Generate unique filename with sanitization-------------------------------
+// Generate unique filename with sanitization
 const generateUniqueFileName = (originalName) => {
   const timestamp = Date.now();
   const randomString = crypto.randomBytes(8).toString('hex');
@@ -43,18 +70,18 @@ const generateUniqueFileName = (originalName) => {
   return `${timestamp}-${randomString}${extension}`;
 };
 
-// -----------------URL generation------------------------------------------- 
+// Generate file URL (with or without CDN)
 const generateFileUrl = (fileName) => {
-  // If CDN is enabled, use CDN domain, otherwise fallback to original endpoint
-  const domain = cdnConfig.enabled ? cdnConfig.domain : process.env.ENDPOINT;
+  // If CDN is enabled, use CDN domain, otherwise fallback to spaces endpoint
+  const domain = cdnConfig.enabled ? cdnConfig.domain : `${bucketName}.${process.env.DO_SPACES_REGION || 'nyc3'}.digitaloceanspaces.com`;
   return `https://${domain}/${fileName}`;
 };
 
-// -----------------Upload a single file------------------------------------- 
+// Upload a single file to DigitalOcean Spaces
 const uploadFile = async (file) => {
   try {
     // Verify connection before upload
-    await verifyMinioConnection();
+    await verifyConnection();
 
     // Validate file
     if (!file || !file.buffer || !file.originalname) {
@@ -63,10 +90,16 @@ const uploadFile = async (file) => {
 
     const fileName = generateUniqueFileName(file.originalname);
     
-    const metaData = {
-      'Content-Type': file.mimetype || 'application/octet-stream',
-      'Content-Length': file.buffer.length,
-      'Original-Name': file.originalname
+    const uploadParams = {
+      Bucket: bucketName,
+      Key: fileName,
+      Body: file.buffer,
+      ContentType: file.mimetype || 'application/octet-stream',
+      ContentLength: file.buffer.length,
+      ACL: 'public-read', // Set ACL as needed for your use case
+      Metadata: {
+        'original-name': file.originalname
+      }
     };
     
     // Upload with retry mechanism
@@ -75,23 +108,19 @@ const uploadFile = async (file) => {
     
     while (attempts < maxAttempts) {
       try {
-        await minioClient.putObject(
-          bucketName,
-          fileName,
-          file.buffer,
-          metaData
-        );
+        const command = new PutObjectCommand(uploadParams);
+        await s3Client.send(command);
         break;
       } catch (error) {
         attempts++;
-        console.log("error of stack",error.stack);
-        console.log("error message",error.message);
+        console.log("error attempts:", attempts);
+        console.log("error message:", error.message);
         if (attempts === maxAttempts) throw error;
         await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
       }
     }
 
-    // Generate URL using new method
+    // Generate URL
     const fileUrl = generateFileUrl(fileName);
     
     return {
@@ -108,7 +137,7 @@ const uploadFile = async (file) => {
   }
 };
 
-// ---------------Handle multiple file uploads--------------------------------
+// Handle multiple file uploads
 const uploadFiles = async (files) => {
   if (!Array.isArray(files)) {
     throw new Error('Files must be an array');
@@ -127,21 +156,31 @@ const uploadFiles = async (files) => {
   }
 };
 
-// -------------Delete a single file from CDN--------------------------------
+// Delete a single file from DigitalOcean Spaces
 const deleteFile = async (fileName) => {
   try {
-    await verifyMinioConnection();
+    await verifyConnection();
     
     // Check if file exists before deletion
     try {
-      await minioClient.statObject(bucketName, fileName);
+      const headCommand = new HeadObjectCommand({
+        Bucket: bucketName,
+        Key: fileName
+      });
+      await s3Client.send(headCommand);
     } catch (error) {
-      if (error.code === 'NotFound') {
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
         throw new Error(`File ${fileName} not found`);
       }
       throw error;
     }
-    await minioClient.removeObject(bucketName, fileName);
+    
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: fileName
+    });
+    
+    await s3Client.send(deleteCommand);
     return true;
   } catch (error) {
     console.error('Error deleting file:', error);
@@ -149,33 +188,39 @@ const deleteFile = async (fileName) => {
   }
 };
 
-// ----------------List all files in the bucket------------------------------------
+// List all files in the bucket
 const listFiles = async (prefix = '') => {
   try {
-    await verifyMinioConnection();
+    await verifyConnection();
     
     const files = [];
-    const stream = minioClient.listObjects(bucketName, prefix, true);
+    let continuationToken = undefined;
     
-    return new Promise((resolve, reject) => {
-      stream.on('data', (obj) => {
-        files.push({
-          name: obj.name,
-          size: obj.size,
-          lastModified: obj.lastModified,
-          url: generateFileUrl(obj.name),
-          cdnEnabled: cdnConfig.enabled
+    do {
+      const command = new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: prefix,
+        ContinuationToken: continuationToken
+      });
+      
+      const response = await s3Client.send(command);
+      
+      if (response.Contents) {
+        response.Contents.forEach(obj => {
+          files.push({
+            name: obj.Key,
+            size: obj.Size,
+            lastModified: obj.LastModified,
+            url: generateFileUrl(obj.Key),
+            cdnEnabled: cdnConfig.enabled
+          });
         });
-      });
+      }
       
-      stream.on('error', (err) => {
-        reject(new Error(`Error listing files: ${err.message}`));
-      });
-      
-      stream.on('end', () => {
-        resolve(files);
-      });
-    });
+      continuationToken = response.NextContinuationToken;
+    } while (continuationToken);
+    
+    return files;
   } catch (error) {
     console.error('Error listing files:', error);
     throw new Error(`File listing failed: ${error.message}`);
@@ -186,6 +231,6 @@ module.exports = {
   uploadFile,
   uploadFiles,
   deleteFile,
-  verifyMinioConnection,
+  verifyConnection,
   listFiles
 };
