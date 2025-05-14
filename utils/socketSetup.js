@@ -3,7 +3,7 @@ const socketIO = require("socket.io");
 const allowedOrigins = [
   // "https://xplore-instant.vercel.app",
   // "https://pre.xplore.xircular.io",
-  "http://localhost:3000",
+  "http://localhost:8080",
   "http://localhost:6160",
   "https://designer.xplr.live",
   "https://xplr.live",
