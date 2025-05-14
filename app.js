@@ -10,7 +10,7 @@ const allowedOrigins = [
   "https://pre.xplore.xircular.io",
   "http://localhost:5173",
   "https://xplr.live",
-  "http://localhost:3000",
+  "http://localhost:8080",
   "http://localhost:6161",
   "https://designer.xplr.live",
   "https://xplore-campaign-app.vercel.app"
