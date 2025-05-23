@@ -23,7 +23,6 @@ const setupSocket = (server) => {
     transports: ['websocket', 'polling'] // Ensure both transports are available
   });
 
-
   io.on("connection", (socket) => {
     console.log(`New connection from ${socket.handshake.headers.origin}`);
     
