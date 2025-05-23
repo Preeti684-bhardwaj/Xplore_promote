@@ -5,6 +5,7 @@ const allowedOrigins = [
   // "https://pre.xplore.xircular.io",
   "http://localhost:8080",
   "http://localhost:6160",
+  "http://api.xplr.live",
   "https://designer.xplr.live",
   "https://xplr.live",
   "http://localhost:5173",
