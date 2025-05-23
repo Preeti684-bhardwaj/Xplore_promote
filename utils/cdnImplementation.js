@@ -5,14 +5,6 @@ require('dotenv').config();
 
 // DigitalOcean Spaces client configuration
 const createS3Client = () => {
-  // Debug log to verify environment variables
-  console.log('DigitalOcean Spaces Configuration:');
-  console.log('Endpoint:', process.env.DO_SPACES_ENDPOINT);
-  console.log('Region:', process.env.DO_SPACES_REGION);
-  console.log('Bucket Name:', process.env.DO_SPACES_BUCKET_NAME);
-  console.log('Access Key:', process.env.DO_SPACES_ACCESS_KEY ? '***configured***' : 'NOT SET');
-  console.log('Secret Key:', process.env.DO_SPACES_SECRET_KEY ? '***configured***' : 'NOT SET');
-  
   return new S3Client({
     endpoint: process.env.DO_SPACES_ENDPOINT, // e.g., "https://nyc3.digitaloceanspaces.com"
     forcePathStyle: false,

@@ -5,7 +5,6 @@ require("dotenv").config({ path: "./.env" });
 const passport = require("passport");
 const passportJWT = require("passport-jwt");
 const setupSocket = require("./utils/socketSetup.js");
-const { setupCacheRefreshScheduler } = require("./utils/CacheRefreshScheduler.js")
 
 // Global error handlers
 process.on("uncaughtException", (err) => {
@@ -51,6 +50,7 @@ async function startServer() {
     app.get("/health", (req, res) => {
       res.status(200).send("OK");
     });
+    
     // Test database connection
     const isConnected = await testConnection(db.sequelize);
     if (!isConnected) {

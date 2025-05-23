@@ -16,9 +16,12 @@ const setupSocket = (server) => {
     cors: {
       origin: allowedOrigins,
       methods: ["GET", "POST"],
+      // credentials: true // Add this if you need credentials
     },
-    path: "/socket.io/", // Make sure this matches the nginx location block
+    path: "/socket.io/",
+    transports: ['websocket', 'polling'] // Ensure both transports are available
   });
+
 
   io.on("connection", (socket) => {
     console.log(`New connection from ${socket.handshake.headers.origin}`);
