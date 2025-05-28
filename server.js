@@ -61,14 +61,14 @@ async function startServer() {
     await db.sequelize.sync({ alter: true });
     console.log("Database synchronized successfully");
 
-     // Setup WebSocket
-     const io = setupSocket(server);
-     app.set("io", io);
-
     // Start HTTP server
     const server = app.listen(process.env.PORT || 8080, '0.0.0.0', () => {
       console.log(`⚙️ Server is running at port: ${process.env.PORT || 8080}`);
     });
+
+     // Setup WebSocket
+     const io = setupSocket(server);
+     app.set("io", io);
 
     // Graceful shutdown
     const shutdown = async () => {
