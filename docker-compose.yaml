@@ -1,8 +1,8 @@
 version: '3.8'
-
 services:
   backend:
     build: ./
+    container_name: xplore-promote-app
     ports:
       - "8080:8080"
     env_file:
@@ -10,25 +10,26 @@ services:
     depends_on:
       - database
     networks:
-      - app-network
+      - promote-network
 
   database:
     image: postgres:latest
+    container_name: xplore-promote-db
     restart: always
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${PASSWORD}
       POSTGRES_DB: ${DATABASE}
     ports:
-      - "25060:25060"
+      - "5436:5432"
     networks:
-      - app-network
+      - promote-network
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_promote:/var/lib/postgresql/data
 
 networks:
-  app-network:
+  promote-network:
     driver: bridge
 
 volumes:
-  pgdata:
+  pgdata_promote:

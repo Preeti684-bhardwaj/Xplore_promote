@@ -120,4 +120,3 @@ module.exports = {
   getPlatform,
   detectOS
 };
-

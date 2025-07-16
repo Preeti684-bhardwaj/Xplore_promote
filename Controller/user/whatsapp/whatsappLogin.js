@@ -565,7 +565,6 @@ const handleWhatsAppCallback = asyncHandler(async (req, res, next) => {
   }
 });
 
-
 //--------------- facebook user data deletion-------------------------------------
 const facebookDataDeletion = asyncHandler(async (req, res, next) => {
   const transaction = await sequelize.transaction();
